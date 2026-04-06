@@ -1,0 +1,37 @@
+{
+    "plugins\/alfred\/plugin_info\/configuration.php": {
+        "401 - Unauthorized access": "401 - Accès non autorisé",
+        "AI provider": "Fournisseur IA",
+        "API key": "Clé API",
+        "Ask me anything about your home automation system.": "Posez-moi n'importe quelle question sur votre domotique.",
+        "Configure Alfred in plugin settings to get started.": "Configurez Alfred dans les paramètres du plugin pour commencer.",
+        "Gemini API key": "Clé API Gemini",
+        "Hello, I'm Alfred.": "Bonjour, je suis Alfred.",
+        "JeedomMCP API key": "Clé API JeedomMCP",
+        "JeedomMCP URL": "URL JeedomMCP",
+        "Max agent iterations": "Itérations agent max",
+        "Model": "Modèle",
+        "Model used for this provider.": "Modèle utilisé pour ce fournisseur.",
+        "OpenAI API key": "Clé API OpenAI",
+        "Anthropic API key": "Clé API Anthropic",
+        "Provider": "Fournisseur",
+        "Select the AI provider to use.": "Sélectionnez le fournisseur IA à utiliser.",
+        "Settings": "Paramètres",
+        "System prompt": "Prompt système",
+        "The URL of your JeedomMCP endpoint (internal network recommended).": "URL de votre endpoint JeedomMCP (réseau interne recommandé).",
+        "URL automatically detected from JeedomMCP plugin.": "URL détectée automatiquement depuis le plugin JeedomMCP.",
+        "Maximum number of tool-call iterations before the agent stops.": "Nombre maximum d'itérations d'appels d'outils avant que l'agent s'arrête."
+    },
+    "plugins\/alfred\/desktop\/php\/alfred.php": {
+        "401 - Unauthorized access": "401 - Accès non autorisé",
+        "Ask me anything about your home automation system.": "Posez-moi n'importe quelle question sur votre domotique.",
+        "Configure Alfred in plugin settings to get started.": "Configurez Alfred dans les paramètres du plugin pour commencer.",
+        "Hello, I'm Alfred.": "Bonjour, je suis Alfred.",
+        "New conversation": "Nouvelle conversation",
+        "Open standalone chat": "Ouvrir le chat autonome",
+        "Send": "Envoyer",
+        "Today": "Aujourd'hui",
+        "Type a message…": "Tapez un message…",
+        "Yesterday": "Hier"
+    }
+}

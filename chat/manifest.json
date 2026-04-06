@@ -1,0 +1,17 @@
+{
+    "name": "Alfred — Jeedom AI",
+    "short_name": "Alfred",
+    "description": "AI assistant for your Jeedom home automation system.",
+    "start_url": "./index.php",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#ffffff",
+    "theme_color": "#337ab7",
+    "icons": [
+        {
+            "src": "../plugin_info/alfred_icon.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        }
+    ]
+}

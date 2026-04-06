@@ -1,0 +1,15 @@
+{
+    "id": "alfred",
+    "name": "Alfred",
+    "description": "AI agent integrated into Jeedom — chat with your home automation system powered by Claude, GPT-4o or Gemini. Uses JeedomMCP to act on your installation.",
+    "licence": "AGPL",
+    "author": "clement-cunin",
+    "require": "4.4",
+    "category": "communication",
+    "compatibility": ["smart", "atlas", "rpi", "diy", "v4"],
+    "hasDependency": false,
+    "hasOwnDeamon": false,
+    "changelog": "https://github.com/clement-cunin/JeedomAlfred/blob/main/CHANGELOG.md",
+    "documentation": "https://github.com/clement-cunin/JeedomAlfred/blob/main/docs/",
+    "link": "https://github.com/clement-cunin/JeedomAlfred"
+}
