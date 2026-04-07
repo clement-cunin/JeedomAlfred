@@ -160,6 +160,7 @@ $(function () {
         var url = 'plugins/alfred/api/chat.php'
             + '?session_id=' + encodeURIComponent(sessionId)
             + '&message='    + encodeURIComponent(text)
+            + '&user_hash='  + encodeURIComponent(alfred_config.userHash)
             + '&_=' + Date.now();
 
         var source = new EventSource(url);

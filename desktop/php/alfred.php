@@ -5,6 +5,7 @@ if (!isConnect()) {
 
 $_chatUrl      = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/alfred/chat/index.php';
 $_isConfigured = alfred::getApiKey() !== '' && alfred::getMcpApiKey() !== '';
+$_userHash     = connectedUser()->getHash();
 ?>
 <link rel="stylesheet" href="plugins/alfred/desktop/css/alfred.css">
 
@@ -68,6 +69,7 @@ $_isConfigured = alfred::getApiKey() !== '' && alfred::getMcpApiKey() !== '';
 <script>
 var alfred_config = {
     isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
+    userHash: "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
     i18n: {
         hello: "{{Hello, I'm Alfred.}}",
         ask:   "{{Ask me anything about your home automation system.}}"

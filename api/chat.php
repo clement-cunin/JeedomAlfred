@@ -28,8 +28,11 @@ set_time_limit(0);
 
 // ---- Auth ----
 if (!isConnect()) {
-    sse_event('error', ['message' => '401 - Unauthorized']);
-    exit;
+    $hash = trim(init('user_hash'));
+    if ($hash === '' || !user::byHash($hash)) {
+        sse_event('error', ['message' => '401 - Unauthorized']);
+        exit;
+    }
 }
 
 // ---- Input ----
