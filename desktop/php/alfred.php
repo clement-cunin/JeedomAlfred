@@ -5,7 +5,7 @@ if (!isConnect()) {
 
 $_chatUrl      = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/alfred/chat/index.php';
 $_isConfigured = alfred::getApiKey() !== '' && alfred::getMcpApiKey() !== '';
-$_userHash     = connectedUser()->getHash();
+$_userHash     = $_SESSION['user']->getHash();
 ?>
 <link rel="stylesheet" href="plugins/alfred/desktop/css/alfred.css">
 
