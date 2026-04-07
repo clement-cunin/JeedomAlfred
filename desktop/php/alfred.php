@@ -74,4 +74,6 @@ var alfred_config = {
     }
 };
 </script>
-<script src="plugins/alfred/desktop/js/alfred.js"></script>
+<script>
+<?php readfile(__DIR__ . '/../js/alfred.js'); ?>
+</script>
