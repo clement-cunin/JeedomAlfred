@@ -9,10 +9,33 @@ try {
 
     $action = init('action');
 
+    if ($action === 'testLLM') {
+        require_once __DIR__ . '/../class/alfred.class.php';
+        require_once __DIR__ . '/../class/alfredLLM.class.php';
+        // Accept form values directly (allows testing before saving)
+        $provider = init('provider') ?: alfred::getProvider();
+        $apiKey   = init('api_key')  ?: alfred::getApiKey($provider);
+        $model    = init('model')    ?: alfred::getModel($provider);
+        $llm = alfredLLM::make($provider, $apiKey, $model);
+        ajax::success($llm->testConnection());
+    }
+
+    if ($action === 'listModels') {
+        require_once __DIR__ . '/../class/alfred.class.php';
+        require_once __DIR__ . '/../class/alfredLLM.class.php';
+        $provider = init('provider');
+        $apiKey   = init('api_key');
+        if ($provider === '' || $apiKey === '') {
+            throw new Exception('Missing provider or api_key');
+        }
+        // Use a dummy model — listModels() doesn't use $this->model
+        $llm = alfredLLM::make($provider, $apiKey, 'none');
+        ajax::success($llm->listModels());
+    }
+
     if ($action === 'getSessions') {
-        // Returns conversation session list for the current user
-        // Implemented in Phase 4
-        ajax::success([]);
+        require_once __DIR__ . '/../class/alfredConversation.class.php';
+        ajax::success(alfredConversation::listSessions());
     }
 
     if ($action === 'deleteSession') {
@@ -20,8 +43,25 @@ try {
         if ($sessionId === '') {
             throw new Exception('Missing session_id');
         }
-        // Implemented in Phase 4
+        require_once __DIR__ . '/../class/alfredConversation.class.php';
+        alfredConversation::deleteSession($sessionId);
         ajax::success();
+    }
+
+    if ($action === 'renameSession') {
+        $sessionId = init('session_id');
+        $title     = init('title');
+        if ($sessionId === '') throw new Exception('Missing session_id');
+        require_once __DIR__ . '/../class/alfredConversation.class.php';
+        alfredConversation::updateSessionTitle($sessionId, $title);
+        ajax::success();
+    }
+
+    if ($action === 'getMessages') {
+        $sessionId = init('session_id');
+        if ($sessionId === '') throw new Exception('Missing session_id');
+        require_once __DIR__ . '/../class/alfredConversation.class.php';
+        ajax::success(alfredConversation::getMessages($sessionId));
     }
 
     throw new Exception(__('No method found for: ', __FILE__) . $action);

@@ -1,0 +1,143 @@
+<?php
+
+/**
+ * Lightweight MCP client for Alfred.
+ * Talks to JeedomMCP over streamable-http (JSON-RPC 2.0 over HTTP POST).
+ *
+ * Usage:
+ *   $mcp   = new alfredMCP($url, $apiKey);
+ *   $tools = $mcp->listTools();
+ *   $result = $mcp->callTool('devices_list', []);
+ */
+class alfredMCP
+{
+    private string $url;
+    private string $apiKey;
+    private int    $timeout;
+    private ?array $cachedTools = null;
+
+    public function __construct(string $url = '', string $apiKey = '', int $timeout = 20)
+    {
+        $this->url     = $url     !== '' ? $url     : alfred::getMcpUrl();
+        $this->apiKey  = $apiKey  !== '' ? $apiKey  : alfred::getMcpApiKey();
+        $this->timeout = $timeout;
+    }
+
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the list of available MCP tools.
+     * Result is cached for the lifetime of this instance.
+     */
+    public function listTools(): array
+    {
+        if ($this->cachedTools !== null) {
+            return $this->cachedTools;
+        }
+
+        $response = $this->send('tools/list', new stdClass());
+        $tools = $response['tools'] ?? [];
+
+        // Normalize: keep name, description, inputSchema
+        $this->cachedTools = array_map(function ($t) {
+            return [
+                'name'        => $t['name'],
+                'description' => $t['description'] ?? '',
+                'inputSchema' => $t['inputSchema'] ?? ['type' => 'object', 'properties' => []],
+            ];
+        }, $tools);
+
+        return $this->cachedTools;
+    }
+
+    /**
+     * Call a single MCP tool and return its result as a PHP value.
+     */
+    public function callTool(string $name, array $arguments)
+    {
+        $response = $this->send('tools/call', [
+            'name'      => $name,
+            'arguments' => $arguments,
+        ]);
+
+        // MCP tool result: {content: [{type:'text', text:'...'}], isError: bool}
+        if (!empty($response['isError'])) {
+            $errText = $this->extractText($response['content'] ?? []);
+            throw new Exception("MCP tool '{$name}' returned an error: {$errText}");
+        }
+
+        $text = $this->extractText($response['content'] ?? []);
+
+        // Try to decode JSON (most MCP tools return JSON strings)
+        $decoded = json_decode($text, true);
+        return $decoded !== null ? $decoded : $text;
+    }
+
+    // -------------------------------------------------------------------------
+    // JSON-RPC transport
+    // -------------------------------------------------------------------------
+
+    private function send(string $method, $params): array
+    {
+        if ($this->url === '') {
+            throw new Exception('JeedomMCP URL is not configured.');
+        }
+        if ($this->apiKey === '') {
+            throw new Exception('JeedomMCP API key is not configured.');
+        }
+
+        $payload = json_encode([
+            'jsonrpc' => '2.0',
+            'id'      => 1,
+            'method'  => $method,
+            'params'  => $params,
+        ]);
+
+        $ch = curl_init($this->url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+                'X-API-Key: ' . $this->apiKey,
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $this->timeout,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false) {
+            throw new Exception("MCP HTTP request failed: {$err}");
+        }
+
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            throw new Exception("MCP invalid JSON response (HTTP {$code}): " . substr($raw, 0, 200));
+        }
+        if (isset($data['error'])) {
+            $msg = $data['error']['message'] ?? json_encode($data['error']);
+            throw new Exception("MCP error: {$msg}");
+        }
+
+        return $data['result'] ?? [];
+    }
+
+    private function extractText(array $content): string
+    {
+        $parts = [];
+        foreach ($content as $block) {
+            if (($block['type'] ?? '') === 'text') {
+                $parts[] = $block['text'];
+            }
+        }
+        return implode("\n", $parts);
+    }
+}

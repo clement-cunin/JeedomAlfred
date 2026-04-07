@@ -15,7 +15,7 @@ class alfred extends eqLogic {
         $defaults = [
             'anthropic_model' => 'claude-sonnet-4-6',
             'openai_model'    => 'gpt-4o',
-            'gemini_model'    => 'gemini-2.0-flash',
+            'gemini_model'    => 'gemini-1.5-pro',
             'max_iterations'  => '10',
             'system_prompt'   => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
         ];

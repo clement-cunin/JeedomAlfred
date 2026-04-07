@@ -1,0 +1,153 @@
+<?php
+
+class alfredLLMGeminiAdapter extends alfredLLMAdapter
+{
+    private const API_BASE   = 'https://generativelanguage.googleapis.com/v1beta/models';
+    private const MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+    public function chat(array $messages, array $tools, string $systemPrompt): array
+    {
+        $url  = self::API_BASE . '/' . urlencode($this->model) . ':generateContent?key=' . urlencode($this->apiKey);
+        $body = ['contents' => $this->toGeminiContents($messages)];
+        if ($systemPrompt !== '') {
+            $body['system_instruction'] = ['parts' => [['text' => $systemPrompt]]];
+        }
+        if (!empty($tools)) {
+            $body['tools'] = [['function_declarations' => $this->toGeminiFunctions($tools)]];
+        }
+
+        $data = $this->httpPost($url, ['Content-Type: application/json'], $body);
+
+        return $this->normalize($data);
+    }
+
+    public function testConnection(): array
+    {
+        $url  = self::API_BASE . '/' . urlencode($this->model) . ':generateContent?key=' . urlencode($this->apiKey);
+        $body = ['contents' => [['role' => 'user', 'parts' => [['text' => 'Hi']]]]];
+        $this->httpPost($url, ['Content-Type: application/json'], $body, 15);
+        return ['ok' => true, 'provider' => 'gemini', 'model' => $this->model];
+    }
+
+    public function listModels(): array
+    {
+        $url = self::MODELS_URL . '?key=' . urlencode($this->apiKey) . '&pageSize=100';
+        $ch  = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $data = json_decode($raw, true);
+        if ($code >= 400 || !isset($data['models'])) {
+            throw new Exception('Gemini models API error (HTTP ' . $code . ')');
+        }
+
+        $models = [];
+        foreach ($data['models'] as $m) {
+            // Must support generateContent
+            $methods = $m['supportedGenerationMethods'] ?? [];
+            if (!in_array('generateContent', $methods, true)) continue;
+
+            $id = preg_replace('#^models/#', '', $m['name'] ?? '');
+            if ($id === '') continue;
+
+            // Must start with gemini-X.Y-(pro|flash)
+            if (!preg_match('/^gemini-\d+\.\d+-(pro|flash)/', $id)) continue;
+
+            $displayName = $m['displayName'] ?? $id;
+
+            // Exclude non-chat sub-variants — check both ID and display name
+            $excludePattern = '/nano|banana|lite|embedding|vision|aqa|thinking-exp/i';
+            if (preg_match($excludePattern, $id) || preg_match($excludePattern, $displayName)) continue;
+
+            $models[] = ['id' => $id, 'name' => $displayName];
+        }
+        usort($models, fn($a, $b) => strcmp($b['id'], $a['id']));
+        return $models;
+    }
+
+    // -------------------------------------------------------------------------
+
+    private function toGeminiContents(array $messages): array
+    {
+        $out = [];
+        foreach ($messages as $msg) {
+            $role = $msg['role'];
+
+            if ($role === 'user') {
+                $out[] = ['role' => 'user', 'parts' => [['text' => $msg['content']]]];
+
+            } elseif ($role === 'assistant') {
+                $parts = [];
+                if (!empty($msg['content'])) {
+                    $parts[] = ['text' => $msg['content']];
+                }
+                foreach ($msg['tool_calls'] ?? [] as $tc) {
+                    $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $tc['input']]];
+                }
+                $out[] = ['role' => 'model', 'parts' => $parts];
+
+            } elseif ($role === 'tool') {
+                $result = json_decode($msg['content'], true) ?? $msg['content'];
+                $out[] = [
+                    'role'  => 'user',
+                    'parts' => [[
+                        'functionResponse' => [
+                            'name'     => $msg['name'],
+                            'response' => ['content' => $result],
+                        ],
+                    ]],
+                ];
+            }
+        }
+        return $out;
+    }
+
+    private function toGeminiFunctions(array $tools): array
+    {
+        return array_map(function ($t) {
+            $schema = $t['inputSchema'] ?? ['type' => 'object', 'properties' => new stdClass()];
+            // Gemini requires properties to be an object, not an empty array
+            if (isset($schema['properties']) && empty($schema['properties'])) {
+                $schema['properties'] = new stdClass();
+            }
+            return [
+                'name'        => $t['name'],
+                'description' => $t['description'] ?? '',
+                'parameters'  => $schema,
+            ];
+        }, $tools);
+    }
+
+    private function normalize(array $data): array
+    {
+        $candidate  = $data['candidates'][0] ?? [];
+        $parts      = $candidate['content']['parts'] ?? [];
+        $text       = '';
+        $tool_calls = [];
+
+        foreach ($parts as $part) {
+            if (isset($part['text'])) {
+                $text .= $part['text'];
+            } elseif (isset($part['functionCall'])) {
+                $tool_calls[] = [
+                    'id'    => uniqid('gemini_', true), // Gemini has no call IDs
+                    'name'  => $part['functionCall']['name'],
+                    'input' => $part['functionCall']['args'] ?? [],
+                ];
+            }
+        }
+
+        $finishReason = $candidate['finishReason'] ?? 'STOP';
+
+        return [
+            'text'        => trim($text),
+            'tool_calls'  => $tool_calls,
+            'stop_reason' => !empty($tool_calls) ? 'tool_use' : 'end_turn',
+        ];
+    }
+}

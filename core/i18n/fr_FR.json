@@ -18,8 +18,12 @@
         "Select the AI provider to use.": "Sélectionnez le fournisseur IA à utiliser.",
         "Settings": "Paramètres",
         "System prompt": "Prompt système",
-        "The URL of your JeedomMCP endpoint (internal network recommended).": "URL de votre endpoint JeedomMCP (réseau interne recommandé).",
-        "URL automatically detected from JeedomMCP plugin.": "URL détectée automatiquement depuis le plugin JeedomMCP.",
+        "Auto-detect from JeedomMCP plugin": "Récupérer depuis le plugin JeedomMCP",
+        "Enter the API key first.": "Saisissez d'abord la clé API.",
+        "Loading…": "Chargement…",
+        "Test LLM connection": "Tester la connexion LLM",
+        "Internal network URL recommended.": "URL réseau interne recommandée.",
+        "JeedomMCP settings auto-detected.": "Paramètres JeedomMCP récupérés automatiquement.",
         "Maximum number of tool-call iterations before the agent stops.": "Nombre maximum d'itérations d'appels d'outils avant que l'agent s'arrête."
     },
     "plugins\/alfred\/desktop\/php\/alfred.php": {

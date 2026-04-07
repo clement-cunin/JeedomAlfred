@@ -3,9 +3,11 @@ if (!isConnect()) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
 
-$_chatUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/alfred/chat/index.php';
+$_chatUrl      = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/alfred/chat/index.php';
 $_isConfigured = alfred::getApiKey() !== '' && alfred::getMcpApiKey() !== '';
 ?>
+<link rel="stylesheet" href="plugins/alfred/desktop/css/alfred.css">
+
 <div id="alfred-app">
 
     <!-- Sidebar: conversation list -->
@@ -15,13 +17,11 @@ $_isConfigured = alfred::getApiKey() !== '' && alfred::getMcpApiKey() !== '';
                 <i class="fas fa-plus"></i> <span class="alfred-label">{{New conversation}}</span>
             </button>
         </div>
-        <div id="alfred-conversations">
-            <!-- Populated by JS in Phase 4 -->
-        </div>
+        <div id="alfred-conversations"></div>
     </div>
 
     <!-- Toggle sidebar on mobile -->
-    <button id="alfred-sidebar-toggle" title="{{New conversation}}">
+    <button id="alfred-sidebar-toggle" title="Menu">
         <i class="fas fa-bars"></i>
     </button>
 
@@ -64,3 +64,14 @@ $_isConfigured = alfred::getApiKey() !== '' && alfred::getMcpApiKey() !== '';
 
     </div>
 </div>
+
+<script>
+var alfred_config = {
+    isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
+    i18n: {
+        hello: "{{Hello, I'm Alfred.}}",
+        ask:   "{{Ask me anything about your home automation system.}}"
+    }
+};
+</script>
+<script src="plugins/alfred/desktop/js/alfred.js"></script>
