@@ -25,6 +25,112 @@ class alfredLLMAnthropicAdapter extends alfredLLMAdapter
         return $this->normalize($data);
     }
 
+    public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
+    {
+        $body = [
+            'model'      => $this->model,
+            'max_tokens' => 4096,
+            'stream'     => true,
+            'messages'   => $this->toAnthropicMessages($messages),
+        ];
+        if ($systemPrompt !== '') {
+            $body['system'] = $systemPrompt;
+        }
+        if (!empty($tools)) {
+            $body['tools'] = $this->toAnthropicTools($tools);
+        }
+
+        $text        = '';
+        $tool_blocks = []; // index => ['id', 'name', 'json']
+        $stop_reason = 'end_turn';
+        $buffer      = '';
+        $error_body  = '';
+
+        $ch = curl_init(self::API_URL);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($body),
+            CURLOPT_HTTPHEADER     => $this->headers(),
+            CURLOPT_TIMEOUT        => 120,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_WRITEFUNCTION  => function ($ch, $raw) use (&$buffer, &$text, &$tool_blocks, &$stop_reason, &$error_body, $onDelta) {
+                $buffer .= $raw;
+                while (($pos = strpos($buffer, "\n")) !== false) {
+                    $line   = rtrim(substr($buffer, 0, $pos), "\r");
+                    $buffer = substr($buffer, $pos + 1);
+
+                    if ($line === '' || substr($line, 0, 7) === 'event: ') continue;
+                    if (substr($line, 0, 6) !== 'data: ') {
+                        $error_body .= $line;
+                        continue;
+                    }
+
+                    $d = json_decode(substr($line, 6), true);
+                    if (!is_array($d)) continue;
+
+                    $type = $d['type'] ?? '';
+
+                    if ($type === 'content_block_start') {
+                        $block = $d['content_block'] ?? [];
+                        if (($block['type'] ?? '') === 'tool_use') {
+                            $idx = $d['index'] ?? 0;
+                            $tool_blocks[$idx] = [
+                                'id'   => $block['id']   ?? '',
+                                'name' => $block['name'] ?? '',
+                                'json' => '',
+                            ];
+                        }
+                    } elseif ($type === 'content_block_delta') {
+                        $delta = $d['delta'] ?? [];
+                        $idx   = $d['index'] ?? 0;
+                        if (($delta['type'] ?? '') === 'text_delta') {
+                            $chunk  = $delta['text'] ?? '';
+                            $text  .= $chunk;
+                            $onDelta($chunk);
+                        } elseif (($delta['type'] ?? '') === 'input_json_delta') {
+                            if (isset($tool_blocks[$idx])) {
+                                $tool_blocks[$idx]['json'] .= $delta['partial_json'] ?? '';
+                            }
+                        }
+                    } elseif ($type === 'message_delta') {
+                        $stop_reason = $d['delta']['stop_reason'] ?? 'end_turn';
+                    } elseif ($type === 'error') {
+                        $error_body = $d['error']['message'] ?? json_encode($d['error'] ?? $d);
+                    }
+                }
+                return strlen($raw);
+            },
+        ]);
+
+        curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
+        curl_close($ch);
+
+        if ($err) {
+            throw new Exception("HTTP request failed: {$err}");
+        }
+        if ($code >= 400) {
+            $msg = $error_body !== '' ? $error_body : "HTTP {$code}";
+            throw new Exception("Anthropic API error: {$msg}");
+        }
+
+        $tool_calls = [];
+        foreach ($tool_blocks as $block) {
+            $tool_calls[] = [
+                'id'    => $block['id'],
+                'name'  => $block['name'],
+                'input' => json_decode($block['json'], true) ?? [],
+            ];
+        }
+
+        return [
+            'text'        => trim($text),
+            'tool_calls'  => $tool_calls,
+            'stop_reason' => ($stop_reason === 'tool_use') ? 'tool_use' : 'end_turn',
+        ];
+    }
+
     public function testConnection(): array
     {
         $body = [

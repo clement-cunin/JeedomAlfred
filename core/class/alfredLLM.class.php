@@ -43,6 +43,17 @@ abstract class alfredLLMAdapter
     abstract public function chat(array $messages, array $tools, string $systemPrompt): array;
 
     /**
+     * Stream a conversation turn, calling $onDelta for each text chunk as it arrives.
+     *
+     * @param array    $messages     Internal format messages array
+     * @param array    $tools        MCP tool definitions [{name, description, inputSchema}]
+     * @param string   $systemPrompt System prompt
+     * @param callable $onDelta      Called with each text chunk: $onDelta(string $chunk)
+     * @return array Normalized response {text, tool_calls, stop_reason} (same as chat())
+     */
+    abstract public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array;
+
+    /**
      * Check that the API key and model are valid (lightweight call).
      * Returns ['ok' => true] or throws an Exception.
      */

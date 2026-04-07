@@ -21,6 +21,25 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
         return $this->normalize($data);
     }
 
+    public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
+    {
+        // Gemini has no SSE streaming for generateContent — call regular endpoint
+        // and simulate chunk-by-chunk delivery by splitting the response into words.
+        $response = $this->chat($messages, $tools, $systemPrompt);
+
+        if ($response['text'] !== '') {
+            // Split on whitespace, preserving delimiters so spacing is retained
+            $parts = preg_split('/(\s+)/', $response['text'], -1, PREG_SPLIT_DELIM_CAPTURE);
+            foreach ($parts as $part) {
+                if ($part !== '') {
+                    $onDelta($part);
+                }
+            }
+        }
+
+        return $response;
+    }
+
     public function testConnection(): array
     {
         $url  = self::API_BASE . '/' . urlencode($this->model) . ':generateContent?key=' . urlencode($this->apiKey);

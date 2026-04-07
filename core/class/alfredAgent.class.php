@@ -80,13 +80,15 @@ class alfredAgent
         while ($iterations < $this->maxIterations) {
             $iterations++;
 
-            $response = $this->llm->chat($messages, $tools, $this->systemPrompt);
+            $onDelta  = function (string $chunk): void {
+                $this->emit('delta', ['text' => $chunk]);
+            };
+            $response = $this->llm->chatStream($messages, $tools, $this->systemPrompt, $onDelta);
 
             if ($response['stop_reason'] === 'end_turn' || empty($response['tool_calls'])) {
-                // Final text response
+                // Final text response — delta events were already emitted chunk by chunk
                 $finalText = $response['text'];
                 alfredConversation::saveAssistantResponse($sessionId, $response);
-                $this->emit('delta', ['text' => $finalText]);
                 break;
             }
 
