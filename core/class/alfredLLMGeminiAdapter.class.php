@@ -106,7 +106,9 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
                     $parts[] = ['text' => $msg['content']];
                 }
                 foreach ($msg['tool_calls'] ?? [] as $tc) {
-                    $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $tc['input']]];
+                    // args must be a JSON object, never an array
+                    $args    = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
+                    $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $args]];
                 }
                 $out[] = ['role' => 'model', 'parts' => $parts];
 
