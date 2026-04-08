@@ -191,6 +191,8 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
 
         foreach ($parts as $part) {
             if (isset($part['text'])) {
+                // Skip internal reasoning (thinking models return thought: true)
+                if (!empty($part['thought'])) continue;
                 $text .= $part['text'];
             } elseif (isset($part['functionCall'])) {
                 $tool_calls[] = [
