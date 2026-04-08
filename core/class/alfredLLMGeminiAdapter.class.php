@@ -130,16 +130,54 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
     {
         return array_map(function ($t) {
             $schema = $t['inputSchema'] ?? ['type' => 'object', 'properties' => new stdClass()];
-            // Gemini requires properties to be an object, not an empty array
-            if (isset($schema['properties']) && empty($schema['properties'])) {
-                $schema['properties'] = new stdClass();
-            }
+            $schema = $this->sanitizeSchema($schema);
             return [
                 'name'        => $t['name'],
                 'description' => $t['description'] ?? '',
                 'parameters'  => $schema,
             ];
         }, $tools);
+    }
+
+    /**
+     * Recursively sanitize a JSON Schema for Gemini:
+     * - Empty properties array → stdClass
+     * - Array type with missing/empty items → items: {type: string}
+     * - Remove unsupported keywords (default, examples, $schema, additionalProperties)
+     */
+    private function sanitizeSchema($schema): array
+    {
+        if (!is_array($schema)) {
+            return ['type' => 'string'];
+        }
+
+        // Remove keywords Gemini does not support
+        foreach (['default', 'examples', '$schema', 'additionalProperties', '$defs', 'definitions'] as $key) {
+            unset($schema[$key]);
+        }
+
+        // Fix empty properties
+        if (isset($schema['properties']) && empty($schema['properties'])) {
+            $schema['properties'] = new stdClass();
+        }
+
+        // Recurse into properties
+        if (isset($schema['properties']) && is_array($schema['properties'])) {
+            foreach ($schema['properties'] as $k => $v) {
+                $schema['properties'][$k] = $this->sanitizeSchema($v);
+            }
+        }
+
+        // Fix array items
+        if (($schema['type'] ?? '') === 'array') {
+            if (empty($schema['items'])) {
+                $schema['items'] = ['type' => 'string'];
+            } else {
+                $schema['items'] = $this->sanitizeSchema($schema['items']);
+            }
+        }
+
+        return $schema;
     }
 
     private function normalize(array $data): array
