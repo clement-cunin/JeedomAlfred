@@ -118,6 +118,8 @@ class alfredMCP
             throw new Exception("MCP HTTP request failed: {$err}");
         }
 
+        // Strip UTF-8 BOM if present (some PHP setups emit it)
+        $raw  = ltrim($raw, "\xEF\xBB\xBF");
         $data = json_decode($raw, true);
         if (!is_array($data)) {
             throw new Exception("MCP invalid JSON response (HTTP {$code}): " . substr($raw, 0, 200));
