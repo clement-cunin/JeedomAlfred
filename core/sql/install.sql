@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `alfred_conversation` (
 CREATE TABLE IF NOT EXISTS `alfred_message` (
   `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   `session_id` VARCHAR(36)   NOT NULL,
-  `role`       ENUM('user','assistant','tool_result') NOT NULL,
+  `role`       ENUM('user','assistant','tool') NOT NULL,
   `content`    LONGTEXT      NOT NULL,
   `metadata`   JSON          DEFAULT NULL,
   `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
