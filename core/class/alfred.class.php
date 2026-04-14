@@ -46,7 +46,12 @@ class alfred extends eqLogic {
         require_once __DIR__ . '/alfredMCP.class.php';
         require_once __DIR__ . '/alfredConversation.class.php';
         require_once __DIR__ . '/alfredAgent.class.php';
-        alfredScheduler::processPending();
+        try {
+            alfredScheduler::processPending();
+        } catch (Exception $e) {
+            // Table may not exist yet during install/update — silently skip
+            log::add('alfred', 'debug', 'cron: alfredScheduler skipped — ' . $e->getMessage());
+        }
     }
 
     // -------------------------------------------------------------------------
