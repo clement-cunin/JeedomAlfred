@@ -107,8 +107,13 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
                 }
                 foreach ($msg['tool_calls'] ?? [] as $tc) {
                     // args must be a JSON object, never an array
-                    $args    = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
-                    $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $args]];
+                    $args  = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
+                    $part  = ['functionCall' => ['name' => $tc['name'], 'args' => $args]];
+                    // Re-include thoughtSignature required by thinking models
+                    if (!empty($tc['thoughtSignature'])) {
+                        $part['thoughtSignature'] = $tc['thoughtSignature'];
+                    }
+                    $parts[] = $part;
                 }
                 $out[] = ['role' => 'model', 'parts' => $parts];
 
@@ -195,11 +200,17 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
                 if (!empty($part['thought'])) continue;
                 $text .= $part['text'];
             } elseif (isset($part['functionCall'])) {
-                $tool_calls[] = [
+                $tc = [
                     'id'    => uniqid('gemini_', true), // Gemini has no call IDs
                     'name'  => $part['functionCall']['name'],
                     'input' => $part['functionCall']['args'] ?? [],
                 ];
+                // Thinking models attach a thoughtSignature to functionCall parts.
+                // It must be preserved and re-sent in conversation history.
+                if (isset($part['thoughtSignature'])) {
+                    $tc['thoughtSignature'] = $part['thoughtSignature'];
+                }
+                $tool_calls[] = $tc;
             }
         }
 
