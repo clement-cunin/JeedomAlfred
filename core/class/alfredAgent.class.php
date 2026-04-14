@@ -17,6 +17,9 @@
  *   delta      — LLM text chunk                   {text}
  *   done       — turn complete                    {text, iterations}
  *   error      — fatal error                      {message}
+ *
+ * Synthetic tools (handled locally, never forwarded to MCP):
+ *   alfred_schedule — schedule a deferred re-invocation of the agent
  */
 class alfredAgent
 {
@@ -37,6 +40,38 @@ class alfredAgent
         $this->maxIterations = alfred::getMaxIterations();
         $this->systemPrompt  = alfred::getSystemPrompt();
         $this->onEvent       = $onEvent;
+    }
+
+    // -------------------------------------------------------------------------
+    // Synthetic tool definitions
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the alfred_schedule tool schema in Alfred's canonical format.
+     * It is injected alongside MCP tools so the LLM can discover and call it.
+     */
+    private static function scheduleTool(): array
+    {
+        return [
+            'name'        => 'alfred_schedule',
+            'description' => 'Schedule a deferred instruction to be executed after a delay.'
+                           . ' Use this when the user asks to do something "in N minutes/hours".'
+                           . ' Alfred will re-invoke itself at the right time and execute the instruction.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'delay_seconds' => [
+                        'type'        => 'integer',
+                        'description' => 'Delay in seconds before re-invocation.',
+                    ],
+                    'instruction' => [
+                        'type'        => 'string',
+                        'description' => 'What to do when woken up (e.g. "Turn off the living room light").',
+                    ],
+                ],
+                'required' => ['delay_seconds', 'instruction'],
+            ],
+        ];
     }
 
     // -------------------------------------------------------------------------
@@ -64,7 +99,7 @@ class alfredAgent
         // Load full history
         $messages = alfredConversation::getMessages($sessionId);
 
-        // Fetch available tools from JeedomMCP
+        // Fetch available tools from JeedomMCP and inject synthetic tools
         $tools = [];
         try {
             $tools = $this->mcp->listTools();
@@ -72,6 +107,8 @@ class alfredAgent
             // Non-fatal: agent works without tools (degraded mode)
             $this->emit('error', ['message' => 'JeedomMCP unavailable: ' . $e->getMessage()]);
         }
+        // Prepend synthetic tools so they appear first in the list
+        array_unshift($tools, self::scheduleTool());
 
         // ReAct loop
         $finalText  = '';
@@ -110,10 +147,15 @@ class alfredAgent
             foreach ($response['tool_calls'] as $tc) {
                 $this->emit('tool_call', ['name' => $tc['name'], 'input' => $tc['input']]);
 
-                try {
-                    $result = $this->mcp->callTool($tc['name'], $tc['input']);
-                } catch (Exception $e) {
-                    $result = ['error' => $e->getMessage()];
+                // Intercept synthetic tools before forwarding to MCP
+                if ($tc['name'] === 'alfred_schedule') {
+                    $result = $this->handleScheduleTool($sessionId, $tc['input']);
+                } else {
+                    try {
+                        $result = $this->mcp->callTool($tc['name'], $tc['input']);
+                    } catch (Exception $e) {
+                        $result = ['error' => $e->getMessage()];
+                    }
                 }
 
                 $resultStr = is_array($result)
@@ -141,6 +183,26 @@ class alfredAgent
         $this->emit('done', ['text' => $finalText, 'iterations' => $iterations]);
 
         return $finalText;
+    }
+
+    // -------------------------------------------------------------------------
+    // Synthetic tool handlers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Handle a call to the synthetic alfred_schedule tool.
+     * Delegates to alfredScheduler and returns a confirmation string.
+     */
+    private function handleScheduleTool(string $sessionId, array $input): string
+    {
+        $delaySeconds = (int)($input['delay_seconds'] ?? 0);
+        $instruction  = trim((string)($input['instruction'] ?? ''));
+
+        if ($delaySeconds <= 0 || $instruction === '') {
+            return 'Error: delay_seconds must be positive and instruction must not be empty.';
+        }
+
+        return alfredScheduler::schedule($sessionId, $delaySeconds, $instruction);
     }
 
     // -------------------------------------------------------------------------

@@ -38,7 +38,16 @@ class alfred extends eqLogic {
         }
     }
 
-    public static function cron() {}
+    public static function cron() {
+        // Process any scheduled wakeups whose run_at has been reached (cron strategy only;
+        // background-strategy schedules run in their own spawned process).
+        require_once __DIR__ . '/alfredScheduler.class.php';
+        require_once __DIR__ . '/alfredLLM.class.php';
+        require_once __DIR__ . '/alfredMCP.class.php';
+        require_once __DIR__ . '/alfredConversation.class.php';
+        require_once __DIR__ . '/alfredAgent.class.php';
+        alfredScheduler::processPending();
+    }
 
     // -------------------------------------------------------------------------
     // Config helpers
