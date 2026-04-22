@@ -24,17 +24,35 @@ class alfred extends eqLogic {
                 config::save($key, $value, __CLASS__);
             }
         }
-        // Auto-detect JeedomMCP internal URL if not set
-        if (config::byKey('mcp_url', __CLASS__) === '') {
-            $internalUrl = network::getNetworkAccess('internal', 'proto:ip:port:comp');
-            config::save('mcp_url', $internalUrl . '/plugins/jeedomMCP/api/mcp.php', __CLASS__);
-        }
-        // Mirror JeedomMCP API key if available and not set
-        if (config::byKey('mcp_api_key', __CLASS__) === '') {
-            $mcpKey = config::byKey('mcpApiKey', 'jeedomMCP');
-            if ($mcpKey !== '') {
-                config::save('mcp_api_key', $mcpKey, __CLASS__);
+
+        // Migrate legacy mcp_url / mcp_api_key to the new mcp_servers list
+        if (config::byKey('mcp_servers', __CLASS__) === '') {
+            $oldUrl    = config::byKey('mcp_url', __CLASS__);
+            $oldApiKey = config::byKey('mcp_api_key', __CLASS__);
+
+            // Auto-detect JeedomMCP internal URL if not already set
+            if ($oldUrl === '') {
+                $oldUrl = network::getNetworkAccess('internal', 'proto:ip:port:comp')
+                        . '/plugins/jeedomMCP/api/mcp.php';
             }
+            // Mirror JeedomMCP API key if available
+            if ($oldApiKey === '') {
+                $oldApiKey = (string)config::byKey('mcpApiKey', 'jeedomMCP');
+            }
+
+            $servers = [];
+            if ($oldUrl !== '') {
+                $servers[] = [
+                    'name'         => 'JeedomMCP',
+                    'slug'         => 'jeedom',
+                    'url'          => $oldUrl,
+                    'auth_header'  => 'X-API-Key',
+                    'auth_value'   => $oldApiKey,
+                    'prefix_tools' => false,
+                    'enabled'      => true,
+                ];
+            }
+            config::save('mcp_servers', json_encode($servers), __CLASS__);
         }
     }
 
@@ -62,12 +80,13 @@ class alfred extends eqLogic {
         return (string)config::byKey($provider . '_model', __CLASS__);
     }
 
-    public static function getMcpUrl(): string {
-        return (string)config::byKey('mcp_url', __CLASS__);
-    }
-
-    public static function getMcpApiKey(): string {
-        return (string)config::byKey('mcp_api_key', __CLASS__);
+    public static function getMcpServers(): array {
+        $json = (string)config::byKey('mcp_servers', __CLASS__);
+        if ($json === '') {
+            return [];
+        }
+        $servers = json_decode($json, true);
+        return is_array($servers) ? $servers : [];
     }
 
     public static function getSystemPrompt(): string {
