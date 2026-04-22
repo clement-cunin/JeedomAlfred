@@ -50,6 +50,7 @@ if ($sessionId === '' || $message === '') {
 require_once __DIR__ . '/../core/class/alfred.class.php';
 require_once __DIR__ . '/../core/class/alfredLLM.class.php';
 require_once __DIR__ . '/../core/class/alfredMCP.class.php';
+require_once __DIR__ . '/../core/class/alfredMCPRegistry.class.php';
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
 require_once __DIR__ . '/../core/class/alfredAgent.class.php';
 

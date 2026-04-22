@@ -9,6 +9,22 @@ try {
 
     $action = init('action');
 
+    if ($action === 'testMCP') {
+        require_once __DIR__ . '/../class/alfredMCP.class.php';
+        $url        = init('url');
+        $authHeader = init('auth_header') ?: 'X-API-Key';
+        $authValue  = init('auth_value');
+        if ($url === '') {
+            throw new Exception('Missing url');
+        }
+        $mcp   = new alfredMCP($url, $authHeader, $authValue);
+        $tools = $mcp->listTools();
+        ajax::success([
+            'count' => count($tools),
+            'tools' => array_column($tools, 'name'),
+        ]);
+    }
+
     if ($action === 'testLLM') {
         require_once __DIR__ . '/../class/alfred.class.php';
         require_once __DIR__ . '/../class/alfredLLM.class.php';

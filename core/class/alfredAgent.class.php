@@ -4,8 +4,8 @@
  * Alfred ReAct agent loop.
  *
  * Orchestrates:
- *   - alfredLLM   : sends messages to the LLM, gets back text or tool calls
- *   - alfredMCP   : executes tool calls against JeedomMCP
+ *   - alfredLLM          : sends messages to the LLM, gets back text or tool calls
+ *   - alfredMCPRegistry  : aggregates tools from all enabled MCP servers and routes calls
  *   - alfredConversation : persists every turn
  *
  * The caller supplies an optional $onEvent callback to receive real-time events:
@@ -20,23 +20,30 @@
  */
 class alfredAgent
 {
-    private alfredLLMAdapter $llm;
-    private alfredMCP        $mcp;
-    private int              $maxIterations;
-    private string           $systemPrompt;
+    private alfredLLMAdapter   $llm;
+    private alfredMCPRegistry  $registry;
+    private int                $maxIterations;
+    private string             $systemPrompt;
     /** @var callable|null */
     private $onEvent;
 
     public function __construct(
-        ?alfredLLMAdapter $llm   = null,
-        ?alfredMCP        $mcp   = null,
-        ?callable         $onEvent = null
+        ?alfredLLMAdapter  $llm      = null,
+        ?alfredMCPRegistry $registry = null,
+        ?callable          $onEvent  = null
     ) {
-        $this->llm           = $llm   ?? alfredLLM::make();
-        $this->mcp           = $mcp   ?? new alfredMCP();
+        $this->llm           = $llm      ?? alfredLLM::make();
         $this->maxIterations = alfred::getMaxIterations();
         $this->systemPrompt  = alfred::getSystemPrompt();
         $this->onEvent       = $onEvent;
+
+        if ($registry !== null) {
+            $this->registry = $registry;
+        } else {
+            $this->registry = alfredMCPRegistry::fromConfig(function (string $msg): void {
+                $this->emit('error', ['message' => $msg]);
+            });
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -64,14 +71,8 @@ class alfredAgent
         // Load full history
         $messages = alfredConversation::getMessages($sessionId);
 
-        // Fetch available tools from JeedomMCP
-        $tools = [];
-        try {
-            $tools = $this->mcp->listTools();
-        } catch (Exception $e) {
-            // Non-fatal: agent works without tools (degraded mode)
-            $this->emit('error', ['message' => 'JeedomMCP unavailable: ' . $e->getMessage()]);
-        }
+        // Fetch aggregated tool list from all enabled MCP servers
+        $tools = $this->registry->listTools();
 
         // ReAct loop
         $finalText  = '';
@@ -107,7 +108,7 @@ class alfredAgent
                 $this->emit('tool_call', ['name' => $tc['name'], 'input' => $tc['input']]);
 
                 try {
-                    $result = $this->mcp->callTool($tc['name'], $tc['input']);
+                    $result = $this->registry->callTool($tc['name'], $tc['input']);
                 } catch (Exception $e) {
                     $result = ['error' => $e->getMessage()];
                 }
