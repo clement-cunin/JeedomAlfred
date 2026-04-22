@@ -2,25 +2,31 @@
 
 /**
  * Lightweight MCP client for Alfred.
- * Talks to JeedomMCP over streamable-http (JSON-RPC 2.0 over HTTP POST).
+ * Talks to an MCP server over streamable-http (JSON-RPC 2.0 over HTTP POST).
  *
  * Usage:
- *   $mcp   = new alfredMCP($url, $apiKey);
+ *   $mcp   = new alfredMCP($url, 'X-API-Key', $apiKey);
  *   $tools = $mcp->listTools();
  *   $result = $mcp->callTool('devices_list', []);
  */
 class alfredMCP
 {
     private string $url;
-    private string $apiKey;
+    private string $authHeader;
+    private string $authValue;
     private int    $timeout;
     private ?array $cachedTools = null;
 
-    public function __construct(string $url = '', string $apiKey = '', int $timeout = 20)
-    {
-        $this->url     = $url     !== '' ? $url     : alfred::getMcpUrl();
-        $this->apiKey  = $apiKey  !== '' ? $apiKey  : alfred::getMcpApiKey();
-        $this->timeout = $timeout;
+    public function __construct(
+        string $url        = '',
+        string $authHeader = 'X-API-Key',
+        string $authValue  = '',
+        int    $timeout    = 20
+    ) {
+        $this->url        = $url;
+        $this->authHeader = $authHeader !== '' ? $authHeader : 'X-API-Key';
+        $this->authValue  = $authValue;
+        $this->timeout    = $timeout;
     }
 
     // -------------------------------------------------------------------------
@@ -82,10 +88,7 @@ class alfredMCP
     private function send(string $method, $params): array
     {
         if ($this->url === '') {
-            throw new Exception('JeedomMCP URL is not configured.');
-        }
-        if ($this->apiKey === '') {
-            throw new Exception('JeedomMCP API key is not configured.');
+            throw new Exception('MCP server URL is not configured.');
         }
 
         $payload = json_encode([
@@ -95,15 +98,19 @@ class alfredMCP
             'params'  => $params,
         ]);
 
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ];
+        if ($this->authHeader !== '' && $this->authValue !== '') {
+            $headers[] = $this->authHeader . ': ' . $this->authValue;
+        }
+
         $ch = curl_init($this->url);
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-                'X-API-Key: ' . $this->apiKey,
-            ],
+            CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $this->timeout,
             CURLOPT_SSL_VERIFYPEER => true,

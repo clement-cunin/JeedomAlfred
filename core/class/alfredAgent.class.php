@@ -4,8 +4,8 @@
  * Alfred ReAct agent loop.
  *
  * Orchestrates:
- *   - alfredLLM   : sends messages to the LLM, gets back text or tool calls
- *   - alfredMCP   : executes tool calls against JeedomMCP
+ *   - alfredLLM          : sends messages to the LLM, gets back text or tool calls
+ *   - alfredMCPRegistry  : aggregates tools from all enabled MCP servers and routes calls
  *   - alfredConversation : persists every turn
  *
  * The caller supplies an optional $onEvent callback to receive real-time events:
@@ -23,40 +23,43 @@
  */
 class alfredAgent
 {
-    private alfredLLMAdapter $llm;
-    private alfredMCP        $mcp;
-    private int              $maxIterations;
-    private string           $systemPrompt;
-    private ?string          $userLogin;
-    private ?string          $userProfil;
+    private alfredLLMAdapter  $llm;
+    private alfredMCPRegistry $registry;
+    private int               $maxIterations;
+    private string            $systemPrompt;
+    private ?string           $userLogin;
+    private ?string           $userProfil;
     /** @var callable|null */
     private $onEvent;
 
     public function __construct(
-        ?alfredLLMAdapter $llm             = null,
-        ?alfredMCP        $mcp             = null,
-        ?callable         $onEvent         = null,
-        ?string           $userLogin       = null,
-        ?string           $userProfil      = null,
-        int               $extraIterations = 0
+        ?alfredLLMAdapter  $llm             = null,
+        ?alfredMCPRegistry $registry        = null,
+        ?callable          $onEvent         = null,
+        ?string            $userLogin       = null,
+        ?string            $userProfil      = null,
+        int                $extraIterations = 0
     ) {
-        $this->llm           = $llm   ?? alfredLLM::make();
-        $this->mcp           = $mcp   ?? new alfredMCP();
+        $this->llm           = $llm ?? alfredLLM::make();
         $this->maxIterations = alfred::getMaxIterations() + $extraIterations;
         $this->systemPrompt  = alfred::getSystemPrompt();
         $this->onEvent       = $onEvent;
         $this->userLogin     = $userLogin;
         $this->userProfil    = $userProfil;
+
+        if ($registry !== null) {
+            $this->registry = $registry;
+        } else {
+            $this->registry = alfredMCPRegistry::fromConfig(function (string $msg): void {
+                $this->emit('error', ['message' => $msg]);
+            });
+        }
     }
 
     // -------------------------------------------------------------------------
     // Synthetic tool definitions
     // -------------------------------------------------------------------------
 
-    /**
-     * Returns the alfred_schedule tool schema in Alfred's canonical format.
-     * It is injected alongside MCP tools so the LLM can discover and call it.
-     */
     private static function scheduleTool(): array
     {
         return [
@@ -81,9 +84,6 @@ class alfredAgent
         ];
     }
 
-    /**
-     * Returns the three alfred_memory_* tool schemas.
-     */
     private static function memoryTools(): array
     {
         return [
@@ -173,15 +173,8 @@ class alfredAgent
             $this->emit('debug', ['system_prompt' => $effectiveSystemPrompt]);
         }
 
-        // Fetch available tools from JeedomMCP and inject synthetic tools
-        $tools = [];
-        try {
-            $tools = $this->mcp->listTools();
-        } catch (Exception $e) {
-            // Non-fatal: agent works without tools (degraded mode)
-            $this->emit('error', ['message' => 'JeedomMCP unavailable: ' . $e->getMessage()]);
-        }
-        // Prepend synthetic tools so they appear first in the list
+        // Fetch aggregated tool list from all enabled MCP servers, then prepend synthetic tools
+        $tools = $this->registry->listTools();
         foreach (array_reverse(self::memoryTools()) as $t) {
             array_unshift($tools, $t);
         }
@@ -224,14 +217,14 @@ class alfredAgent
             foreach ($response['tool_calls'] as $tc) {
                 $this->emit('tool_call', ['name' => $tc['name'], 'input' => $tc['input']]);
 
-                // Intercept synthetic tools before forwarding to MCP
+                // Intercept synthetic tools before forwarding to registry
                 if ($tc['name'] === 'alfred_schedule') {
                     $result = $this->handleScheduleTool($sessionId, $tc['input']);
                 } elseif (strpos($tc['name'], 'alfred_memory_') === 0) {
                     $result = $this->handleMemoryTool($tc['name'], $tc['input']);
                 } else {
                     try {
-                        $result = $this->mcp->callTool($tc['name'], $tc['input']);
+                        $result = $this->registry->callTool($tc['name'], $tc['input']);
                     } catch (Exception $e) {
                         $result = ['error' => $e->getMessage()];
                     }
