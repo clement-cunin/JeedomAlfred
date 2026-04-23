@@ -353,9 +353,19 @@ $(function () {
 
         source.addEventListener('error', function (e) {
             hideTyping();
-            var msg = 'An error occurred.';
-            try { msg = JSON.parse(e.data).message; } catch (_) {}
-            appendBubble('assistant', '⚠️ ' + msg);
+            var technical = null;
+            try { technical = JSON.parse(e.data).message; } catch (_) {}
+            var display = alfred_config.isAdmin && technical
+                ? technical
+                : 'An error occurred.';
+            var $bubble = appendBubble('assistant', '⚠️ ' + display);
+            if (alfred_config.isAdmin && technical && technical !== display) {
+                $bubble.find('.alfred-msg-bubble').append(
+                    $('<details style="margin-top:6px;font-size:11px;opacity:0.7">')
+                        .append($('<summary>').text('Details'))
+                        .append($('<pre style="white-space:pre-wrap;margin:4px 0 0">').text(technical))
+                );
+            }
             source.close();
             currentSource = null;
             isStreaming   = false;
