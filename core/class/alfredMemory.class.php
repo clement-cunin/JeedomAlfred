@@ -13,7 +13,7 @@ class alfredMemory
             [':scope' => $scope, ':content' => $content],
             DB::FETCH_TYPE_ROW
         );
-        return (int)DB::getLastId();
+        return (int)DB::getLastInsertId();
     }
 
     /**
