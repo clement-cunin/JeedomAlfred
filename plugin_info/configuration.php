@@ -241,6 +241,39 @@ $_models = [
             <span class="help-block col-sm-6">{{Maximum number of tool-call iterations before the agent stops.}}</span>
         </div>
 
+        <!-- ================================================================ -->
+        <!-- Memory -->
+        <!-- ================================================================ -->
+        <legend><i class="fas fa-brain"></i> {{Memory}}</legend>
+
+        <div class="form-group">
+            <div class="col-sm-offset-4 col-sm-8" style="margin-bottom:8px">
+                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_load_memories">
+                    <i class="fas fa-sync-alt"></i> {{Load memories}}
+                </button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-offset-1 col-sm-10">
+                <table class="table table-bordered table-condensed" id="alfred_memory_table" style="display:none">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">{{ID}}</th>
+                            <th style="width:130px">{{Scope}}</th>
+                            <th>{{Content}}</th>
+                            <th style="width:160px">{{Date}}</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="alfred_memory_tbody"></tbody>
+                </table>
+                <div id="alfred_memory_empty" style="display:none;color:#888;font-style:italic">
+                    {{No memories saved yet.}}
+                </div>
+            </div>
+        </div>
+
     </fieldset>
 </form>
 
@@ -362,6 +395,77 @@ function alfredLoadModels($section) {
 
 $(document).on('mousedown', '.alfred-model-select', function () {
     alfredLoadModels($(this).closest('.alfred-provider-section'));
+});
+
+// ---- Memory management ----
+
+function alfredRenderMemories(memories) {
+    var $tbody = $('#alfred_memory_tbody');
+    var $table = $('#alfred_memory_table');
+    var $empty = $('#alfred_memory_empty');
+    $tbody.empty();
+    if (!memories || memories.length === 0) {
+        $table.hide();
+        $empty.show();
+        return;
+    }
+    $empty.hide();
+    $table.show();
+    memories.forEach(function (m) {
+        var scopeBadge = m.scope === 'global'
+            ? '<span class="label label-primary">global</span>'
+            : '<span class="label label-default">' + m.scope + '</span>';
+        var date = m.created_at ? m.created_at.substring(0, 16) : '';
+        var $row = $('<tr data-id="' + m.id + '">'
+            + '<td><small>#' + m.id + '</small></td>'
+            + '<td>' + scopeBadge + '</td>'
+            + '<td style="word-break:break-word">' + $('<span>').text(m.content).html() + '</td>'
+            + '<td><small>' + date + '</small></td>'
+            + '<td><button class="btn btn-xs btn-danger alfred-memory-delete" data-id="' + m.id + '">'
+            + '<i class="fas fa-trash"></i></button></td>'
+            + '</tr>');
+        $tbody.append($row);
+    });
+}
+
+$('#bt_alfred_load_memories').on('click', function () {
+    var $btn = $(this);
+    $btn.prop('disabled', true).find('i').addClass('fa-spin');
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: { action: 'listMemories' },
+        dataType: 'json',
+        success: function (resp) {
+            if (resp.state === 'ok') {
+                alfredRenderMemories(resp.result);
+            }
+        },
+        complete: function () {
+            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+        }
+    });
+});
+
+$(document).on('click', '.alfred-memory-delete', function () {
+    var id  = $(this).data('id');
+    var $tr = $(this).closest('tr');
+    if (!confirm('{{Delete this memory?}}')) return;
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: { action: 'deleteMemory', id: id },
+        dataType: 'json',
+        success: function (resp) {
+            if (resp.state === 'ok') {
+                $tr.remove();
+                if ($('#alfred_memory_tbody tr').length === 0) {
+                    $('#alfred_memory_table').hide();
+                    $('#alfred_memory_empty').show();
+                }
+            }
+        }
+    });
 });
 
 $('#bt_alfred_test_llm').on('click', function () {

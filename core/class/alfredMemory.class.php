@@ -33,13 +33,15 @@ class alfredMemory
     }
 
     /**
-     * Delete a memory. Enforces scope access.
+     * Delete a memory. Enforces scope access unless $allowedScopes is null (admin).
      */
-    public static function forget(int $id, array $allowedScopes): void
+    public static function forget(int $id, ?array $allowedScopes = null): void
     {
-        $row = self::getById($id);
-        if ($row === null || !in_array($row['scope'], $allowedScopes, true)) {
-            throw new Exception('Memory #' . $id . ' not found or access denied.');
+        if ($allowedScopes !== null) {
+            $row = self::getById($id);
+            if ($row === null || !in_array($row['scope'], $allowedScopes, true)) {
+                throw new Exception('Memory #' . $id . ' not found or access denied.');
+            }
         }
         DB::Prepare(
             'DELETE FROM alfred_memory WHERE id = :id',
