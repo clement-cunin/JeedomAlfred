@@ -305,7 +305,7 @@ class alfredAgent
             $block = "\n\n## Persistent memory\n";
             foreach ($memories as $m) {
                 $tag    = $m['scope'] === 'global' ? 'global' : 'personal';
-                $block .= "- [#{$m['id']}|{$tag}] {$m['content']}\n";
+                $block .= "\n### {$tag}-{$m['id']}\n{$m['content']}\n";
             }
             $prompt .= $block;
         }
