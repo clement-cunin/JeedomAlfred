@@ -399,32 +399,64 @@ $(document).on('mousedown', '.alfred-model-select', function () {
 
 // ---- Memory management ----
 
+var _alfredMemories = [];
+
+function alfredScopeOptions(currentScope) {
+    var scopes = ['global'];
+    _alfredMemories.forEach(function (m) {
+        if (m.scope !== 'global' && scopes.indexOf(m.scope) === -1) {
+            scopes.push(m.scope);
+        }
+    });
+    var html = '';
+    scopes.forEach(function (s) {
+        var sel = s === currentScope ? ' selected' : '';
+        html += '<option value="' + s + '"' + sel + '>' + s + '</option>';
+    });
+    return html;
+}
+
+function alfredMemoryRowView(m) {
+    var scopeBadge = m.scope === 'global'
+        ? '<span class="label label-primary">global</span>'
+        : '<span class="label label-default">' + m.scope + '</span>';
+    var date = m.created_at ? m.created_at.substring(0, 16) : '';
+    return '<td><small>#' + m.id + '</small></td>'
+        + '<td class="alfred-mem-scope-cell">' + scopeBadge + '</td>'
+        + '<td class="alfred-mem-content-cell" style="word-break:break-word">' + $('<span>').text(m.content).html() + '</td>'
+        + '<td><small>' + date + '</small></td>'
+        + '<td style="white-space:nowrap">'
+        + '<button class="btn btn-xs btn-default alfred-memory-edit" data-id="' + m.id + '" title="{{Edit}}"><i class="fas fa-pencil-alt"></i></button> '
+        + '<button class="btn btn-xs btn-danger alfred-memory-delete" data-id="' + m.id + '" title="{{Delete}}"><i class="fas fa-trash"></i></button>'
+        + '</td>';
+}
+
+function alfredMemoryRowEdit(m) {
+    return '<td><small>#' + m.id + '</small></td>'
+        + '<td><select class="form-control input-sm alfred-mem-scope-input" style="min-width:110px">' + alfredScopeOptions(m.scope) + '</select></td>'
+        + '<td><textarea class="form-control alfred-mem-content-input" rows="2" style="font-size:12px">' + $('<span>').text(m.content).html() + '</textarea></td>'
+        + '<td></td>'
+        + '<td style="white-space:nowrap">'
+        + '<button class="btn btn-xs btn-success alfred-memory-save" data-id="' + m.id + '" title="{{Save}}"><i class="fas fa-check"></i></button> '
+        + '<button class="btn btn-xs btn-default alfred-memory-cancel" data-id="' + m.id + '" title="{{Cancel}}"><i class="fas fa-times"></i></button>'
+        + '</td>';
+}
+
 function alfredRenderMemories(memories) {
+    _alfredMemories = memories || [];
     var $tbody = $('#alfred_memory_tbody');
     var $table = $('#alfred_memory_table');
     var $empty = $('#alfred_memory_empty');
     $tbody.empty();
-    if (!memories || memories.length === 0) {
+    if (_alfredMemories.length === 0) {
         $table.hide();
         $empty.show();
         return;
     }
     $empty.hide();
     $table.show();
-    memories.forEach(function (m) {
-        var scopeBadge = m.scope === 'global'
-            ? '<span class="label label-primary">global</span>'
-            : '<span class="label label-default">' + m.scope + '</span>';
-        var date = m.created_at ? m.created_at.substring(0, 16) : '';
-        var $row = $('<tr data-id="' + m.id + '">'
-            + '<td><small>#' + m.id + '</small></td>'
-            + '<td>' + scopeBadge + '</td>'
-            + '<td style="word-break:break-word">' + $('<span>').text(m.content).html() + '</td>'
-            + '<td><small>' + date + '</small></td>'
-            + '<td><button class="btn btn-xs btn-danger alfred-memory-delete" data-id="' + m.id + '">'
-            + '<i class="fas fa-trash"></i></button></td>'
-            + '</tr>');
-        $tbody.append($row);
+    _alfredMemories.forEach(function (m) {
+        $tbody.append($('<tr data-id="' + m.id + '">').html(alfredMemoryRowView(m)));
     });
 }
 
@@ -447,6 +479,44 @@ $('#bt_alfred_load_memories').on('click', function () {
     });
 });
 
+$(document).on('click', '.alfred-memory-edit', function () {
+    var id = $(this).data('id');
+    var m  = _alfredMemories.filter(function (x) { return x.id == id; })[0];
+    if (!m) return;
+    $(this).closest('tr').html(alfredMemoryRowEdit(m));
+});
+
+$(document).on('click', '.alfred-memory-cancel', function () {
+    var id = $(this).data('id');
+    var m  = _alfredMemories.filter(function (x) { return x.id == id; })[0];
+    if (!m) return;
+    $(this).closest('tr').html(alfredMemoryRowView(m));
+});
+
+$(document).on('click', '.alfred-memory-save', function () {
+    var $btn     = $(this);
+    var id       = $btn.data('id');
+    var $tr      = $btn.closest('tr');
+    var content  = $tr.find('.alfred-mem-content-input').val().trim();
+    var scope    = $tr.find('.alfred-mem-scope-input').val();
+    if (!content) return;
+    $btn.prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: { action: 'updateMemory', id: id, content: content, scope: scope },
+        dataType: 'json',
+        success: function (resp) {
+            if (resp.state === 'ok') {
+                var m = _alfredMemories.filter(function (x) { return x.id == id; })[0];
+                if (m) { m.content = content; m.scope = scope; }
+                $tr.html(alfredMemoryRowView(m || { id: id, content: content, scope: scope, created_at: '' }));
+            }
+        },
+        complete: function () { $btn.prop('disabled', false); }
+    });
+});
+
 $(document).on('click', '.alfred-memory-delete', function () {
     var id  = $(this).data('id');
     var $tr = $(this).closest('tr');
@@ -458,6 +528,7 @@ $(document).on('click', '.alfred-memory-delete', function () {
         dataType: 'json',
         success: function (resp) {
             if (resp.state === 'ok') {
+                _alfredMemories = _alfredMemories.filter(function (x) { return x.id != id; });
                 $tr.remove();
                 if ($('#alfred_memory_tbody tr').length === 0) {
                     $('#alfred_memory_table').hide();

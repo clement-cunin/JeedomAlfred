@@ -17,17 +17,34 @@ class alfredMemory
     }
 
     /**
-     * Update an existing memory. Enforces that the memory belongs to one of $allowedScopes.
+     * Update an existing memory content. Enforces scope unless $allowedScopes is null (admin).
      */
-    public static function update(int $id, string $content, array $allowedScopes): void
+    public static function update(int $id, string $content, ?array $allowedScopes = null): void
     {
-        $row = self::getById($id);
-        if ($row === null || !in_array($row['scope'], $allowedScopes, true)) {
-            throw new Exception('Memory #' . $id . ' not found or access denied.');
+        if ($allowedScopes !== null) {
+            $row = self::getById($id);
+            if ($row === null || !in_array($row['scope'], $allowedScopes, true)) {
+                throw new Exception('Memory #' . $id . ' not found or access denied.');
+            }
         }
         DB::Prepare(
             'UPDATE alfred_memory SET content = :content, updated_at = NOW() WHERE id = :id',
             [':content' => $content, ':id' => $id],
+            DB::FETCH_TYPE_ROW
+        );
+    }
+
+    /**
+     * Update content and/or scope of a memory (admin, no scope restriction).
+     */
+    public static function adminUpdate(int $id, string $content, string $scope): void
+    {
+        if (self::getById($id) === null) {
+            throw new Exception('Memory #' . $id . ' not found.');
+        }
+        DB::Prepare(
+            'UPDATE alfred_memory SET content = :content, scope = :scope, updated_at = NOW() WHERE id = :id',
+            [':content' => $content, ':scope' => $scope, ':id' => $id],
             DB::FETCH_TYPE_ROW
         );
     }
