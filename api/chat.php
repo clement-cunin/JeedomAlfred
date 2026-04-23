@@ -38,7 +38,8 @@ if (isConnect()) {
         exit;
     }
 }
-$userLogin = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
+$userLogin  = ($connectedUser !== null) ? $connectedUser->getLogin()  : null;
+$userProfil = ($connectedUser !== null) ? $connectedUser->getProfil() : null;
 
 // ---- Input ----
 $raw       = file_get_contents('php://input');
@@ -68,7 +69,8 @@ try {
         function (string $type, array $data) {
             sse_event($type, $data);
         },
-        $userLogin
+        $userLogin,
+        $userProfil
     );
     $agent->run($sessionId, $message);
 } catch (Exception $e) {

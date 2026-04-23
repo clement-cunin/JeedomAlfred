@@ -28,14 +28,16 @@ class alfredAgent
     private int              $maxIterations;
     private string           $systemPrompt;
     private ?string          $userLogin;
+    private ?string          $userProfil;
     /** @var callable|null */
     private $onEvent;
 
     public function __construct(
-        ?alfredLLMAdapter $llm       = null,
-        ?alfredMCP        $mcp       = null,
-        ?callable         $onEvent   = null,
-        ?string           $userLogin = null
+        ?alfredLLMAdapter $llm        = null,
+        ?alfredMCP        $mcp        = null,
+        ?callable         $onEvent    = null,
+        ?string           $userLogin  = null,
+        ?string           $userProfil = null
     ) {
         $this->llm           = $llm   ?? alfredLLM::make();
         $this->mcp           = $mcp   ?? new alfredMCP();
@@ -43,6 +45,7 @@ class alfredAgent
         $this->systemPrompt  = alfred::getSystemPrompt();
         $this->onEvent       = $onEvent;
         $this->userLogin     = $userLogin;
+        $this->userProfil    = $userProfil;
     }
 
     // -------------------------------------------------------------------------
@@ -282,6 +285,12 @@ class alfredAgent
         if ($this->userLogin === null) {
             return $prompt;
         }
+
+        // Inject current user block
+        $role    = $this->userProfil ?? 'user';
+        $prompt .= "\n\n## Current user"
+                 . "\n- Login: " . $this->userLogin
+                 . "\n- Role: " . $role;
 
         $memories = alfredMemory::loadForUser($this->userLogin);
 
