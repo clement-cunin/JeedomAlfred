@@ -38,8 +38,8 @@ if (isConnect()) {
         exit;
     }
 }
-$userLogin  = ($connectedUser !== null) ? $connectedUser->getLogin()  : null;
-$userProfil = ($connectedUser !== null) ? $connectedUser->getProfil() : null;
+$userLogin  = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
+$userProfil = isConnect('admin') ? 'admin' : 'user';
 
 // ---- Input ----
 $raw       = file_get_contents('php://input');

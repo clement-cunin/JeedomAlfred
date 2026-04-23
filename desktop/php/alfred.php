@@ -82,7 +82,7 @@ $_userHash     = $_SESSION['user']->getHash();
 var alfred_config = {
     isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
     userHash: "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
-    isAdmin: <?php echo ($_SESSION['user']->getProfil() === 'admin') ? 'true' : 'false'; ?>,
+    isAdmin: <?php echo isConnect('admin') ? 'true' : 'false'; ?>,
     i18n: {
         hello: "{{Hello, I'm Alfred.}}",
         ask:   "{{Ask me anything about your home automation system.}}"
