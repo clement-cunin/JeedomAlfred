@@ -88,6 +88,14 @@ class alfred extends eqLogic {
         return (string)config::byKey('system_prompt', __CLASS__);
     }
 
+    public static function getFirstInstallPrompt(): string {
+        return (string)config::byKey('first_install_prompt', __CLASS__);
+    }
+
+    public static function getNewUserPrompt(): string {
+        return (string)config::byKey('new_user_prompt', __CLASS__);
+    }
+
     public static function getMaxIterations(): int {
         $v = (int)config::byKey('max_iterations', __CLASS__);
         return $v > 0 ? $v : 10;

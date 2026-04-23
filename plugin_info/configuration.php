@@ -207,6 +207,31 @@ $_models = [
             </div>
         </div>
 
+        <!-- ================================================================ -->
+        <!-- Onboarding -->
+        <!-- ================================================================ -->
+        <legend><i class="fas fa-user-plus"></i> {{Onboarding}}</legend>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{First install prompt}}</label>
+            <div class="col-sm-6">
+                <textarea class="configKey form-control" data-l1key="first_install_prompt" rows="5"
+                          style="font-family: monospace; font-size: 12px;"
+                          placeholder="{{Injected when Alfred has never spoken to anyone yet.}}"></textarea>
+            </div>
+            <span class="help-block col-sm-2">{{Triggered when the memory is completely empty.}}</span>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{New user prompt}}</label>
+            <div class="col-sm-6">
+                <textarea class="configKey form-control" data-l1key="new_user_prompt" rows="5"
+                          style="font-family: monospace; font-size: 12px;"
+                          placeholder="{{Injected the first time Alfred talks to a new user.}}"></textarea>
+            </div>
+            <span class="help-block col-sm-2">{{Triggered when this user has no personal memories yet.}}</span>
+        </div>
+
         <div class="form-group">
             <label class="col-sm-4 control-label">{{Max agent iterations}}</label>
             <div class="col-sm-2">

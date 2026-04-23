@@ -284,17 +284,37 @@ class alfredAgent
         }
 
         $memories = alfredMemory::loadForUser($this->userLogin);
-        if (empty($memories)) {
-            return $prompt;
+
+        // Inject memory block
+        if (!empty($memories)) {
+            $block = "\n\n## Persistent memory\n";
+            foreach ($memories as $m) {
+                $tag    = $m['scope'] === 'global' ? 'global' : 'personal';
+                $block .= "- [#{$m['id']}|{$tag}] {$m['content']}\n";
+            }
+            $prompt .= $block;
         }
 
-        $block = "\n\n## Persistent memory\n";
+        // Inject onboarding prompt when appropriate
+        $userScope       = 'user:' . $this->userLogin;
+        $hasUserMemory   = false;
+        $hasGlobalMemory = false;
         foreach ($memories as $m) {
-            $tag    = $m['scope'] === 'global' ? 'global' : 'personal';
-            $block .= "- [#{$m['id']}|{$tag}] {$m['content']}\n";
+            if ($m['scope'] === $userScope)  $hasUserMemory   = true;
+            if ($m['scope'] === 'global')    $hasGlobalMemory = true;
         }
 
-        return $prompt . $block;
+        if (!$hasUserMemory) {
+            $onboarding = (!$hasGlobalMemory)
+                ? alfred::getFirstInstallPrompt()
+                : alfred::getNewUserPrompt();
+
+            if ($onboarding !== '') {
+                $prompt .= "\n\n## First contact instructions\n" . $onboarding;
+            }
+        }
+
+        return $prompt;
     }
 
     /**
