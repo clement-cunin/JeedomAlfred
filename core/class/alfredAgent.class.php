@@ -27,19 +27,22 @@ class alfredAgent
     private alfredMCP        $mcp;
     private int              $maxIterations;
     private string           $systemPrompt;
+    private ?string          $userLogin;
     /** @var callable|null */
     private $onEvent;
 
     public function __construct(
-        ?alfredLLMAdapter $llm   = null,
-        ?alfredMCP        $mcp   = null,
-        ?callable         $onEvent = null
+        ?alfredLLMAdapter $llm       = null,
+        ?alfredMCP        $mcp       = null,
+        ?callable         $onEvent   = null,
+        ?string           $userLogin = null
     ) {
         $this->llm           = $llm   ?? alfredLLM::make();
         $this->mcp           = $mcp   ?? new alfredMCP();
         $this->maxIterations = alfred::getMaxIterations();
         $this->systemPrompt  = alfred::getSystemPrompt();
         $this->onEvent       = $onEvent;
+        $this->userLogin     = $userLogin;
     }
 
     // -------------------------------------------------------------------------
@@ -74,6 +77,60 @@ class alfredAgent
         ];
     }
 
+    /**
+     * Returns the three alfred_memory_* tool schemas.
+     */
+    private static function memoryTools(): array
+    {
+        return [
+            [
+                'name'        => 'alfred_memory_save',
+                'description' => 'Save a persistent memory that will be available in all future conversations.'
+                               . ' Use scope "user" for personal info about the current user,'
+                               . ' "global" for household facts shared across all users.',
+                'inputSchema' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'scope'   => [
+                            'type'        => 'string',
+                            'enum'        => ['user', 'global'],
+                            'description' => '"user" = personal to current user. "global" = shared with all household members.',
+                        ],
+                        'content' => [
+                            'type'        => 'string',
+                            'description' => 'The fact or information to remember.',
+                        ],
+                    ],
+                    'required' => ['scope', 'content'],
+                ],
+            ],
+            [
+                'name'        => 'alfred_memory_update',
+                'description' => 'Update the content of an existing memory by its ID.'
+                               . ' IDs are shown in the memory block at the start of the conversation.',
+                'inputSchema' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'id'      => ['type' => 'integer', 'description' => 'ID of the memory to update.'],
+                        'content' => ['type' => 'string',  'description' => 'New content for this memory.'],
+                    ],
+                    'required' => ['id', 'content'],
+                ],
+            ],
+            [
+                'name'        => 'alfred_memory_forget',
+                'description' => 'Permanently delete a memory by its ID.',
+                'inputSchema' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer', 'description' => 'ID of the memory to delete.'],
+                    ],
+                    'required' => ['id'],
+                ],
+            ],
+        ];
+    }
+
     // -------------------------------------------------------------------------
     // Public entry point
     // -------------------------------------------------------------------------
@@ -99,6 +156,9 @@ class alfredAgent
         // Load full history
         $messages = alfredConversation::getMessages($sessionId);
 
+        // Build effective system prompt (base + persistent memory block)
+        $effectiveSystemPrompt = $this->buildSystemPrompt();
+
         // Fetch available tools from JeedomMCP and inject synthetic tools
         $tools = [];
         try {
@@ -108,6 +168,9 @@ class alfredAgent
             $this->emit('error', ['message' => 'JeedomMCP unavailable: ' . $e->getMessage()]);
         }
         // Prepend synthetic tools so they appear first in the list
+        foreach (array_reverse(self::memoryTools()) as $t) {
+            array_unshift($tools, $t);
+        }
         array_unshift($tools, self::scheduleTool());
 
         // ReAct loop
@@ -120,7 +183,7 @@ class alfredAgent
             $onDelta  = function (string $chunk): void {
                 $this->emit('delta', ['text' => $chunk]);
             };
-            $response = $this->llm->chatStream($messages, $tools, $this->systemPrompt, $onDelta);
+            $response = $this->llm->chatStream($messages, $tools, $effectiveSystemPrompt, $onDelta);
 
             if ($response['stop_reason'] === 'end_turn' || empty($response['tool_calls'])) {
                 // Final text response — delta events were already emitted chunk by chunk
@@ -150,6 +213,8 @@ class alfredAgent
                 // Intercept synthetic tools before forwarding to MCP
                 if ($tc['name'] === 'alfred_schedule') {
                     $result = $this->handleScheduleTool($sessionId, $tc['input']);
+                } elseif (strpos($tc['name'], 'alfred_memory_') === 0) {
+                    $result = $this->handleMemoryTool($tc['name'], $tc['input']);
                 } else {
                     try {
                         $result = $this->mcp->callTool($tc['name'], $tc['input']);
@@ -203,6 +268,80 @@ class alfredAgent
         }
 
         return alfredScheduler::schedule($sessionId, $delaySeconds, $instruction);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Build the effective system prompt by appending the persistent memory block.
+     */
+    private function buildSystemPrompt(): string
+    {
+        $prompt = $this->systemPrompt;
+
+        if ($this->userLogin === null) {
+            return $prompt;
+        }
+
+        $memories = alfredMemory::loadForUser($this->userLogin);
+        if (empty($memories)) {
+            return $prompt;
+        }
+
+        $block = "\n\n## Persistent memory\n";
+        foreach ($memories as $m) {
+            $tag    = $m['scope'] === 'global' ? 'global' : 'personal';
+            $block .= "- [#{$m['id']}|{$tag}] {$m['content']}\n";
+        }
+
+        return $prompt . $block;
+    }
+
+    /**
+     * Handle a call to one of the alfred_memory_* synthetic tools.
+     */
+    private function handleMemoryTool(string $name, array $input): string
+    {
+        $allowedScopes = alfredMemory::allowedScopes($this->userLogin);
+
+        try {
+            switch ($name) {
+                case 'alfred_memory_save':
+                    $rawScope = (string)($input['scope'] ?? '');
+                    $content  = trim((string)($input['content'] ?? ''));
+                    if ($content === '') {
+                        return 'Error: content must not be empty.';
+                    }
+                    if ($rawScope === 'user') {
+                        if ($this->userLogin === null) {
+                            return 'Error: cannot save a user-scoped memory without an authenticated user.';
+                        }
+                        $scope = 'user:' . $this->userLogin;
+                    } else {
+                        $scope = 'global';
+                    }
+                    $id = alfredMemory::save($scope, $content);
+                    return 'Memory saved with ID #' . $id . '.';
+
+                case 'alfred_memory_update':
+                    $id      = (int)($input['id'] ?? 0);
+                    $content = trim((string)($input['content'] ?? ''));
+                    if ($id <= 0)       return 'Error: invalid ID.';
+                    if ($content === '') return 'Error: content must not be empty.';
+                    alfredMemory::update($id, $content, $allowedScopes);
+                    return 'Memory #' . $id . ' updated.';
+
+                case 'alfred_memory_forget':
+                    $id = (int)($input['id'] ?? 0);
+                    if ($id <= 0) return 'Error: invalid ID.';
+                    alfredMemory::forget($id, $allowedScopes);
+                    return 'Memory #' . $id . ' deleted.';
+            }
+        } catch (Exception $e) {
+            return 'Error: ' . $e->getMessage();
+        }
+
+        return 'Unknown memory tool.';
     }
 
     // -------------------------------------------------------------------------
