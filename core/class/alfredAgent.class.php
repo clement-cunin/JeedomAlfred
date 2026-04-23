@@ -291,11 +291,12 @@ class alfredAgent
             return $prompt;
         }
 
-        // Inject current user block
+        // Inject current date and user block
         $role    = $this->userProfil ?? 'user';
-        $prompt .= "\n\n## Current user"
-                 . "\n- Login: " . $this->userLogin
-                 . "\n- Role: " . $role;
+        $prompt .= "\n\n## Context"
+                 . "\n- Current date and time: " . date('l, F j Y H:i')
+                 . "\n- Current user login: " . $this->userLogin
+                 . "\n- Current user role: " . $role;
 
         $memories = alfredMemory::loadForUser($this->userLogin);
 
