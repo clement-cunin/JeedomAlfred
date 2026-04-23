@@ -321,6 +321,19 @@ $(function () {
             updateToolCall(d.name, 'done');
         });
 
+        source.addEventListener('debug', function (e) {
+            if (!alfred_config.isAdmin) return;
+            var d = JSON.parse(e.data);
+            var $block = $('<div class="alfred-debug-prompt">')
+                .append(
+                    $('<details>')
+                        .append($('<summary>').text('🔍 System prompt'))
+                        .append($('<pre>').text(d.system_prompt))
+                );
+            $('#alfred-messages').append($block);
+            scrollToBottom();
+        });
+
         source.addEventListener('delta', function (e) {
             var d = JSON.parse(e.data);
             hideTyping();

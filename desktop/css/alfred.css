@@ -2,6 +2,35 @@
    Alfred — Chat UI
    ============================================================ */
 
+/* Admin debug: system prompt block */
+.alfred-debug-prompt {
+    margin: 8px 12px;
+    font-size: 11px;
+    opacity: 0.6;
+}
+.alfred-debug-prompt:hover {
+    opacity: 1;
+}
+.alfred-debug-prompt details summary {
+    cursor: pointer;
+    color: #888;
+    user-select: none;
+    padding: 2px 0;
+}
+.alfred-debug-prompt details pre {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 4px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
 /* Full-height layout inside Jeedom's content area */
 #alfred-app {
     display: flex;

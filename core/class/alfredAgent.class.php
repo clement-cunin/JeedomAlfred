@@ -162,6 +162,11 @@ class alfredAgent
         // Build effective system prompt (base + persistent memory block)
         $effectiveSystemPrompt = $this->buildSystemPrompt();
 
+        // Emit full system prompt for admin debugging
+        if ($this->userProfil === 'admin') {
+            $this->emit('debug', ['system_prompt' => $effectiveSystemPrompt]);
+        }
+
         // Fetch available tools from JeedomMCP and inject synthetic tools
         $tools = [];
         try {
