@@ -259,11 +259,12 @@ $_models = [
                 <table class="table table-bordered table-condensed" id="alfred_memory_table" style="display:none">
                     <thead>
                         <tr>
-                            <th style="width:50px">{{ID}}</th>
-                            <th style="width:130px">{{Scope}}</th>
+                            <th style="width:40px">{{ID}}</th>
+                            <th style="width:120px">{{Scope}}</th>
+                            <th style="width:150px">{{Label}}</th>
                             <th>{{Content}}</th>
-                            <th style="width:160px">{{Date}}</th>
-                            <th style="width:50px"></th>
+                            <th style="width:140px">{{Date}}</th>
+                            <th style="width:60px"></th>
                         </tr>
                     </thead>
                     <tbody id="alfred_memory_tbody"></tbody>
@@ -420,9 +421,11 @@ function alfredMemoryRowView(m) {
     var scopeBadge = m.scope === 'global'
         ? '<span class="label label-primary">global</span>'
         : '<span class="label label-default">' + m.scope + '</span>';
-    var date = m.created_at ? m.created_at.substring(0, 16) : '';
+    var date  = m.created_at ? m.created_at.substring(0, 16) : '';
+    var label = m.label ? '<code>' + $('<span>').text(m.label).html() + '</code>' : '<em style="color:#aaa">—</em>';
     return '<td><small>#' + m.id + '</small></td>'
         + '<td class="alfred-mem-scope-cell">' + scopeBadge + '</td>'
+        + '<td class="alfred-mem-label-cell">' + label + '</td>'
         + '<td class="alfred-mem-content-cell" style="word-break:break-word">' + $('<span>').text(m.content).html() + '</td>'
         + '<td><small>' + date + '</small></td>'
         + '<td style="white-space:nowrap">'
@@ -434,6 +437,7 @@ function alfredMemoryRowView(m) {
 function alfredMemoryRowEdit(m) {
     return '<td><small>#' + m.id + '</small></td>'
         + '<td><select class="form-control input-sm alfred-mem-scope-input" style="min-width:110px">' + alfredScopeOptions(m.scope) + '</select></td>'
+        + '<td><input type="text" class="form-control input-sm alfred-mem-label-input" value="' + $('<span>').text(m.label || '').html() + '" style="font-size:12px;font-family:monospace"></td>'
         + '<td><textarea class="form-control alfred-mem-content-input" rows="2" style="font-size:12px">' + $('<span>').text(m.content).html() + '</textarea></td>'
         + '<td></td>'
         + '<td style="white-space:nowrap">'
@@ -497,20 +501,21 @@ $(document).on('click', '.alfred-memory-save', function () {
     var $btn     = $(this);
     var id       = $btn.data('id');
     var $tr      = $btn.closest('tr');
+    var label    = $tr.find('.alfred-mem-label-input').val().trim();
     var content  = $tr.find('.alfred-mem-content-input').val().trim();
     var scope    = $tr.find('.alfred-mem-scope-input').val();
-    if (!content) return;
+    if (!label || !content) return;
     $btn.prop('disabled', true);
     $.ajax({
         type: 'POST',
         url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-        data: { action: 'updateMemory', id: id, content: content, scope: scope },
+        data: { action: 'updateMemory', id: id, label: label, content: content, scope: scope },
         dataType: 'json',
         success: function (resp) {
             if (resp.state === 'ok') {
                 var m = _alfredMemories.filter(function (x) { return x.id == id; })[0];
-                if (m) { m.content = content; m.scope = scope; }
-                $tr.html(alfredMemoryRowView(m || { id: id, content: content, scope: scope, created_at: '' }));
+                if (m) { m.label = label; m.content = content; m.scope = scope; }
+                $tr.html(alfredMemoryRowView(m || { id: id, label: label, content: content, scope: scope, created_at: '' }));
             }
         },
         complete: function () { $btn.prop('disabled', false); }

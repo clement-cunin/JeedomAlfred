@@ -80,13 +80,15 @@ try {
     if ($action === 'updateMemory') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
         $id      = (int)init('id');
+        $label   = trim(init('label'));
         $content = trim(init('content'));
         $scope   = trim(init('scope'));
         if ($id <= 0)        throw new Exception('Missing or invalid id');
+        if ($label === '')   throw new Exception('Label must not be empty');
         if ($content === '') throw new Exception('Content must not be empty');
         if ($scope === '')   throw new Exception('Scope must not be empty');
         require_once __DIR__ . '/../class/alfredMemory.class.php';
-        alfredMemory::adminUpdate($id, $content, $scope);
+        alfredMemory::adminUpdate($id, $label, $content, $scope);
         ajax::success();
     }
 

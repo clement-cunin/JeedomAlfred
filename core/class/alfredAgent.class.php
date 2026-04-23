@@ -88,9 +88,10 @@ class alfredAgent
         return [
             [
                 'name'        => 'alfred_memory_save',
-                'description' => 'Save a persistent memory that will be available in all future conversations.'
+                'description' => 'Save a persistent memory available in all future conversations.'
                                . ' Use scope "user" for personal info about the current user,'
-                               . ' "global" for household facts shared across all users.',
+                               . ' "global" for household facts shared across all users.'
+                               . ' Choose a short, unique, descriptive label (e.g. "vacation-july-2026", "user-firstname").',
                 'inputSchema' => [
                     'type'       => 'object',
                     'properties' => [
@@ -99,36 +100,40 @@ class alfredAgent
                             'enum'        => ['user', 'global'],
                             'description' => '"user" = personal to current user. "global" = shared with all household members.',
                         ],
+                        'label'   => [
+                            'type'        => 'string',
+                            'description' => 'Short unique text identifier for this memory (e.g. "user-firstname", "vacation-july-2026").',
+                        ],
                         'content' => [
                             'type'        => 'string',
                             'description' => 'The fact or information to remember.',
                         ],
                     ],
-                    'required' => ['scope', 'content'],
+                    'required' => ['scope', 'label', 'content'],
                 ],
             ],
             [
                 'name'        => 'alfred_memory_update',
-                'description' => 'Update the content of an existing memory by its ID.'
-                               . ' IDs are shown in the memory block at the start of the conversation.',
+                'description' => 'Update the content of an existing memory by its text label.'
+                               . ' Labels are shown as headings in the memory block.',
                 'inputSchema' => [
                     'type'       => 'object',
                     'properties' => [
-                        'id'      => ['type' => 'integer', 'description' => 'ID of the memory to update.'],
-                        'content' => ['type' => 'string',  'description' => 'New content for this memory.'],
+                        'label'   => ['type' => 'string', 'description' => 'Text label of the memory to update.'],
+                        'content' => ['type' => 'string', 'description' => 'New content for this memory.'],
                     ],
-                    'required' => ['id', 'content'],
+                    'required' => ['label', 'content'],
                 ],
             ],
             [
                 'name'        => 'alfred_memory_forget',
-                'description' => 'Permanently delete a memory by its ID.',
+                'description' => 'Permanently delete a memory by its text label.',
                 'inputSchema' => [
                     'type'       => 'object',
                     'properties' => [
-                        'id' => ['type' => 'integer', 'description' => 'ID of the memory to delete.'],
+                        'label' => ['type' => 'string', 'description' => 'Text label of the memory to delete.'],
                     ],
-                    'required' => ['id'],
+                    'required' => ['label'],
                 ],
             ],
         ];
@@ -304,8 +309,8 @@ class alfredAgent
         if (!empty($memories)) {
             $block = "\n\n## Persistent memory\n";
             foreach ($memories as $m) {
-                $tag    = $m['scope'] === 'global' ? 'global' : 'personal';
-                $block .= "\n### {$tag}-{$m['id']}\n{$m['content']}\n";
+                $heading = $m['label'] !== '' ? $m['label'] : (($m['scope'] === 'global' ? 'global' : 'personal') . '-' . $m['id']);
+                $block  .= "\n### {$heading}\n{$m['content']}\n";
             }
             $prompt .= $block;
         }
@@ -342,11 +347,11 @@ class alfredAgent
         try {
             switch ($name) {
                 case 'alfred_memory_save':
-                    $rawScope = (string)($input['scope'] ?? '');
+                    $rawScope = (string)($input['scope']   ?? '');
+                    $label    = trim((string)($input['label']   ?? ''));
                     $content  = trim((string)($input['content'] ?? ''));
-                    if ($content === '') {
-                        return 'Error: content must not be empty.';
-                    }
+                    if ($label   === '') return 'Error: label must not be empty.';
+                    if ($content === '') return 'Error: content must not be empty.';
                     if ($rawScope === 'user') {
                         if ($this->userLogin === null) {
                             return 'Error: cannot save a user-scoped memory without an authenticated user.';
@@ -355,22 +360,22 @@ class alfredAgent
                     } else {
                         $scope = 'global';
                     }
-                    $id = alfredMemory::save($scope, $content);
-                    return 'Memory saved with ID #' . $id . '.';
+                    alfredMemory::save($scope, $label, $content);
+                    return "Memory '{$label}' saved.";
 
                 case 'alfred_memory_update':
-                    $id      = (int)($input['id'] ?? 0);
+                    $label   = trim((string)($input['label']   ?? ''));
                     $content = trim((string)($input['content'] ?? ''));
-                    if ($id <= 0)       return 'Error: invalid ID.';
+                    if ($label   === '') return 'Error: label must not be empty.';
                     if ($content === '') return 'Error: content must not be empty.';
-                    alfredMemory::update($id, $content, $allowedScopes);
-                    return 'Memory #' . $id . ' updated.';
+                    alfredMemory::updateByLabel($label, $content, $allowedScopes);
+                    return "Memory '{$label}' updated.";
 
                 case 'alfred_memory_forget':
-                    $id = (int)($input['id'] ?? 0);
-                    if ($id <= 0) return 'Error: invalid ID.';
-                    alfredMemory::forget($id, $allowedScopes);
-                    return 'Memory #' . $id . ' deleted.';
+                    $label = trim((string)($input['label'] ?? ''));
+                    if ($label === '') return 'Error: label must not be empty.';
+                    alfredMemory::forgetByLabel($label, $allowedScopes);
+                    return "Memory '{$label}' deleted.";
             }
         } catch (Exception $e) {
             return 'Error: ' . $e->getMessage();

@@ -43,7 +43,8 @@
         "Delete": "Supprimer",
         "Save": "Enregistrer",
         "Cancel": "Annuler",
-        "Delete this memory?": "Supprimer ce souvenir ?"
+        "Delete this memory?": "Supprimer ce souvenir ?",
+        "Label": "Libellé"
     },
     "plugins\/alfred\/desktop\/php\/alfred.php": {
         "401 - Unauthorized access": "401 - Accès non autorisé",
