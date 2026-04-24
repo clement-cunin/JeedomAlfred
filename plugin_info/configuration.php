@@ -3,6 +3,10 @@ if (!isConnect('admin')) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
 
+include_file('core', 'alfredMigration', 'class', 'alfred');
+$_schemaVersion       = alfredMigration::getVersion();
+$_schemaTargetVersion = alfredMigration::getTargetVersion();
+
 // Auto-detect JeedomMCP settings (used for button + placeholder)
 $_mcpAutoUrl    = network::getNetworkAccess('internal', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
 $_mcpAutoApiKey = config::byKey('mcpApiKey', 'jeedomMCP');
@@ -13,6 +17,7 @@ $_js_i18n = [
     'enter_api_key'    => __('Enter the API key first.', __FILE__),
     'loading'          => __('Loading…', __FILE__),
     'error'            => __('Error', __FILE__),
+    'up_to_date'       => __('Up to date', __FILE__),
 ];
 
 $_providers = [
@@ -159,6 +164,37 @@ $_models = [
         </div>
 
         <!-- ================================================================ -->
+        <!-- Database -->
+        <!-- ================================================================ -->
+        <legend><i class="fas fa-database"></i> {{Database}}</legend>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Schema version}}</label>
+            <div class="col-sm-4" style="padding-top:7px">
+                <?php if ($_schemaVersion >= $_schemaTargetVersion): ?>
+                <span style="color:#3c763d">
+                    <i class="fas fa-check-circle"></i>
+                    <?php echo $_schemaVersion; ?> / <?php echo $_schemaTargetVersion; ?> — {{Up to date}}
+                </span>
+                <?php else: ?>
+                <span style="color:#8a6d3b">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <?php echo $_schemaVersion; ?> / <?php echo $_schemaTargetVersion; ?> — {{Outdated}}
+                </span>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-offset-4 col-sm-8">
+                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_repair_db">
+                    <i class="fas fa-wrench"></i> {{Repair database}}
+                </button>
+                <span id="alfred_repair_db_result" style="margin-left:10px;font-size:13px"></span>
+            </div>
+        </div>
+
+        <!-- ================================================================ -->
         <!-- Agent settings -->
         <!-- ================================================================ -->
         <legend><i class="fas fa-cogs"></i> {{Settings}}</legend>
@@ -187,6 +223,36 @@ $_models = [
 var _alfredMcpAutoUrl    = <?php echo json_encode($_mcpAutoUrl); ?>;
 var _alfredMcpAutoApiKey = <?php echo json_encode($_mcpAutoApiKey); ?>;
 var _alfredI18n          = <?php echo json_encode($_js_i18n); ?>;
+var _alfredSchemaTarget  = <?php echo (int) $_schemaTargetVersion; ?>;
+
+$('#bt_alfred_repair_db').on('click', function () {
+    var $btn    = $(this);
+    var $result = $('#alfred_repair_db_result');
+
+    $btn.prop('disabled', true);
+    $result.html('<i class="fas fa-spinner fa-spin"></i>');
+
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: { action: 'runMigrations' },
+        dataType: 'json',
+        success: function (data) {
+            if (data.state === 'ok') {
+                var v = data.result;
+                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> ' + v + ' / ' + _alfredSchemaTarget + ' — ' + _alfredI18n.up_to_date + '</span>');
+            } else {
+                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (data.result || data.state) + '</span>');
+            }
+        },
+        error: function (jqXHR) {
+            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
+        },
+        complete: function () {
+            $btn.prop('disabled', false);
+        }
+    });
+});
 
 $('#bt_alfred_autodetect_mcp').on('click', function () {
     $('[data-l1key="mcp_url"]').val(_alfredMcpAutoUrl);
