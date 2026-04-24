@@ -96,11 +96,15 @@ class alfredAgent
             alfredConversation::saveAssistantResponse($sessionId, $response);
 
             // Add to in-memory messages for next iteration
-            $messages[] = [
+            $assistantMsg = [
                 'role'       => 'assistant',
                 'content'    => $response['text'],
                 'tool_calls' => $response['tool_calls'],
             ];
+            if (!empty($response['gemini_thought_parts'])) {
+                $assistantMsg['gemini_thought_parts'] = $response['gemini_thought_parts'];
+            }
+            $messages[] = $assistantMsg;
 
             // Execute each tool call
             foreach ($response['tool_calls'] as $tc) {

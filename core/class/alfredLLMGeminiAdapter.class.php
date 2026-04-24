@@ -102,6 +102,10 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
 
             } elseif ($role === 'assistant') {
                 $parts = [];
+                // Thought parts must come first (required by Gemini when thoughtSignature is present)
+                foreach ($msg['gemini_thought_parts'] ?? [] as $tp) {
+                    $parts[] = $tp;
+                }
                 if (!empty($msg['content'])) {
                     $parts[] = ['text' => $msg['content']];
                 }
@@ -184,15 +188,19 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
 
     private function normalize(array $data): array
     {
-        $candidate  = $data['candidates'][0] ?? [];
-        $parts      = $candidate['content']['parts'] ?? [];
-        $text       = '';
-        $tool_calls = [];
+        $candidate     = $data['candidates'][0] ?? [];
+        $parts         = $candidate['content']['parts'] ?? [];
+        $text          = '';
+        $tool_calls    = [];
+        $thought_parts = [];
 
         foreach ($parts as $part) {
             if (isset($part['text'])) {
-                // Skip internal reasoning (thinking models return thought: true)
-                if (!empty($part['thought'])) continue;
+                if (!empty($part['thought'])) {
+                    // Preserve thought parts with thoughtSignature for conversation history
+                    $thought_parts[] = $part;
+                    continue;
+                }
                 $text .= $part['text'];
             } elseif (isset($part['functionCall'])) {
                 $tool_calls[] = [
@@ -203,12 +211,16 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
             }
         }
 
-        $finishReason = $candidate['finishReason'] ?? 'STOP';
-
-        return [
+        $result = [
             'text'        => trim($text),
             'tool_calls'  => $tool_calls,
             'stop_reason' => !empty($tool_calls) ? 'tool_use' : 'end_turn',
         ];
+
+        if (!empty($thought_parts)) {
+            $result['gemini_thought_parts'] = $thought_parts;
+        }
+
+        return $result;
     }
 }
