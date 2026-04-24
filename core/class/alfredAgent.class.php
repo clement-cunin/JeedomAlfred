@@ -33,15 +33,16 @@ class alfredAgent
     private $onEvent;
 
     public function __construct(
-        ?alfredLLMAdapter $llm        = null,
-        ?alfredMCP        $mcp        = null,
-        ?callable         $onEvent    = null,
-        ?string           $userLogin  = null,
-        ?string           $userProfil = null
+        ?alfredLLMAdapter $llm             = null,
+        ?alfredMCP        $mcp             = null,
+        ?callable         $onEvent         = null,
+        ?string           $userLogin       = null,
+        ?string           $userProfil      = null,
+        int               $extraIterations = 0
     ) {
         $this->llm           = $llm   ?? alfredLLM::make();
         $this->mcp           = $mcp   ?? new alfredMCP();
-        $this->maxIterations = alfred::getMaxIterations();
+        $this->maxIterations = alfred::getMaxIterations() + $extraIterations;
         $this->systemPrompt  = alfred::getSystemPrompt();
         $this->onEvent       = $onEvent;
         $this->userLogin     = $userLogin;
@@ -152,14 +153,14 @@ class alfredAgent
      */
     public function run(string $sessionId, string $userMessage): string
     {
-        // Ensure session exists
-        $session = alfredConversation::getSession($sessionId);
-        if ($session === null) {
-            alfredConversation::createSession($sessionId, alfredConversation::autoTitle($userMessage));
+        // Ensure session exists and persist user message (skipped for continuation turns)
+        if ($userMessage !== '') {
+            $session = alfredConversation::getSession($sessionId);
+            if ($session === null) {
+                alfredConversation::createSession($sessionId, alfredConversation::autoTitle($userMessage));
+            }
+            alfredConversation::addMessage($sessionId, 'user', $userMessage);
         }
-
-        // Persist user message
-        alfredConversation::addMessage($sessionId, 'user', $userMessage);
 
         // Load full history
         $messages = alfredConversation::getMessages($sessionId);
@@ -254,8 +255,8 @@ class alfredAgent
         }
 
         if ($iterations >= $this->maxIterations && $finalText === '') {
-            $finalText = 'Maximum iterations reached without a final answer.';
-            alfredConversation::addMessage($sessionId, 'assistant', $finalText);
+            $this->emit('done', ['text' => '', 'iterations' => $iterations, 'limit_reached' => true]);
+            return '';
         }
 
         $this->emit('done', ['text' => $finalText, 'iterations' => $iterations]);

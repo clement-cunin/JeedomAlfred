@@ -44,10 +44,11 @@ $userProfil = ($connectedUser !== null && $connectedUser->getProfils() === 'admi
 // ---- Input ----
 $raw       = file_get_contents('php://input');
 $input     = json_decode($raw, true) ?? [];
-$sessionId = trim($input['session_id'] ?? init('session_id'));
-$message   = trim($input['message']   ?? init('message'));
+$sessionId       = trim($input['session_id']       ?? init('session_id'));
+$message         = trim($input['message']          ?? init('message'));
+$extraIterations = max(0, (int)($input['extra_iterations'] ?? (int)init('extra_iterations')));
 
-if ($sessionId === '' || $message === '') {
+if ($sessionId === '' || ($message === '' && $extraIterations === 0)) {
     sse_event('error', ['message' => 'Missing session_id or message']);
     exit;
 }
@@ -70,7 +71,8 @@ try {
             sse_event($type, $data);
         },
         $userLogin,
-        $userProfil
+        $userProfil,
+        $extraIterations
     );
     $agent->run($sessionId, $message);
 } catch (Exception $e) {

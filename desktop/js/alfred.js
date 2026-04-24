@@ -368,21 +368,29 @@ $(function () {
     // =========================================================================
 
     function sendMessage(sessionId, text) {
-        // Remove welcome screen
         $('#alfred-welcome').remove();
-
         appendBubble('user', text);
         showTyping();
         setInputEnabled(false);
         isStreaming = true;
-
-        // Close any previous stream
         if (currentSource) { currentSource.close(); currentSource = null; }
+        openStream(sessionId, text, 0);
+    }
 
+    function sendContinue(sessionId, extraIterations) {
+        showTyping();
+        setInputEnabled(false);
+        isStreaming = true;
+        if (currentSource) { currentSource.close(); currentSource = null; }
+        openStream(sessionId, '', extraIterations);
+    }
+
+    function openStream(sessionId, message, extraIterations) {
         var url = 'plugins/alfred/api/chat.php'
-            + '?session_id=' + encodeURIComponent(sessionId)
-            + '&message='    + encodeURIComponent(text)
-            + '&user_hash='  + encodeURIComponent(alfred_config.userHash)
+            + '?session_id='       + encodeURIComponent(sessionId)
+            + '&message='          + encodeURIComponent(message)
+            + '&extra_iterations=' + extraIterations
+            + '&user_hash='        + encodeURIComponent(alfred_config.userHash)
             + '&_=' + Date.now();
 
         var source = new EventSource(url);
@@ -429,18 +437,19 @@ $(function () {
         source.addEventListener('done', function (e) {
             var d = JSON.parse(e.data);
             hideTyping();
-            // If delta never fired (tool-only turn with empty text), show the text now
             if (!$assistantBubble && d.text) {
                 appendBubble('assistant', d.text);
             }
-            speak(d.text || assistantText);
+            if (d.limit_reached) {
+                appendLimitReached(sessionId);
+            } else {
+                speak(d.text || assistantText);
+            }
             source.close();
             currentSource = null;
             isStreaming   = false;
             setInputEnabled(true);
-            // Refresh session list to show new/updated session
             loadSessions();
-            // Mark session active
             $('.alfred-session-item').removeClass('active');
             $('[data-session-id="' + sessionId + '"]').addClass('active');
         });
@@ -466,7 +475,6 @@ $(function () {
             setInputEnabled(true);
         });
 
-        // Network-level SSE error (connection dropped)
         source.onerror = function () {
             if (source.readyState === EventSource.CLOSED) {
                 hideTyping();
@@ -475,6 +483,24 @@ $(function () {
                 currentSource = null;
             }
         };
+    }
+
+    function appendLimitReached(sessionId) {
+        var $el = $('<div class="alfred-limit-reached">');
+        $('<span>').text('{{Maximum iterations reached}}').appendTo($el);
+        var steps = [5, 10, 20];
+        for (var i = 0; i < steps.length; i++) {
+            (function (n) {
+                $('<button class="alfred-limit-btn">').text('+' + n)
+                    .on('click', function () {
+                        $el.remove();
+                        sendContinue(sessionId, n);
+                    })
+                    .appendTo($el);
+            }(steps[i]));
+        }
+        $('#alfred-messages').append($el);
+        scrollToBottom();
     }
 
     // =========================================================================
