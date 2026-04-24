@@ -13,6 +13,13 @@ $(function () {
     var isStreaming      = false;
     var currentSource    = null; // active EventSource
 
+    // Voice dictation state
+    var recognition     = null;
+    var isListening     = false;
+    var micAutoSend     = localStorage.getItem('alfred_mic_autosend') === '1';
+    var micInitialText  = ''; // textarea content when mic started
+    var micCommitted    = ''; // accumulated final transcripts
+
     // =========================================================================
     // Sidebar toggle (mobile)
     // =========================================================================
@@ -130,6 +137,7 @@ $(function () {
 
     $('#alfred-send').on('click', function () {
         if (isStreaming) return;
+        if (isListening) { recognition.stop(); }
         var text = $('#alfred-input').val().trim();
         if (!text) return;
 
@@ -140,6 +148,90 @@ $(function () {
         $('#alfred-input').val('').css('height', 'auto');
         sendMessage(currentSessionId, text);
     });
+
+    // =========================================================================
+    // Voice dictation
+    // =========================================================================
+
+    function buildRecognition() {
+        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return null;
+        var r = new SR();
+        r.lang            = navigator.language || 'fr-FR';
+        r.continuous      = !micAutoSend; // fill mode keeps listening; auto-send stops on first pause
+        r.interimResults  = true;
+
+        r.onresult = function (e) {
+            var finals  = '';
+            var interim = '';
+            for (var i = e.resultIndex; i < e.results.length; i++) {
+                if (e.results[i].isFinal) finals  += e.results[i][0].transcript;
+                else                      interim += e.results[i][0].transcript;
+            }
+            micCommitted += finals;
+            var base = micInitialText;
+            var sep  = base && base.slice(-1) !== ' ' && (micCommitted || interim) ? ' ' : '';
+            $('#alfred-input').val(base + sep + micCommitted + interim).trigger('input');
+        };
+
+        r.onend = function () {
+            isListening = false;
+            setMicListening(false);
+            if (micAutoSend && micCommitted.trim()) {
+                $('#alfred-send').trigger('click');
+            }
+        };
+
+        r.onerror = function (e) {
+            isListening = false;
+            setMicListening(false);
+        };
+
+        return r;
+    }
+
+    function toggleMic() {
+        if (isListening) {
+            recognition.stop();
+            // onend handles state reset
+        } else {
+            micInitialText = $('#alfred-input').val();
+            micCommitted   = '';
+            recognition    = buildRecognition();
+            if (!recognition) return;
+            recognition.start();
+            isListening = true;
+            setMicListening(true);
+        }
+    }
+
+    function setMicListening(active) {
+        var $btn = $('#alfred-mic');
+        $btn.toggleClass('listening', active);
+        $btn.find('i').attr('class', active ? 'fas fa-stop' : 'fas fa-microphone');
+        $btn.attr('title', active ? '{{Stop recording}}' : '{{Voice input}}');
+    }
+
+    // Init mic buttons
+    (function () {
+        if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+            $('#alfred-mic, #alfred-mic-autosend').hide();
+            return;
+        }
+        $('#alfred-mic-autosend').toggleClass('active', micAutoSend)
+            .attr('title', micAutoSend ? '{{Auto-send: ON}}' : '{{Auto-send: OFF}}');
+
+        $('#alfred-mic').on('click', function () {
+            if (!isStreaming) toggleMic();
+        });
+
+        $('#alfred-mic-autosend').on('click', function () {
+            micAutoSend = !micAutoSend;
+            localStorage.setItem('alfred_mic_autosend', micAutoSend ? '1' : '0');
+            $(this).toggleClass('active', micAutoSend)
+                   .attr('title', micAutoSend ? '{{Auto-send: ON}}' : '{{Auto-send: OFF}}');
+        });
+    }());
 
     // =========================================================================
     // SSE streaming
@@ -285,7 +377,8 @@ $(function () {
     }
 
     function setInputEnabled(enabled) {
-        $('#alfred-input, #alfred-send').prop('disabled', !enabled);
+        $('#alfred-input, #alfred-send, #alfred-mic, #alfred-mic-autosend').prop('disabled', !enabled);
+        if (!enabled && isListening) { recognition.stop(); }
     }
 
     function scrollToBottom() {

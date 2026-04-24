@@ -64,6 +64,13 @@ try {
         ajax::success(alfredConversation::getMessages($sessionId));
     }
 
+    if ($action === 'runMigrations') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        include_file('core', 'alfredMigration', 'class', 'alfred');
+        alfredMigration::runPending();
+        ajax::success(alfredMigration::getVersion());
+    }
+
     throw new Exception(__('No method found for: ', __FILE__) . $action);
 
 } catch (Exception $e) {
