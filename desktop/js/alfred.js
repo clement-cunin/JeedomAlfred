@@ -187,6 +187,9 @@ $(function () {
         function populateVoices() {
             var voices = speechSynthesis.getVoices();
             if (!voices.length) return;
+            // Voices are now available — remove handler to prevent Chrome from
+            // re-triggering it on speak/cancel and resetting the user's selection.
+            speechSynthesis.onvoiceschanged = null;
             var $select = $('#alfred-tts-voice').empty();
             var savedName = localStorage.getItem('alfred_tts_voice') || '';
             var lang = (navigator.language || 'fr-FR').split('-')[0];
