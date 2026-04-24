@@ -57,6 +57,14 @@ $_userHash     = $_SESSION['user']->getHash();
                       placeholder="{{Type a message…}}"
                       rows="1"
                       <?php echo !$_isConfigured ? 'disabled' : ''; ?>></textarea>
+            <button id="alfred-mic-autosend" title="{{Auto-send: OFF}}"
+                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
+                <i class="fas fa-bolt"></i>
+            </button>
+            <button id="alfred-mic" title="{{Voice input}}"
+                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
+                <i class="fas fa-microphone"></i>
+            </button>
             <button id="alfred-send" title="{{Send}}"
                     <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
                 <i class="fas fa-paper-plane"></i>
