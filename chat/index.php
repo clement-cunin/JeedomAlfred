@@ -25,6 +25,7 @@ if (!isConnect()) {
     <meta name="theme-color" content="#337ab7">
     <title>Alfred</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="../plugin_info/alfred_icon.png">
     <style>
         body {
