@@ -110,9 +110,14 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
                     $parts[] = ['text' => $msg['content']];
                 }
                 foreach ($msg['tool_calls'] ?? [] as $tc) {
-                    // args must be a JSON object, never an array
-                    $args    = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
-                    $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $args]];
+                    if (!empty($tc['gemini_part'])) {
+                        // Use preserved raw part (retains thoughtSignature if Gemini sent one)
+                        $parts[] = $tc['gemini_part'];
+                    } else {
+                        // Fallback for old messages without preserved raw part
+                        $args    = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
+                        $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $args]];
+                    }
                 }
                 $out[] = ['role' => 'model', 'parts' => $parts];
 
@@ -204,9 +209,10 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
                 $text .= $part['text'];
             } elseif (isset($part['functionCall'])) {
                 $tool_calls[] = [
-                    'id'    => uniqid('gemini_', true), // Gemini has no call IDs
-                    'name'  => $part['functionCall']['name'],
-                    'input' => $part['functionCall']['args'] ?? [],
+                    'id'         => uniqid('gemini_', true), // Gemini has no call IDs
+                    'name'       => $part['functionCall']['name'],
+                    'input'      => $part['functionCall']['args'] ?? [],
+                    'gemini_part' => $part, // preserve full part (may contain thoughtSignature)
                 ];
             }
         }
