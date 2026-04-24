@@ -57,6 +57,10 @@ $_userHash     = $_SESSION['user']->getHash();
                       placeholder="{{Type a message…}}"
                       rows="1"
                       <?php echo !$_isConfigured ? 'disabled' : ''; ?>></textarea>
+            <button id="alfred-tts" title="{{Text-to-speech}}"
+                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
+                <i class="fas fa-volume-up"></i>
+            </button>
             <button id="alfred-mic-autosend" title="{{Auto-send: OFF}}"
                     <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
                 <i class="fas fa-bolt"></i>

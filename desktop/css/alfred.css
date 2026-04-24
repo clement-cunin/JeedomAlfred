@@ -303,6 +303,7 @@
     animation: alfred-mic-pulse 1.2s ease-in-out infinite;
 }
 
+#alfred-tts,
 #alfred-mic-autosend {
     width: 30px;
     height: 30px;
@@ -320,17 +321,20 @@
     transition: all 0.15s;
 }
 
+#alfred-tts:hover:not(:disabled),
 #alfred-mic-autosend:hover:not(:disabled) {
     border-color: #337ab7;
     color: #337ab7;
 }
 
+#alfred-tts.active,
 #alfred-mic-autosend.active {
     background: #337ab7;
     border-color: #337ab7;
     color: #fff;
 }
 
+#alfred-tts:disabled,
 #alfred-mic-autosend:disabled {
     opacity: 0.4;
     cursor: not-allowed;

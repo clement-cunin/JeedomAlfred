@@ -20,6 +20,9 @@ $(function () {
     var micInitialText  = ''; // textarea content when mic started
     var micCommitted    = ''; // accumulated final transcripts
 
+    // Text-to-speech state
+    var ttsEnabled = localStorage.getItem('alfred_tts') === '1';
+
     // =========================================================================
     // Sidebar toggle (mobile)
     // =========================================================================
@@ -138,6 +141,7 @@ $(function () {
     $('#alfred-send').on('click', function () {
         if (isStreaming) return;
         if (isListening) { recognition.stop(); }
+        speechSynthesis.cancel();
         var text = $('#alfred-input').val().trim();
         if (!text) return;
 
@@ -148,6 +152,42 @@ $(function () {
         $('#alfred-input').val('').css('height', 'auto');
         sendMessage(currentSessionId, text);
     });
+
+    // =========================================================================
+    // Text-to-speech
+    // =========================================================================
+
+    (function initTts() {
+        if (!window.speechSynthesis) return;
+        var $btn = $('#alfred-tts');
+        $btn.toggleClass('active', ttsEnabled);
+
+        $btn.on('click', function () {
+            ttsEnabled = !ttsEnabled;
+            localStorage.setItem('alfred_tts', ttsEnabled ? '1' : '0');
+            $btn.toggleClass('active', ttsEnabled);
+            if (!ttsEnabled) speechSynthesis.cancel();
+        });
+    }());
+
+    function speak(text) {
+        if (!ttsEnabled || !window.speechSynthesis || !text) return;
+        speechSynthesis.cancel();
+        var clean = text
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/`[^`]*`/g, '')
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/\*([^*]+)\*/g, '$1')
+            .replace(/#+\s*/g, '')
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            .replace(/[_~>|]/g, '')
+            .replace(/\n+/g, ' ')
+            .trim();
+        if (!clean) return;
+        var utt = new SpeechSynthesisUtterance(clean);
+        utt.lang = navigator.language || 'fr-FR';
+        speechSynthesis.speak(utt);
+    }
 
     // =========================================================================
     // Voice dictation
@@ -290,6 +330,7 @@ $(function () {
             if (!$assistantBubble && d.text) {
                 appendBubble('assistant', d.text);
             }
+            speak(d.text || assistantText);
             source.close();
             currentSource = null;
             isStreaming   = false;
