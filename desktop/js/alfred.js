@@ -451,7 +451,7 @@ $(function () {
             try { technical = JSON.parse(e.data).message; } catch (_) {}
             var display = alfred_config.isAdmin && technical
                 ? technical
-                : 'An error occurred.';
+                : '{{An error occurred.}}';
             var $bubble = appendBubble('assistant', '⚠️ ' + display);
             if (alfred_config.isAdmin && technical && technical !== display) {
                 $bubble.find('.alfred-msg-bubble').append(
