@@ -22,6 +22,8 @@ $(function () {
 
     // Text-to-speech state
     var ttsEnabled = localStorage.getItem('alfred_tts') === '1';
+    var ttsVoice   = null; // SpeechSynthesisVoice object
+    var ttsRate    = parseFloat(localStorage.getItem('alfred_tts_rate') || '1');
 
     // =========================================================================
     // Sidebar toggle (mobile)
@@ -168,6 +170,79 @@ $(function () {
             $btn.toggleClass('active', ttsEnabled);
             if (!ttsEnabled) speechSynthesis.cancel();
         });
+
+        // Build settings popover
+        var rateDisplay = isNaN(ttsRate) ? '1.0' : ttsRate.toFixed(1);
+        var $popover = $('<div id="alfred-tts-popover">')
+            .append('<span class="alfred-tts-label">{{Voice}}</span>')
+            .append('<select id="alfred-tts-voice"></select>')
+            .append('<span class="alfred-tts-label">{{Speed}}</span>')
+            .append(
+                $('<div class="alfred-tts-rate-row">')
+                    .append('<input type="range" id="alfred-tts-rate" min="0.5" max="2" step="0.1" value="' + (isNaN(ttsRate) ? 1 : ttsRate) + '">')
+                    .append('<span class="alfred-tts-rate-val" id="alfred-tts-rate-val">' + rateDisplay + 'x</span>')
+            );
+        $('#alfred-tts-wrap').append($popover);
+
+        function populateVoices() {
+            var voices = speechSynthesis.getVoices();
+            if (!voices.length) return;
+            var $select = $('#alfred-tts-voice').empty();
+            var savedName = localStorage.getItem('alfred_tts_voice') || '';
+            var lang = (navigator.language || 'fr-FR').split('-')[0];
+            var autoSelected = false;
+            for (var i = 0; i < voices.length; i++) {
+                var v = voices[i];
+                var $opt = $('<option>').val(v.name).text(v.name + ' (' + v.lang + ')');
+                if (v.name === savedName) {
+                    $opt.prop('selected', true);
+                    ttsVoice = v;
+                    autoSelected = true;
+                }
+                $select.append($opt);
+            }
+            if (!autoSelected) {
+                for (var j = 0; j < voices.length; j++) {
+                    if (voices[j].lang.indexOf(lang) === 0) {
+                        $select.find('option').eq(j).prop('selected', true);
+                        ttsVoice = voices[j];
+                        break;
+                    }
+                }
+            }
+        }
+
+        populateVoices();
+        if (typeof speechSynthesis.onvoiceschanged !== 'undefined') {
+            speechSynthesis.onvoiceschanged = populateVoices;
+        }
+
+        $('#alfred-tts-voice').on('change', function () {
+            var name = $(this).val();
+            localStorage.setItem('alfred_tts_voice', name);
+            var voices = speechSynthesis.getVoices();
+            ttsVoice = null;
+            for (var i = 0; i < voices.length; i++) {
+                if (voices[i].name === name) { ttsVoice = voices[i]; break; }
+            }
+        });
+
+        $('#alfred-tts-rate').on('input', function () {
+            ttsRate = parseFloat(this.value);
+            localStorage.setItem('alfred_tts_rate', String(ttsRate));
+            $('#alfred-tts-rate-val').text(ttsRate.toFixed(1) + 'x');
+        });
+
+        $('#alfred-tts-settings').on('click', function (e) {
+            e.stopPropagation();
+            $popover.toggleClass('open');
+        });
+
+        $(document).on('click.tts-popover', function (e) {
+            if (!$(e.target).closest('#alfred-tts-wrap').length) {
+                $popover.removeClass('open');
+            }
+        });
     }());
 
     function speak(text) {
@@ -185,7 +260,13 @@ $(function () {
             .trim();
         if (!clean) return;
         var utt = new SpeechSynthesisUtterance(clean);
-        utt.lang = navigator.language || 'fr-FR';
+        if (ttsVoice) {
+            utt.voice = ttsVoice;
+            utt.lang  = ttsVoice.lang;
+        } else {
+            utt.lang = navigator.language || 'fr-FR';
+        }
+        utt.rate = (ttsRate > 0) ? ttsRate : 1;
         speechSynthesis.speak(utt);
     }
 
