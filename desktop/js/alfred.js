@@ -197,16 +197,13 @@ $(function () {
         var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) return null;
         var r = new SR();
-        r.lang            = navigator.language || 'fr-FR';
-        r.continuous      = !micAutoSend; // fill mode keeps listening; auto-send stops on first pause
-        r.interimResults  = true;
+        r.lang           = navigator.language || 'fr-FR';
+        r.continuous     = false; // always false: continuous=true is unreliable on Android Chrome
+        r.interimResults = true;
 
         r.onresult = function (e) {
             var committed = '';
             var interim   = '';
-            // Rebuild from all results (not from e.resultIndex) so that
-            // browsers where e.resultIndex stays at 0 (Android Chrome) don't
-            // re-append already-committed finals.
             for (var i = 0; i < e.results.length; i++) {
                 if (e.results[i].isFinal) committed += e.results[i][0].transcript;
                 else                      interim   += e.results[i][0].transcript;
@@ -218,14 +215,22 @@ $(function () {
         };
 
         r.onend = function () {
-            isListening = false;
             setMicListening(false);
-            if (micAutoSend && micCommitted.trim()) {
-                $('#alfred-send').trigger('click');
+            if (!isListening) return; // manually stopped — do nothing
+
+            if (micAutoSend) {
+                isListening = false;
+                if (micCommitted.trim()) $('#alfred-send').trigger('click');
+            } else {
+                // Fill mode: update base to current textarea, then restart cleanly
+                micInitialText = $('#alfred-input').val();
+                micCommitted   = '';
+                try { recognition.start(); } catch (ex) {}
+                setMicListening(true);
             }
         };
 
-        r.onerror = function (e) {
+        r.onerror = function () {
             isListening = false;
             setMicListening(false);
         };
@@ -235,8 +240,9 @@ $(function () {
 
     function toggleMic() {
         if (isListening) {
+            isListening = false; // set before stop so onend won't restart
             recognition.stop();
-            // onend handles state reset
+            setMicListening(false);
         } else {
             micInitialText = $('#alfred-input').val();
             micCommitted   = '';
