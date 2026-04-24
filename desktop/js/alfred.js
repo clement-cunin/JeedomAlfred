@@ -202,16 +202,19 @@ $(function () {
         r.interimResults  = true;
 
         r.onresult = function (e) {
-            var finals  = '';
-            var interim = '';
-            for (var i = e.resultIndex; i < e.results.length; i++) {
-                if (e.results[i].isFinal) finals  += e.results[i][0].transcript;
-                else                      interim += e.results[i][0].transcript;
+            var committed = '';
+            var interim   = '';
+            // Rebuild from all results (not from e.resultIndex) so that
+            // browsers where e.resultIndex stays at 0 (Android Chrome) don't
+            // re-append already-committed finals.
+            for (var i = 0; i < e.results.length; i++) {
+                if (e.results[i].isFinal) committed += e.results[i][0].transcript;
+                else                      interim   += e.results[i][0].transcript;
             }
-            micCommitted += finals;
+            micCommitted = committed;
             var base = micInitialText;
-            var sep  = base && base.slice(-1) !== ' ' && (micCommitted || interim) ? ' ' : '';
-            $('#alfred-input').val(base + sep + micCommitted + interim).trigger('input');
+            var sep  = base && base.slice(-1) !== ' ' && (committed || interim) ? ' ' : '';
+            $('#alfred-input').val(base + sep + committed + interim).trigger('input');
         };
 
         r.onend = function () {
