@@ -339,7 +339,7 @@ $(function () {
         var $btn = $('#alfred-mic');
         $btn.toggleClass('listening', active);
         $btn.find('i').attr('class', active ? 'fas fa-stop' : 'fas fa-microphone');
-        $btn.attr('title', active ? '{{Stop recording}}' : '{{Voice input}}');
+        $btn.attr('title', active ? "{{Stop recording}}" : "{{Voice input}}");
     }
 
     // Init mic buttons
@@ -349,7 +349,7 @@ $(function () {
             return;
         }
         $('#alfred-mic-autosend').toggleClass('active', micAutoSend)
-            .attr('title', micAutoSend ? '{{Auto-send: ON}}' : '{{Auto-send: OFF}}');
+            .attr('title', micAutoSend ? "{{Auto-send: ON}}" : "{{Auto-send: OFF}}");
 
         $('#alfred-mic').on('click', function () {
             if (!isStreaming) toggleMic();
@@ -359,7 +359,7 @@ $(function () {
             micAutoSend = !micAutoSend;
             localStorage.setItem('alfred_mic_autosend', micAutoSend ? '1' : '0');
             $(this).toggleClass('active', micAutoSend)
-                   .attr('title', micAutoSend ? '{{Auto-send: ON}}' : '{{Auto-send: OFF}}');
+                   .attr('title', micAutoSend ? "{{Auto-send: ON}}" : "{{Auto-send: OFF}}");
         });
     }());
 
@@ -460,7 +460,7 @@ $(function () {
             try { technical = JSON.parse(e.data).message; } catch (_) {}
             var display = alfred_config.isAdmin && technical
                 ? technical
-                : '{{An error occurred.}}';
+                : "{{An error occurred.}}";
             var $bubble = appendBubble('assistant', '⚠️ ' + display);
             if (alfred_config.isAdmin && technical && technical !== display) {
                 $bubble.find('.alfred-msg-bubble').append(
@@ -487,7 +487,7 @@ $(function () {
 
     function appendLimitReached(sessionId) {
         var $el = $('<div class="alfred-limit-reached">');
-        $('<span>').text('{{Maximum iterations reached}}').appendTo($el);
+        $('<span>').text("{{Maximum iterations reached}}").appendTo($el);
         var steps = [5, 10, 20];
         for (var i = 0; i < steps.length; i++) {
             (function (n) {
