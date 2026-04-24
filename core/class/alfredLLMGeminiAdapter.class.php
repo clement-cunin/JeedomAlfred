@@ -112,7 +112,13 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
                 foreach ($msg['tool_calls'] ?? [] as $tc) {
                     if (!empty($tc['gemini_part'])) {
                         // Use preserved raw part (retains thoughtSignature if Gemini sent one)
-                        $parts[] = $tc['gemini_part'];
+                        // but re-cast args to object: empty {} round-trips through DB as []
+                        $rawPart = $tc['gemini_part'];
+                        if (isset($rawPart['functionCall'])) {
+                            $a = $rawPart['functionCall']['args'] ?? [];
+                            $rawPart['functionCall']['args'] = empty($a) ? new stdClass() : (object)$a;
+                        }
+                        $parts[] = $rawPart;
                     } else {
                         // Fallback for old messages without preserved raw part
                         $args    = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
