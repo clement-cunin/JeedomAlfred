@@ -7,17 +7,26 @@ include_file('core', 'alfredMigration', 'class', 'alfred');
 $_schemaVersion       = alfredMigration::getVersion();
 $_schemaTargetVersion = alfredMigration::getTargetVersion();
 
-// Auto-detect JeedomMCP settings (used for button + placeholder)
-$_mcpAutoUrl    = network::getNetworkAccess('internal', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
-$_mcpAutoApiKey = config::byKey('mcpApiKey', 'jeedomMCP');
-
 // JS i18n strings — always via json_encode to survive apostrophes in translations
 $_js_i18n = [
-    'mcp_autodetected' => __('JeedomMCP settings auto-detected.', __FILE__),
-    'enter_api_key'    => __('Enter the API key first.', __FILE__),
-    'loading'          => __('Loading…', __FILE__),
-    'error'            => __('Error', __FILE__),
-    'up_to_date'       => __('Up to date', __FILE__),
+    'mcp_autodetected'   => __('JeedomMCP settings auto-detected.', __FILE__),
+    'enter_api_key'      => __('Enter the API key first.', __FILE__),
+    'loading'            => __('Loading…', __FILE__),
+    'error'              => __('Error', __FILE__),
+    'up_to_date'         => __('Up to date', __FILE__),
+    'server_name'        => __('Name', __FILE__),
+    'server_slug'        => __('Slug', __FILE__),
+    'server_url'         => __('URL', __FILE__),
+    'server_auth_header' => __('Auth header', __FILE__),
+    'server_auth_value'  => __('Auth value', __FILE__),
+    'server_prefix'      => __('Prefix tools', __FILE__),
+    'server_enabled'     => __('Enabled', __FILE__),
+    'server_test'        => __('Test', __FILE__),
+    'server_remove'      => __('Remove', __FILE__),
+    'add_server'         => __('Add MCP server', __FILE__),
+    'test_ok'            => __('OK — %d tool(s) found', __FILE__),
+    'conflict_warning'   => __('Tool name conflicts detected — first declared server wins. Conflicting names: %s. Enable tool prefix on one of the servers to resolve.', __FILE__),
+    'no_servers'         => __('No MCP servers configured. Alfred will work as a plain LLM without tools.', __FILE__),
 ];
 
 $_providers = [
@@ -26,22 +35,12 @@ $_providers = [
     'gemini'    => 'Google (Gemini)',
 ];
 
-$_models = [
-    'anthropic' => [
-        'claude-sonnet-4-6'        => 'Claude Sonnet 4.6',
-        'claude-opus-4-6'          => 'Claude Opus 4.6',
-        'claude-haiku-4-5-20251001' => 'Claude Haiku 4.5',
-    ],
-    'openai' => [
-        'gpt-4o'      => 'GPT-4o',
-        'gpt-4o-mini' => 'GPT-4o mini',
-        'gpt-4-turbo' => 'GPT-4 Turbo',
-    ],
-    'gemini' => [
-        'gemini-1.5-pro'   => 'Gemini 1.5 Pro',
-        'gemini-1.5-flash' => 'Gemini 1.5 Flash',
-    ],
-];
+// Auto-detect JeedomMCP settings (used for add button default URL)
+$_mcpAutoUrl    = network::getNetworkAccess('internal', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
+$_mcpAutoApiKey = config::byKey('mcpApiKey', 'jeedomMCP');
+$_mcpRaw = config::byKey('mcp_servers', 'alfred');
+// config::byKey auto-decodes JSON arrays — re-encode to get a plain string for JS injection
+$_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcpRaw ?: '[]');
 ?>
 
 <form class="form-horizontal">
@@ -134,32 +133,33 @@ $_models = [
         </div>
 
         <!-- ================================================================ -->
-        <!-- JeedomMCP -->
+        <!-- MCP Servers -->
         <!-- ================================================================ -->
-        <legend><i class="fas fa-plug"></i> JeedomMCP</legend>
+        <legend><i class="fas fa-plug"></i> {{MCP servers}}</legend>
+
+        <!-- Hidden field synced by JS. data-l1key ensures Jeedom's standard save also persists the value. -->
+        <input type="hidden" id="alfred_mcp_servers_json" class="configKey" data-l1key="mcp_servers" />
 
         <div class="form-group">
-            <div class="col-sm-offset-4 col-sm-8" style="margin-bottom:8px">
-                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_autodetect_mcp">
-                    <i class="fas fa-magic"></i> {{Auto-detect from JeedomMCP plugin}}
+            <div class="col-sm-offset-4 col-sm-8">
+                <!-- Conflict warning banner -->
+                <div id="alfred-mcp-conflict-banner" class="alert alert-warning" style="display:none">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span id="alfred-mcp-conflict-text"></span>
+                </div>
+                <!-- Server list -->
+                <div id="alfred-mcp-server-list"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-offset-4 col-sm-8">
+                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_add_server">
+                    <i class="fas fa-plus"></i> {{Add MCP server}}
                 </button>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="col-sm-4 control-label">{{JeedomMCP URL}}</label>
-            <div class="col-sm-5">
-                <input type="text" class="configKey form-control" data-l1key="mcp_url"
-                       placeholder="<?php echo htmlspecialchars($_mcpAutoUrl); ?>" />
-            </div>
-            <span class="help-block col-sm-3">{{Internal network URL recommended.}}</span>
-        </div>
-
-        <div class="form-group">
-            <label class="col-sm-4 control-label">{{JeedomMCP API key}}</label>
-            <div class="col-sm-4">
-                <input type="password" class="configKey form-control" data-l1key="mcp_api_key"
-                       autocomplete="new-password" />
+                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_autodetect_mcp" style="margin-left:8px">
+                    <i class="fas fa-magic"></i> {{Auto-detect JeedomMCP}}
+                </button>
             </div>
         </div>
 
@@ -278,11 +278,73 @@ $_models = [
     </fieldset>
 </form>
 
+<style>
+.alfred-mcp-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.alfred-mcp-server-card {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px 12px;
+    background: #fafafa;
+    min-width: 0;
+}
+.alfred-mcp-server-card.disabled-server {
+    opacity: 0.6;
+}
+.alfred-mcp-side-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+.alfred-mcp-line {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin-bottom: 6px;
+}
+.alfred-mcp-line:last-child { margin-bottom: 0; }
+.alfred-mcp-check-line { align-items: center; }
+.alfred-field {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+.alfred-field label {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 2px;
+    font-weight: normal;
+}
+.alfred-mcp-check-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-weight: normal;
+    margin: 0;
+    font-size: 13px;
+}
+.alfred-mcp-test-result {
+    font-size: 12px;
+    line-height: 30px;
+    margin-left: 6px;
+}
+</style>
+
 <script>
-var _alfredMcpAutoUrl    = <?php echo json_encode($_mcpAutoUrl); ?>;
-var _alfredMcpAutoApiKey = <?php echo json_encode($_mcpAutoApiKey); ?>;
-var _alfredI18n          = <?php echo json_encode($_js_i18n); ?>;
-var _alfredSchemaTarget  = <?php echo (int) $_schemaTargetVersion; ?>;
+var _alfredMcpAutoUrl      = <?php echo json_encode($_mcpAutoUrl); ?>;
+var _alfredMcpAutoApiKey   = <?php echo json_encode($_mcpAutoApiKey); ?>;
+var _alfredMcpServersJson  = <?php echo json_encode($_mcpServersJson); ?>;
+var _alfredI18n            = <?php echo json_encode($_js_i18n); ?>;
+var _alfredSchemaTarget    = <?php echo (int) $_schemaTargetVersion; ?>;
 
 $('#bt_alfred_repair_db').on('click', function () {
     var $btn    = $(this);
@@ -313,25 +375,280 @@ $('#bt_alfred_repair_db').on('click', function () {
     });
 });
 
-$('#bt_alfred_autodetect_mcp').on('click', function () {
-    $('[data-l1key="mcp_url"]').val(_alfredMcpAutoUrl);
-    $('[data-l1key="mcp_api_key"]').val(_alfredMcpAutoApiKey);
+// ============================================================
+// MCP Server list manager
+// ============================================================
+
+var _alfredMcpServers = [];          // in-memory list
+var _alfredMcpToolCache = {};        // index => [tool names] (populated by Test)
+var _alfredMcpSaveTimer = null;
+
+function alfredMcpSerialize(skipSave) {
+    var json = JSON.stringify(_alfredMcpServers);
+    $('#alfred_mcp_servers_json').val(json);
+    // Jeedom's configKey mechanism skips input[type="hidden"] on save, so we persist
+    // explicitly. Debounced to avoid an AJAX call on every keystroke.
+    if (!skipSave) {
+        clearTimeout(_alfredMcpSaveTimer);
+        _alfredMcpSaveTimer = setTimeout(function() {
+            $.ajax({
+                type: 'POST',
+                url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+                data: { action: 'saveMCPServers', mcp_servers: json },
+                dataType: 'json'
+            });
+        }, 600);
+    }
+}
+
+function alfredMcpDeserialize() {
+    var raw = $('#alfred_mcp_servers_json').val();
+    if (!raw) return [];
+    try { return JSON.parse(raw); } catch(e) { return []; }
+}
+
+function alfredMcpRender() {
+    var $list = $('#alfred-mcp-server-list');
+    $list.empty();
+
+    if (_alfredMcpServers.length === 0) {
+        $list.append('<p class="text-muted" style="margin:8px 0 4px">' + _alfredI18n.no_servers + '</p>');
+    }
+
+    $.each(_alfredMcpServers, function(i, srv) {
+        $list.append(alfredMcpBuildRow(i, srv));
+    });
+
+    alfredMcpCheckConflicts();
+}
+
+function alfredMcpBuildRow(i, srv) {
+    var $card = $('<div class="alfred-mcp-server-card">');
+    if (!srv.enabled) $card.addClass('disabled-server');
+
+    // ---- Name ----
+    var $nameWrap = $('<div class="alfred-field">');
+    $nameWrap.append($('<label>').text(_alfredI18n.server_name));
+    $nameWrap.append($('<input type="text" class="form-control input-sm">').val(srv.name || '').on('input', function() {
+        _alfredMcpServers[i].name = $(this).val();
+        alfredMcpSerialize();
+    }));
+    $card.append($('<div class="alfred-mcp-line">').append($nameWrap));
+
+    // ---- URL ----
+    var $urlWrap = $('<div class="alfred-field">');
+    $urlWrap.append($('<label>').text(_alfredI18n.server_url));
+    $urlWrap.append($('<input type="text" class="form-control input-sm" placeholder="http://...">').val(srv.url || '').on('input', function() {
+        _alfredMcpServers[i].url = $(this).val();
+        alfredMcpSerialize();
+        delete _alfredMcpToolCache[i];
+        alfredMcpCheckConflicts();
+    }));
+    $card.append($('<div class="alfred-mcp-line">').append($urlWrap));
+
+    // ---- Auth header + value ----
+    var $authHWrap = $('<div class="alfred-field" style="flex:1">');
+    $authHWrap.append($('<label>').text(_alfredI18n.server_auth_header));
+    $authHWrap.append($('<input type="text" class="form-control input-sm" placeholder="X-API-Key">').val(srv.auth_header || '').on('input', function() {
+        _alfredMcpServers[i].auth_header = $(this).val();
+        alfredMcpSerialize();
+    }));
+
+    var $authVWrap = $('<div class="alfred-field" style="flex:2">');
+    $authVWrap.append($('<label>').text(_alfredI18n.server_auth_value));
+    $authVWrap.append($('<input type="password" class="form-control input-sm" autocomplete="new-password">').val(srv.auth_value || '').on('input', function() {
+        _alfredMcpServers[i].auth_value = $(this).val();
+        alfredMcpSerialize();
+    }));
+    $card.append($('<div class="alfred-mcp-line">').append($authHWrap).append($authVWrap));
+
+    // ---- Prefix tools + slug ----
+    var $prefixCb = $('<input type="checkbox">').prop('checked', !!srv.prefix_tools).on('change', function() {
+        _alfredMcpServers[i].prefix_tools = $(this).is(':checked');
+        alfredMcpSerialize();
+        alfredMcpCheckConflicts();
+    });
+    var $prefixLabel = $('<label class="alfred-mcp-check-label">').append($prefixCb).append(' ' + _alfredI18n.server_prefix);
+
+    var $slugWrap = $('<div class="alfred-field" style="flex:0 0 auto;width:160px">');
+    $slugWrap.append($('<label>').text(_alfredI18n.server_slug));
+    $slugWrap.append($('<input type="text" class="form-control input-sm" placeholder="e.g. jeedom">').val(srv.slug || '').on('input', function() {
+        _alfredMcpServers[i].slug = $(this).val();
+        alfredMcpSerialize();
+    }));
+    $card.append($('<div class="alfred-mcp-line alfred-mcp-check-line">').append($prefixLabel).append($slugWrap));
+
+    // ---- Enabled ----
+    var $enabledCb = $('<input type="checkbox">').prop('checked', srv.enabled !== false).on('change', function() {
+        _alfredMcpServers[i].enabled = $(this).is(':checked');
+        $card.toggleClass('disabled-server', !_alfredMcpServers[i].enabled);
+        alfredMcpSerialize();
+        alfredMcpCheckConflicts();
+    });
+    var $enabledLabel = $('<label class="alfred-mcp-check-label">').append($enabledCb).append(' ' + _alfredI18n.server_enabled);
+    $card.append($('<div class="alfred-mcp-line alfred-mcp-check-line">').append($enabledLabel));
+
+    // ---- Test button + result ----
+    var $testResult = $('<div class="alfred-mcp-test-result">');
+    var $btnTest = $('<button type="button" class="btn btn-default btn-sm">').prepend($('<i class="fas fa-plug" style="margin-right:6px">')).append(_alfredI18n.server_test);
+    $btnTest.on('click', function() { alfredMcpTest(i, $testResult); });
+    $card.append($('<div class="alfred-mcp-line">').append($btnTest).append($testResult));
+
+    if (_alfredMcpToolCache[i] !== undefined) {
+        var n = _alfredMcpToolCache[i].length;
+        $testResult.html('<span style="color:#3c763d"><i class="fas fa-check"></i> ' + _alfredI18n.test_ok.replace('%d', n) + '</span>');
+    }
+
+    // ---- Side actions (outside card): up/down only shown with 2+ servers ----
+    var $side = $('<div class="alfred-mcp-side-actions">');
+    if (_alfredMcpServers.length > 1) {
+        var $btnUp = $('<button type="button" class="btn btn-default btn-xs" title="Move up"><i class="fas fa-arrow-up"></i></button>');
+        $btnUp.prop('disabled', i === 0).on('click', function() { alfredMcpMove(i, -1); });
+
+        var $btnDown = $('<button type="button" class="btn btn-default btn-xs" title="Move down"><i class="fas fa-arrow-down"></i></button>');
+        $btnDown.prop('disabled', i === _alfredMcpServers.length - 1).on('click', function() { alfredMcpMove(i, 1); });
+
+        $side.append($btnUp).append($btnDown);
+    }
+    var $btnRemove = $('<button type="button" class="btn btn-danger btn-xs" title="Remove"><i class="fas fa-trash"></i></button>');
+    $btnRemove.on('click', function() { alfredMcpRemove(i); });
+    $side.append($btnRemove);
+
+    return $('<div class="alfred-mcp-entry">').append($card).append($side);
+}
+
+function alfredMcpMove(i, dir) {
+    var j = i + dir;
+    if (j < 0 || j >= _alfredMcpServers.length) return;
+    var tmp = _alfredMcpServers[i];
+    _alfredMcpServers[i] = _alfredMcpServers[j];
+    _alfredMcpServers[j] = tmp;
+    // Swap tool cache too
+    var tmpCache = _alfredMcpToolCache[i];
+    _alfredMcpToolCache[i] = _alfredMcpToolCache[j];
+    _alfredMcpToolCache[j] = tmpCache;
+    alfredMcpSerialize();
+    alfredMcpRender();
+}
+
+function alfredMcpRemove(i) {
+    _alfredMcpServers.splice(i, 1);
+    delete _alfredMcpToolCache[i];
+    alfredMcpSerialize();
+    alfredMcpRender();
+}
+
+function alfredMcpTest(i, $result) {
+    var srv = _alfredMcpServers[i];
+    if (!srv.url) {
+        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> URL required</span>');
+        return;
+    }
+    $result.html('<i class="fas fa-spinner fa-spin"></i>');
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: {
+            action:      'testMCP',
+            url:         srv.url,
+            auth_header: srv.auth_header || 'X-API-Key',
+            auth_value:  srv.auth_value  || ''
+        },
+        dataType: 'json',
+        success: function(data) {
+            if (data.state === 'ok') {
+                var n = data.result.count;
+                _alfredMcpToolCache[i] = data.result.tools || [];
+                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> ' + _alfredI18n.test_ok.replace('%d', n) + '</span>');
+                alfredMcpCheckConflicts();
+            } else {
+                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (data.result || data.state) + '</span>');
+            }
+        },
+        error: function(jqXHR) {
+            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
+        }
+    });
+}
+
+function alfredMcpCheckConflicts() {
+    var seen = {};
+    var conflicts = [];
+
+    $.each(_alfredMcpServers, function(i, srv) {
+        if (srv.enabled === false) return;
+        var tools = _alfredMcpToolCache[i];
+        if (!tools) return;
+        $.each(tools, function(_, name) {
+            var exposed = (srv.prefix_tools && srv.slug) ? srv.slug + '__' + name : name;
+            if (seen[exposed]) {
+                conflicts.push(exposed);
+            } else {
+                seen[exposed] = true;
+            }
+        });
+    });
+
+    var $banner = $('#alfred-mcp-conflict-banner');
+    if (conflicts.length > 0) {
+        var msg = _alfredI18n.conflict_warning.replace('%s', conflicts.join(', '));
+        $('#alfred-mcp-conflict-text').text(msg);
+        $banner.show();
+    } else {
+        $banner.hide();
+    }
+}
+
+// ---- Add server ----
+$('#bt_alfred_add_server').on('click', function() {
+    _alfredMcpServers.push({
+        name: '', slug: '', url: '',
+        auth_header: 'X-API-Key', auth_value: '',
+        prefix_tools: false, enabled: true
+    });
+    alfredMcpSerialize();
+    alfredMcpRender();
+});
+
+// ---- Auto-detect JeedomMCP ----
+$('#bt_alfred_autodetect_mcp').on('click', function() {
+    _alfredMcpServers.push({
+        name:         'JeedomMCP',
+        slug:         'jeedom',
+        url:          _alfredMcpAutoUrl,
+        auth_header:  'X-API-Key',
+        auth_value:   _alfredMcpAutoApiKey,
+        prefix_tools: false,
+        enabled:      true
+    });
+    alfredMcpSerialize();
+    alfredMcpRender();
     $.fn.showAlert({ message: _alfredI18n.mcp_autodetected, level: 'success' });
 });
 
+// ---- LLM provider selector ----
 function alfredShowProvider(provider) {
     $('.alfred-provider-section').hide();
     $('.alfred-provider-section[data-provider="' + provider + '"]').show();
 }
 
-// Wait until Jeedom has loaded config values, then show the right provider section
+// Initialize MCP server list immediately from PHP-injected value — no polling needed.
+// Relying on Jeedom's configKey AJAX load has a race condition: if the AJAX response
+// arrives after the poll timeout (2s), the hidden field is empty when we first read it.
+(function () {
+    try { _alfredMcpServers = JSON.parse(_alfredMcpServersJson); } catch (e) { _alfredMcpServers = []; }
+    alfredMcpSerialize(true);  // sync hidden field only, no save on init
+    alfredMcpRender();
+})();
+
+// Wait until Jeedom has loaded config values, then show the correct provider section.
 var _alfredPollCount = 0;
 var _alfredProviderPoll = setInterval(function () {
     _alfredPollCount++;
     var hasKey = !!($('[data-l1key="anthropic_api_key"]').val()
                   || $('[data-l1key="openai_api_key"]').val()
                   || $('[data-l1key="gemini_api_key"]').val());
-    if (hasKey || _alfredPollCount >= 15) {
+    if (hasKey || _alfredPollCount >= 20) {
         clearInterval(_alfredProviderPoll);
         alfredShowProvider($('#alfred_provider').val());
     }
@@ -342,9 +659,6 @@ $('#alfred_provider').on('change', function () {
 });
 
 // ---- Lazy model loading ----
-// Triggered on first mousedown on the select (before dropdown opens).
-// Shows a loading placeholder, fetches, then restores saved value.
-
 var _alfredModelsLoaded = {};
 
 function alfredLoadModels($section) {
@@ -358,7 +672,6 @@ function alfredLoadModels($section) {
 
     if (!apiKey) return;
 
-    // Show loading placeholder (prevents seeing stale options)
     $select.empty().append($('<option>').val('').text(_alfredI18n.loading).prop('disabled', true).prop('selected', true));
     $select.prop('disabled', true);
 
@@ -377,7 +690,6 @@ function alfredLoadModels($section) {
             resp.result.forEach(function (m) {
                 $select.append($('<option>').val(m.id).text(m.name));
             });
-            // Restore saved selection, or pick first available
             if (savedVal && $select.find('option[value="' + savedVal + '"]').length) {
                 $select.val(savedVal);
             } else {
