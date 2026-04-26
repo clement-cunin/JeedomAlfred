@@ -280,8 +280,8 @@
 }
 
 #alfred-send {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: #337ab7;
     color: #fff;
@@ -304,8 +304,8 @@
 }
 
 #alfred-mic {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: #6c757d;
     color: #fff;
@@ -342,8 +342,8 @@
 
 #alfred-tts,
 #alfred-mic-autosend {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: transparent;
     color: #aaa;
@@ -353,14 +353,14 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 13px;
     padding: 0;
     transition: all 0.15s;
 }
 
 #alfred-tts-settings {
-    width: 22px;
-    height: 22px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: transparent;
     color: #ccc;
@@ -370,7 +370,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 10px;
+    font-size: 13px;
     padding: 0;
     transition: all 0.15s;
 }
