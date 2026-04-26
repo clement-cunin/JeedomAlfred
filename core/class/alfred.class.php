@@ -98,7 +98,11 @@ class alfred extends eqLogic {
     }
 
     public static function getMcpServers(): array {
-        $json = (string)config::byKey('mcp_servers', __CLASS__);
+        $raw = config::byKey('mcp_servers', __CLASS__);
+        if (is_array($raw)) {
+            return $raw;
+        }
+        $json = (string)$raw;
         if ($json === '') {
             return [];
         }
