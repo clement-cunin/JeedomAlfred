@@ -11,7 +11,10 @@ try {
 
     if ($action === 'saveMCPServers') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
-        config::save('mcp_servers', init('mcp_servers', '[]'), 'alfred');
+        $value = init('mcp_servers', '[]');
+        log::add('alfred', 'info', '[saveMCPServers] value=' . substr($value, 0, 200));
+        config::save('mcp_servers', $value, 'alfred');
+        log::add('alfred', 'info', '[saveMCPServers] saved OK, readback=' . substr(config::byKey('mcp_servers', 'alfred', ''), 0, 200));
         ajax::success();
     }
 

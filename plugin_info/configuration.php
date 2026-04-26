@@ -389,11 +389,14 @@ function alfredMcpSerialize(skipSave) {
     if (!skipSave) {
         clearTimeout(_alfredMcpSaveTimer);
         _alfredMcpSaveTimer = setTimeout(function() {
+            console.log('[alfred] saveMCPServers sending:', json);
             $.ajax({
                 type: 'POST',
                 url: 'plugins/alfred/core/ajax/alfred.ajax.php',
                 data: { action: 'saveMCPServers', mcp_servers: json },
-                dataType: 'json'
+                dataType: 'json',
+                success: function(r) { console.log('[alfred] saveMCPServers success:', r); },
+                error:   function(xhr, status, err) { console.error('[alfred] saveMCPServers error:', status, err, xhr.responseText); }
             });
         }, 600);
     }
