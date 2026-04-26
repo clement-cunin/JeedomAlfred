@@ -9,6 +9,12 @@ try {
 
     $action = init('action');
 
+    if ($action === 'saveMCPServers') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        config::save('mcp_servers', init('mcp_servers', '[]'), 'alfred');
+        ajax::success();
+    }
+
     if ($action === 'testMCP') {
         require_once __DIR__ . '/../class/alfredMCP.class.php';
         $url        = init('url');
