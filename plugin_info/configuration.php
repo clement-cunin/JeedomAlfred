@@ -135,9 +135,8 @@ $_mcpServersJson = config::byKey('mcp_servers', 'alfred') ?: '[]';
         <!-- ================================================================ -->
         <legend><i class="fas fa-plug"></i> {{MCP servers}}</legend>
 
-        <!-- Hidden field for JS sync only — NOT a configKey, Jeedom must not touch it.
-             Load comes from PHP injection (_alfredMcpServersJson), save goes via saveMCPServers AJAX. -->
-        <input type="hidden" id="alfred_mcp_servers_json" />
+        <!-- Hidden field synced by JS. data-l1key ensures Jeedom's standard save also persists the value. -->
+        <input type="hidden" id="alfred_mcp_servers_json" class="configKey" data-l1key="mcp_servers" />
 
         <div class="form-group">
             <div class="col-sm-offset-4 col-sm-8">
