@@ -27,21 +27,28 @@ if (ob_get_level()) ob_end_flush();
 set_time_limit(0);
 
 // ---- Auth ----
-if (!isConnect()) {
-    $hash = trim(init('user_hash'));
-    if ($hash === '' || !user::byHash($hash)) {
+$connectedUser = null;
+if (isConnect()) {
+    $connectedUser = $_SESSION['user'] ?? null;
+} else {
+    $hash          = trim(init('user_hash'));
+    $connectedUser = $hash !== '' ? user::byHash($hash) : null;
+    if (!$connectedUser) {
         sse_event('error', ['message' => '401 - Unauthorized']);
         exit;
     }
 }
+$userLogin  = ($connectedUser !== null) ? $connectedUser->getLogin()   : null;
+$userProfil = ($connectedUser !== null && $connectedUser->getProfils() === 'admin') ? 'admin' : 'user';
 
 // ---- Input ----
 $raw       = file_get_contents('php://input');
 $input     = json_decode($raw, true) ?? [];
-$sessionId = trim($input['session_id'] ?? init('session_id'));
-$message   = trim($input['message']   ?? init('message'));
+$sessionId       = trim($input['session_id']       ?? init('session_id'));
+$message         = trim($input['message']          ?? init('message'));
+$extraIterations = max(0, (int)($input['extra_iterations'] ?? (int)init('extra_iterations')));
 
-if ($sessionId === '' || $message === '') {
+if ($sessionId === '' || ($message === '' && $extraIterations === 0)) {
     sse_event('error', ['message' => 'Missing session_id or message']);
     exit;
 }
@@ -52,6 +59,8 @@ require_once __DIR__ . '/../core/class/alfredLLM.class.php';
 require_once __DIR__ . '/../core/class/alfredMCP.class.php';
 require_once __DIR__ . '/../core/class/alfredMCPRegistry.class.php';
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
+require_once __DIR__ . '/../core/class/alfredScheduler.class.php';
+require_once __DIR__ . '/../core/class/alfredMemory.class.php';
 require_once __DIR__ . '/../core/class/alfredAgent.class.php';
 
 // ---- Run agent ----
@@ -61,7 +70,10 @@ try {
         null,
         function (string $type, array $data) {
             sse_event($type, $data);
-        }
+        },
+        $userLogin,
+        $userProfil,
+        $extraIterations
     );
     $agent->run($sessionId, $message);
 } catch (Exception $e) {

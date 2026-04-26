@@ -102,13 +102,28 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
 
             } elseif ($role === 'assistant') {
                 $parts = [];
+                // Thought parts must come first (required by Gemini when thoughtSignature is present)
+                foreach ($msg['gemini_thought_parts'] ?? [] as $tp) {
+                    $parts[] = $tp;
+                }
                 if (!empty($msg['content'])) {
                     $parts[] = ['text' => $msg['content']];
                 }
                 foreach ($msg['tool_calls'] ?? [] as $tc) {
-                    // args must be a JSON object, never an array
-                    $args    = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
-                    $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $args]];
+                    if (!empty($tc['gemini_part'])) {
+                        // Use preserved raw part (retains thoughtSignature if Gemini sent one)
+                        // but re-cast args to object: empty {} round-trips through DB as []
+                        $rawPart = $tc['gemini_part'];
+                        if (isset($rawPart['functionCall'])) {
+                            $a = $rawPart['functionCall']['args'] ?? [];
+                            $rawPart['functionCall']['args'] = empty($a) ? new stdClass() : (object)$a;
+                        }
+                        $parts[] = $rawPart;
+                    } else {
+                        // Fallback for old messages without preserved raw part
+                        $args    = empty($tc['input']) ? new stdClass() : (object)$tc['input'];
+                        $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $args]];
+                    }
                 }
                 $out[] = ['role' => 'model', 'parts' => $parts];
 
@@ -184,31 +199,40 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
 
     private function normalize(array $data): array
     {
-        $candidate  = $data['candidates'][0] ?? [];
-        $parts      = $candidate['content']['parts'] ?? [];
-        $text       = '';
-        $tool_calls = [];
+        $candidate     = $data['candidates'][0] ?? [];
+        $parts         = $candidate['content']['parts'] ?? [];
+        $text          = '';
+        $tool_calls    = [];
+        $thought_parts = [];
 
         foreach ($parts as $part) {
             if (isset($part['text'])) {
-                // Skip internal reasoning (thinking models return thought: true)
-                if (!empty($part['thought'])) continue;
+                if (!empty($part['thought'])) {
+                    // Preserve thought parts with thoughtSignature for conversation history
+                    $thought_parts[] = $part;
+                    continue;
+                }
                 $text .= $part['text'];
             } elseif (isset($part['functionCall'])) {
                 $tool_calls[] = [
-                    'id'    => uniqid('gemini_', true), // Gemini has no call IDs
-                    'name'  => $part['functionCall']['name'],
-                    'input' => $part['functionCall']['args'] ?? [],
+                    'id'          => uniqid('gemini_', true), // Gemini has no call IDs
+                    'name'        => $part['functionCall']['name'],
+                    'input'       => $part['functionCall']['args'] ?? [],
+                    'gemini_part' => $part, // preserve full part (may contain thoughtSignature)
                 ];
             }
         }
 
-        $finishReason = $candidate['finishReason'] ?? 'STOP';
-
-        return [
+        $result = [
             'text'        => trim($text),
             'tool_calls'  => $tool_calls,
             'stop_reason' => !empty($tool_calls) ? 'tool_use' : 'end_turn',
         ];
+
+        if (!empty($thought_parts)) {
+            $result['gemini_thought_parts'] = $thought_parts;
+        }
+
+        return $result;
     }
 }

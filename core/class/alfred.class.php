@@ -56,7 +56,21 @@ class alfred extends eqLogic {
         }
     }
 
-    public static function cron() {}
+    public static function cron() {
+        // Process any scheduled wakeups whose run_at has been reached (cron strategy only;
+        // background-strategy schedules run in their own spawned process).
+        require_once __DIR__ . '/alfredScheduler.class.php';
+        require_once __DIR__ . '/alfredLLM.class.php';
+        require_once __DIR__ . '/alfredMCP.class.php';
+        require_once __DIR__ . '/alfredConversation.class.php';
+        require_once __DIR__ . '/alfredAgent.class.php';
+        try {
+            alfredScheduler::processPending();
+        } catch (Exception $e) {
+            // Table may not exist yet during install/update — silently skip
+            log::add('alfred', 'debug', 'cron: alfredScheduler skipped — ' . $e->getMessage());
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Config helpers
@@ -91,6 +105,14 @@ class alfred extends eqLogic {
 
     public static function getSystemPrompt(): string {
         return (string)config::byKey('system_prompt', __CLASS__);
+    }
+
+    public static function getFirstInstallPrompt(): string {
+        return (string)config::byKey('first_install_prompt', __CLASS__);
+    }
+
+    public static function getNewUserPrompt(): string {
+        return (string)config::byKey('new_user_prompt', __CLASS__);
     }
 
     public static function getMaxIterations(): int {

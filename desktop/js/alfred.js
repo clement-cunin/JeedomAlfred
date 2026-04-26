@@ -13,6 +13,18 @@ $(function () {
     var isStreaming      = false;
     var currentSource    = null; // active EventSource
 
+    // Voice dictation state
+    var recognition     = null;
+    var isListening     = false;
+    var micAutoSend     = localStorage.getItem('alfred_mic_autosend') === '1';
+    var micInitialText  = ''; // textarea content when mic started
+    var micCommitted    = ''; // accumulated final transcripts
+
+    // Text-to-speech state
+    var ttsEnabled = localStorage.getItem('alfred_tts') === '1';
+    var ttsVoice   = null; // SpeechSynthesisVoice object
+    var ttsRate    = parseFloat(localStorage.getItem('alfred_tts_rate') || '1');
+
     // =========================================================================
     // Sidebar toggle (mobile)
     // =========================================================================
@@ -130,6 +142,8 @@ $(function () {
 
     $('#alfred-send').on('click', function () {
         if (isStreaming) return;
+        if (isListening) { recognition.stop(); }
+        speechSynthesis.cancel();
         var text = $('#alfred-input').val().trim();
         if (!text) return;
 
@@ -142,25 +156,244 @@ $(function () {
     });
 
     // =========================================================================
+    // Text-to-speech
+    // =========================================================================
+
+    (function initTts() {
+        if (!window.speechSynthesis) return;
+        var $btn = $('#alfred-tts');
+        $btn.toggleClass('active', ttsEnabled);
+
+        $btn.on('click', function () {
+            ttsEnabled = !ttsEnabled;
+            localStorage.setItem('alfred_tts', ttsEnabled ? '1' : '0');
+            $btn.toggleClass('active', ttsEnabled);
+            if (!ttsEnabled) speechSynthesis.cancel();
+        });
+
+        // Build settings popover
+        var rateDisplay = isNaN(ttsRate) ? '1.0' : ttsRate.toFixed(1);
+        var $popover = $('<div id="alfred-tts-popover">')
+            .append('<span class="alfred-tts-label">{{Voice}}</span>')
+            .append('<select id="alfred-tts-voice"></select>')
+            .append('<span class="alfred-tts-label">{{Speed}}</span>')
+            .append(
+                $('<div class="alfred-tts-rate-row">')
+                    .append('<input type="range" id="alfred-tts-rate" min="0.5" max="2" step="0.1" value="' + (isNaN(ttsRate) ? 1 : ttsRate) + '">')
+                    .append('<span class="alfred-tts-rate-val" id="alfred-tts-rate-val">' + rateDisplay + 'x</span>')
+            );
+        $('#alfred-tts-wrap').append($popover);
+
+        function populateVoices() {
+            var voices = speechSynthesis.getVoices();
+            if (!voices.length) return;
+            // Voices are now available — remove handler to prevent Chrome from
+            // re-triggering it on speak/cancel and resetting the user's selection.
+            speechSynthesis.onvoiceschanged = null;
+            var $select = $('#alfred-tts-voice').empty();
+            var savedName = localStorage.getItem('alfred_tts_voice') || '';
+            var lang = (navigator.language || 'fr-FR').split('-')[0];
+            var autoSelected = false;
+            for (var i = 0; i < voices.length; i++) {
+                var v = voices[i];
+                var $opt = $('<option>').val(v.name).text(v.name + ' (' + v.lang + ')');
+                if (v.name === savedName) {
+                    $opt.prop('selected', true);
+                    ttsVoice = v;
+                    autoSelected = true;
+                }
+                $select.append($opt);
+            }
+            if (!autoSelected) {
+                for (var j = 0; j < voices.length; j++) {
+                    if (voices[j].lang.indexOf(lang) === 0) {
+                        $select.find('option').eq(j).prop('selected', true);
+                        ttsVoice = voices[j];
+                        break;
+                    }
+                }
+            }
+        }
+
+        populateVoices();
+        if (typeof speechSynthesis.onvoiceschanged !== 'undefined') {
+            speechSynthesis.onvoiceschanged = populateVoices;
+        }
+
+        $('#alfred-tts-voice').on('change', function () {
+            var name = $(this).val();
+            localStorage.setItem('alfred_tts_voice', name);
+            var voices = speechSynthesis.getVoices();
+            ttsVoice = null;
+            for (var i = 0; i < voices.length; i++) {
+                if (voices[i].name === name) { ttsVoice = voices[i]; break; }
+            }
+        });
+
+        $('#alfred-tts-rate').on('input', function () {
+            ttsRate = parseFloat(this.value);
+            localStorage.setItem('alfred_tts_rate', String(ttsRate));
+            $('#alfred-tts-rate-val').text(ttsRate.toFixed(1) + 'x');
+        });
+
+        $('#alfred-tts-settings').on('click', function (e) {
+            e.stopPropagation();
+            $popover.toggleClass('open');
+        });
+
+        $(document).on('click.tts-popover', function (e) {
+            if (!$(e.target).closest('#alfred-tts-wrap').length) {
+                $popover.removeClass('open');
+            }
+        });
+    }());
+
+    function speak(text) {
+        if (!ttsEnabled || !window.speechSynthesis || !text) return;
+        speechSynthesis.cancel();
+        var clean = text
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/`[^`]*`/g, '')
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/\*([^*]+)\*/g, '$1')
+            .replace(/#+\s*/g, '')
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            .replace(/[_~>|]/g, '')
+            .replace(/\n+/g, ' ')
+            .trim();
+        if (!clean) return;
+        var utt = new SpeechSynthesisUtterance(clean);
+        if (ttsVoice) {
+            utt.voice = ttsVoice;
+            utt.lang  = ttsVoice.lang;
+        } else {
+            utt.lang = navigator.language || 'fr-FR';
+        }
+        utt.rate = (ttsRate > 0) ? ttsRate : 1;
+        speechSynthesis.speak(utt);
+    }
+
+    // =========================================================================
+    // Voice dictation
+    // =========================================================================
+
+    function buildRecognition() {
+        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return null;
+        var r = new SR();
+        r.lang           = navigator.language || 'fr-FR';
+        r.continuous     = false; // always false: continuous=true is unreliable on Android Chrome
+        r.interimResults = true;
+
+        r.onresult = function (e) {
+            var committed = '';
+            var interim   = '';
+            for (var i = 0; i < e.results.length; i++) {
+                if (e.results[i].isFinal) committed += e.results[i][0].transcript;
+                else                      interim   += e.results[i][0].transcript;
+            }
+            micCommitted = committed;
+            var base = micInitialText;
+            var sep  = base && base.slice(-1) !== ' ' && (committed || interim) ? ' ' : '';
+            $('#alfred-input').val(base + sep + committed + interim).trigger('input');
+        };
+
+        r.onend = function () {
+            setMicListening(false);
+            if (!isListening) return; // manually stopped — do nothing
+
+            if (micAutoSend) {
+                isListening = false;
+                if (micCommitted.trim()) $('#alfred-send').trigger('click');
+            } else {
+                // Fill mode: update base to current textarea, then restart cleanly
+                micInitialText = $('#alfred-input').val();
+                micCommitted   = '';
+                try { recognition.start(); } catch (ex) {}
+                setMicListening(true);
+            }
+        };
+
+        r.onerror = function () {
+            isListening = false;
+            setMicListening(false);
+        };
+
+        return r;
+    }
+
+    function toggleMic() {
+        if (isListening) {
+            isListening = false; // set before stop so onend won't restart
+            recognition.stop();
+            setMicListening(false);
+        } else {
+            micInitialText = $('#alfred-input').val();
+            micCommitted   = '';
+            recognition    = buildRecognition();
+            if (!recognition) return;
+            recognition.start();
+            isListening = true;
+            setMicListening(true);
+        }
+    }
+
+    function setMicListening(active) {
+        var $btn = $('#alfred-mic');
+        $btn.toggleClass('listening', active);
+        $btn.find('i').attr('class', active ? 'fas fa-stop' : 'fas fa-microphone');
+        $btn.attr('title', active ? "{{Stop recording}}" : "{{Voice input}}");
+    }
+
+    // Init mic buttons
+    (function () {
+        if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+            $('#alfred-mic, #alfred-mic-autosend').hide();
+            return;
+        }
+        $('#alfred-mic-autosend').toggleClass('active', micAutoSend)
+            .attr('title', micAutoSend ? "{{Auto-send: ON}}" : "{{Auto-send: OFF}}");
+
+        $('#alfred-mic').on('click', function () {
+            if (!isStreaming) toggleMic();
+        });
+
+        $('#alfred-mic-autosend').on('click', function () {
+            micAutoSend = !micAutoSend;
+            localStorage.setItem('alfred_mic_autosend', micAutoSend ? '1' : '0');
+            $(this).toggleClass('active', micAutoSend)
+                   .attr('title', micAutoSend ? "{{Auto-send: ON}}" : "{{Auto-send: OFF}}");
+        });
+    }());
+
+    // =========================================================================
     // SSE streaming
     // =========================================================================
 
     function sendMessage(sessionId, text) {
-        // Remove welcome screen
         $('#alfred-welcome').remove();
-
         appendBubble('user', text);
         showTyping();
         setInputEnabled(false);
         isStreaming = true;
-
-        // Close any previous stream
         if (currentSource) { currentSource.close(); currentSource = null; }
+        openStream(sessionId, text, 0);
+    }
 
+    function sendContinue(sessionId, extraIterations) {
+        showTyping();
+        setInputEnabled(false);
+        isStreaming = true;
+        if (currentSource) { currentSource.close(); currentSource = null; }
+        openStream(sessionId, '', extraIterations);
+    }
+
+    function openStream(sessionId, message, extraIterations) {
         var url = 'plugins/alfred/api/chat.php'
-            + '?session_id=' + encodeURIComponent(sessionId)
-            + '&message='    + encodeURIComponent(text)
-            + '&user_hash='  + encodeURIComponent(alfred_config.userHash)
+            + '?session_id='       + encodeURIComponent(sessionId)
+            + '&message='          + encodeURIComponent(message)
+            + '&extra_iterations=' + extraIterations
+            + '&user_hash='        + encodeURIComponent(alfred_config.userHash)
             + '&_=' + Date.now();
 
         var source = new EventSource(url);
@@ -180,6 +413,19 @@ $(function () {
             updateToolCall(d.name, 'done');
         });
 
+        source.addEventListener('debug', function (e) {
+            if (!alfred_config.isAdmin) return;
+            var d = JSON.parse(e.data);
+            var $block = $('<div class="alfred-debug-prompt">')
+                .append(
+                    $('<details>')
+                        .append($('<summary>').text('🔍 System prompt'))
+                        .append($('<pre>').text(d.system_prompt))
+                );
+            $('#alfred-messages').append($block);
+            scrollToBottom();
+        });
+
         source.addEventListener('delta', function (e) {
             var d = JSON.parse(e.data);
             hideTyping();
@@ -194,33 +440,44 @@ $(function () {
         source.addEventListener('done', function (e) {
             var d = JSON.parse(e.data);
             hideTyping();
-            // If delta never fired (tool-only turn with empty text), show the text now
             if (!$assistantBubble && d.text) {
                 appendBubble('assistant', d.text);
+            }
+            if (d.limit_reached) {
+                appendLimitReached(sessionId);
+            } else {
+                speak(d.text || assistantText);
             }
             source.close();
             currentSource = null;
             isStreaming   = false;
             setInputEnabled(true);
-            // Refresh session list to show new/updated session
             loadSessions();
-            // Mark session active
             $('.alfred-session-item').removeClass('active');
             $('[data-session-id="' + sessionId + '"]').addClass('active');
         });
 
         source.addEventListener('error', function (e) {
             hideTyping();
-            var msg = 'An error occurred.';
-            try { msg = JSON.parse(e.data).message; } catch (_) {}
-            appendBubble('assistant', '⚠️ ' + msg);
+            var technical = null;
+            try { technical = JSON.parse(e.data).message; } catch (_) {}
+            var display = alfred_config.isAdmin && technical
+                ? technical
+                : "{{An error occurred.}}";
+            var $bubble = appendBubble('assistant', '⚠️ ' + display);
+            if (alfred_config.isAdmin && technical && technical !== display) {
+                $bubble.find('.alfred-msg-bubble').append(
+                    $('<details style="margin-top:6px;font-size:11px;opacity:0.7">')
+                        .append($('<summary>').text('Details'))
+                        .append($('<pre style="white-space:pre-wrap;margin:4px 0 0">').text(technical))
+                );
+            }
             source.close();
             currentSource = null;
             isStreaming   = false;
             setInputEnabled(true);
         });
 
-        // Network-level SSE error (connection dropped)
         source.onerror = function () {
             if (source.readyState === EventSource.CLOSED) {
                 hideTyping();
@@ -229,6 +486,24 @@ $(function () {
                 currentSource = null;
             }
         };
+    }
+
+    function appendLimitReached(sessionId) {
+        var $el = $('<div class="alfred-limit-reached">');
+        $('<span>').text("{{Maximum iterations reached}}").appendTo($el);
+        var steps = [5, 10, 20];
+        for (var i = 0; i < steps.length; i++) {
+            (function (n) {
+                $('<button class="alfred-limit-btn">').text('+' + n)
+                    .on('click', function () {
+                        $el.remove();
+                        sendContinue(sessionId, n);
+                    })
+                    .appendTo($el);
+            }(steps[i]));
+        }
+        $('#alfred-messages').append($el);
+        scrollToBottom();
     }
 
     // =========================================================================
@@ -285,7 +560,8 @@ $(function () {
     }
 
     function setInputEnabled(enabled) {
-        $('#alfred-input, #alfred-send').prop('disabled', !enabled);
+        $('#alfred-input, #alfred-send, #alfred-mic, #alfred-mic-autosend').prop('disabled', !enabled);
+        if (!enabled && isListening) { recognition.stop(); }
     }
 
     function scrollToBottom() {

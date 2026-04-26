@@ -124,8 +124,13 @@ class alfredConversation
             $msg = ['role' => $row['role'], 'content' => $content];
 
             // Restore tool_calls on assistant messages
-            if ($row['role'] === 'assistant' && !empty($meta['tool_calls'])) {
-                $msg['tool_calls'] = $meta['tool_calls'];
+            if ($row['role'] === 'assistant') {
+                if (!empty($meta['tool_calls'])) {
+                    $msg['tool_calls'] = $meta['tool_calls'];
+                }
+                if (!empty($meta['gemini_thought_parts'])) {
+                    $msg['gemini_thought_parts'] = $meta['gemini_thought_parts'];
+                }
             }
             // Restore tool result fields
             if ($row['role'] === 'tool') {
@@ -148,6 +153,9 @@ class alfredConversation
         $meta = [];
         if (!empty($response['tool_calls'])) {
             $meta['tool_calls'] = $response['tool_calls'];
+        }
+        if (!empty($response['gemini_thought_parts'])) {
+            $meta['gemini_thought_parts'] = $response['gemini_thought_parts'];
         }
         self::addMessage($sessionId, 'assistant', $response['text'], $meta);
     }

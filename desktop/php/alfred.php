@@ -57,6 +57,24 @@ $_userHash     = $_SESSION['user']->getHash();
                       placeholder="{{Type a message…}}"
                       rows="1"
                       <?php echo !$_isConfigured ? 'disabled' : ''; ?>></textarea>
+            <div id="alfred-tts-wrap">
+                <button id="alfred-tts" title="{{Text-to-speech}}"
+                        <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
+                    <i class="fas fa-volume-up"></i>
+                </button>
+                <button id="alfred-tts-settings" title="{{TTS settings}}"
+                        <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
+                    <i class="fas fa-sliders-h"></i>
+                </button>
+            </div>
+            <button id="alfred-mic-autosend" title="{{Auto-send: OFF}}"
+                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
+                <i class="fas fa-bolt"></i>
+            </button>
+            <button id="alfred-mic" title="{{Voice input}}"
+                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
+                <i class="fas fa-microphone"></i>
+            </button>
             <button id="alfred-send" title="{{Send}}"
                     <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
                 <i class="fas fa-paper-plane"></i>
@@ -70,6 +88,7 @@ $_userHash     = $_SESSION['user']->getHash();
 var alfred_config = {
     isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
     userHash: "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
+    isAdmin: <?php echo ($_SESSION['user']->getProfils() === 'admin') ? 'true' : 'false'; ?>,
     i18n: {
         hello: "{{Hello, I'm Alfred.}}",
         ask:   "{{Ask me anything about your home automation system.}}"
