@@ -38,7 +38,9 @@ $_providers = [
 // Auto-detect JeedomMCP settings (used for add button default URL)
 $_mcpAutoUrl    = network::getNetworkAccess('internal', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
 $_mcpAutoApiKey = config::byKey('mcpApiKey', 'jeedomMCP');
-$_mcpServersJson = config::byKey('mcp_servers', 'alfred') ?: '[]';
+$_mcpRaw = config::byKey('mcp_servers', 'alfred');
+// config::byKey auto-decodes JSON arrays — re-encode to get a plain string for JS injection
+$_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcpRaw ?: '[]');
 ?>
 
 <form class="form-horizontal">
@@ -389,14 +391,11 @@ function alfredMcpSerialize(skipSave) {
     if (!skipSave) {
         clearTimeout(_alfredMcpSaveTimer);
         _alfredMcpSaveTimer = setTimeout(function() {
-            console.log('[alfred] saveMCPServers sending:', json);
             $.ajax({
                 type: 'POST',
                 url: 'plugins/alfred/core/ajax/alfred.ajax.php',
                 data: { action: 'saveMCPServers', mcp_servers: json },
-                dataType: 'json',
-                success: function(r) { console.log('[alfred] saveMCPServers success:', r); },
-                error:   function(xhr, status, err) { console.error('[alfred] saveMCPServers error:', status, err, xhr.responseText); }
+                dataType: 'json'
             });
         }, 600);
     }
