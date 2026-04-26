@@ -9,6 +9,16 @@ class alfredMigration
 
     public static function runPending()
     {
+        // If the core tables are missing, reset version to force re-creation
+        $tableCheck = DB::Prepare(
+            "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'alfred_message'",
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+        if (isset($tableCheck['cnt']) && (int)$tableCheck['cnt'] === 0) {
+            config::save('schemaVersion', 0, 'alfred');
+        }
+
         $current = (int) config::byKey('schemaVersion', 'alfred', 0);
         $target = max(array_keys(self::MIGRATIONS));
 

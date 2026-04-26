@@ -7,6 +7,9 @@ class alfred extends eqLogic {
     // -------------------------------------------------------------------------
 
     public static function activate() {
+        // Ensure DB tables exist (idempotent — safe to call on every activation)
+        require_once __DIR__ . '/alfredMigration.class.php';
+        alfredMigration::runPending();
         // Set default provider
         if (config::byKey('provider', __CLASS__) === '') {
             config::save('provider', 'anthropic', __CLASS__);
