@@ -199,6 +199,49 @@
     border-bottom-left-radius: 2px;
 }
 
+/* Per-message TTS action bar */
+.alfred-msg.assistant {
+    flex-direction: column;
+}
+
+.alfred-msg-actions {
+    display: flex;
+    gap: 4px;
+    padding-left: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.alfred-msg.assistant:hover .alfred-msg-actions {
+    opacity: 1;
+}
+
+.alfred-tts-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: transparent;
+    color: #aaa;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    padding: 0;
+    line-height: 1;
+    transition: all 0.15s;
+}
+
+.alfred-tts-btn:hover {
+    border-color: #337ab7;
+    color: #337ab7;
+}
+
+.alfred-tts-btn.hidden {
+    display: none;
+}
+
 /* Tool call indicator */
 .alfred-tool-call {
     align-self: flex-start;
