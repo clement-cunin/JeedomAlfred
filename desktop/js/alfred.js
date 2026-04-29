@@ -637,7 +637,7 @@ $(function () {
         if (role === 'assistant' && window.speechSynthesis) {
             $msg.data('tts-text', text);
             var $actions = $('<div class="alfred-msg-actions">');
-            var $btnPlay   = $('<button class="alfred-tts-btn alfred-tts-play"          title="{{Play}}"><i class="fas fa-play"></i></button>');
+            var $btnPlay   = $('<button class="alfred-tts-btn alfred-tts-play"          title="{{Play}}"><i class="fas fa-volume-up"></i></button>');
             var $btnPause  = $('<button class="alfred-tts-btn alfred-tts-pause  hidden" title="{{Pause}}"><i class="fas fa-pause"></i></button>');
             var $btnResume = $('<button class="alfred-tts-btn alfred-tts-resume hidden" title="{{Resume}}"><i class="fas fa-play"></i></button>');
             var $btnStop   = $('<button class="alfred-tts-btn alfred-tts-stop   hidden" title="{{Stop}}"><i class="fas fa-stop"></i></button>');

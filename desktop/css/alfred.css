@@ -209,7 +209,7 @@
 .alfred-msg {
     display: flex;
     gap: 10px;
-    max-width: 80%;
+    max-width: 85%;
 }
 
 .alfred-msg.user {
@@ -243,13 +243,18 @@
 
 /* Per-message TTS action bar */
 .alfred-msg.assistant {
-    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
 }
 
 .alfred-msg-actions {
     display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
     gap: 4px;
-    padding-left: 2px;
+    margin-left: -12px;
+    padding-top: 14px;
+    z-index: 1;
     opacity: 0;
     transition: opacity 0.15s;
 }
@@ -261,10 +266,11 @@
 .alfred-tts-btn {
     width: 24px;
     height: 24px;
-    border-radius: 50%;
-    background: transparent;
+    border-radius: 6px !important;
+    background: #fff;
     color: #aaa;
-    border: 1px solid #ddd;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
