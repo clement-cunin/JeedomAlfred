@@ -34,9 +34,10 @@ class alfredConversation
 
     public static function listSessions(int $limit = 50): array
     {
+        $n = max(1, (int)$limit);
         return DB::Prepare(
-            'SELECT * FROM alfred_conversation ORDER BY updated_at DESC LIMIT :limit',
-            [':limit' => $limit],
+            "SELECT * FROM alfred_conversation ORDER BY updated_at DESC LIMIT {$n}",
+            [],
             DB::FETCH_TYPE_ALL
         ) ?: [];
     }

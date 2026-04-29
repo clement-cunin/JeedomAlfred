@@ -23,7 +23,7 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
             $body['tools'] = $this->toOpenAITools($tools);
         }
 
-        $data = $this->httpPost(self::API_URL, $this->headers(), $body);
+        $data = $this->httpPost(self::API_URL, $this->headers(), $body, 120);
 
         return $this->normalize($data);
     }

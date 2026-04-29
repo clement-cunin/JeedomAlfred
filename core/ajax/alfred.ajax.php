@@ -7,6 +7,13 @@ try {
         throw new Exception(__('401 - Unauthorized access', __FILE__));
     }
 
+    try {
+        include_file('core', 'alfredMigration', 'class', 'alfred');
+        alfredMigration::runPending();
+    } catch (Exception $e) {
+        log::add('alfred', 'error', 'Migration failed in ajax: ' . $e->getMessage());
+    }
+
     $action = init('action');
 
     if ($action === 'saveMCPServers') {

@@ -21,9 +21,11 @@ $(function () {
     var micCommitted    = ''; // accumulated final transcripts
 
     // Text-to-speech state
-    var ttsEnabled = localStorage.getItem('alfred_tts') === '1';
-    var ttsVoice   = null; // SpeechSynthesisVoice object
-    var ttsRate    = parseFloat(localStorage.getItem('alfred_tts_rate') || '1');
+    var ttsEnabled    = localStorage.getItem('alfred_tts') === '1';
+    var ttsVoice      = null; // SpeechSynthesisVoice object
+    var ttsRate       = parseFloat(localStorage.getItem('alfred_tts_rate') || '1');
+    var ttsCurrentMsg = null; // $msg element currently playing/paused
+    var ttsCurrentUtt = null; // current SpeechSynthesisUtterance
 
     // =========================================================================
     // Sidebar toggle (mobile)
@@ -51,6 +53,7 @@ $(function () {
 
     function startNewSession() {
         currentSessionId = generateUUID();
+        localStorage.setItem('alfred_last_session', currentSessionId);
         renderWelcome();
         setInputEnabled(true);
         $('.alfred-session-item').removeClass('active');
@@ -60,27 +63,41 @@ $(function () {
     // Load session list
     // =========================================================================
 
-    function loadSessions() {
+    function loadSessions(callback) {
         $.ajax({
             type: 'POST',
             url: 'plugins/alfred/core/ajax/alfred.ajax.php',
             data: { action: 'getSessions' },
             dataType: 'json',
             success: function (resp) {
-                if (resp.state !== 'ok') return;
-                renderSessionList(resp.result);
+                if (resp.state === 'ok') renderSessionList(resp.result);
+                if (callback) callback();
+            },
+            error: function () {
+                if (callback) callback();
             }
         });
     }
 
     function renderSessionList(sessions) {
         var $container = $('#alfred-conversations').empty();
-        if (!sessions || sessions.length === 0) return;
+        if (!sessions || sessions.length === 0) {
+            $container.append('<div class="alfred-sessions-empty">{{No conversations yet}}</div>');
+            return;
+        }
 
         sessions.forEach(function (s) {
+            var $title = $('<span class="alfred-session-title">').text(s.title || s.session_id.substr(0, 8) + '…');
+            var $del = $('<button class="alfred-session-delete" title="{{Delete}}">')
+                .html('<i class="fas fa-trash"></i>')
+                .on('click', function (e) {
+                    e.stopPropagation();
+                    deleteSession(s.session_id);
+                });
             var $item = $('<div class="alfred-session-item">')
                 .attr('data-session-id', s.session_id)
-                .text(s.title || s.session_id.substr(0, 8) + '…')
+                .append($title)
+                .append($del)
                 .on('click', function () {
                     loadSession(s.session_id);
                     $('#alfred-sidebar').removeClass('open');
@@ -92,8 +109,26 @@ $(function () {
         });
     }
 
+    function deleteSession(sessionId) {
+        $.ajax({
+            type: 'POST',
+            url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+            data: { action: 'deleteSession', session_id: sessionId },
+            dataType: 'json',
+            success: function (resp) {
+                if (resp.state !== 'ok') return;
+                if (sessionId === currentSessionId) {
+                    localStorage.removeItem('alfred_last_session');
+                    startNewSession();
+                }
+                loadSessions();
+            }
+        });
+    }
+
     function loadSession(sessionId) {
         currentSessionId = sessionId;
+        localStorage.setItem('alfred_last_session', sessionId);
         $('.alfred-session-item').removeClass('active');
         $('[data-session-id="' + sessionId + '"]').addClass('active');
 
@@ -105,7 +140,7 @@ $(function () {
             success: function (resp) {
                 if (resp.state !== 'ok') return;
                 renderHistory(resp.result);
-                setInputEnabled(true);
+                setInputEnabled(!!alfred_config.isConfigured);
             }
         });
     }
@@ -143,6 +178,11 @@ $(function () {
     $('#alfred-send').on('click', function () {
         if (isStreaming) return;
         if (isListening) { recognition.stop(); }
+        if (ttsCurrentMsg) {
+            setMsgTtsState(ttsCurrentMsg, 'idle');
+            ttsCurrentMsg = null;
+            ttsCurrentUtt = null;
+        }
         speechSynthesis.cancel();
         var text = $('#alfred-input').val().trim();
         if (!text) return;
@@ -168,7 +208,14 @@ $(function () {
             ttsEnabled = !ttsEnabled;
             localStorage.setItem('alfred_tts', ttsEnabled ? '1' : '0');
             $btn.toggleClass('active', ttsEnabled);
-            if (!ttsEnabled) speechSynthesis.cancel();
+            if (!ttsEnabled) {
+                if (ttsCurrentMsg) {
+                    setMsgTtsState(ttsCurrentMsg, 'idle');
+                    ttsCurrentMsg = null;
+                    ttsCurrentUtt = null;
+                }
+                speechSynthesis.cancel();
+            }
         });
 
         // Build settings popover
@@ -248,10 +295,8 @@ $(function () {
         });
     }());
 
-    function speak(text) {
-        if (!ttsEnabled || !window.speechSynthesis || !text) return;
-        speechSynthesis.cancel();
-        var clean = text
+    function cleanTtsText(text) {
+        return text
             .replace(/```[\s\S]*?```/g, '')
             .replace(/`[^`]*`/g, '')
             .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -261,8 +306,10 @@ $(function () {
             .replace(/[_~>|]/g, '')
             .replace(/\n+/g, ' ')
             .trim();
-        if (!clean) return;
-        var utt = new SpeechSynthesisUtterance(clean);
+    }
+
+    function buildMsgUtterance(text, $msgEl) {
+        var utt = new SpeechSynthesisUtterance(text);
         if (ttsVoice) {
             utt.voice = ttsVoice;
             utt.lang  = ttsVoice.lang;
@@ -270,7 +317,77 @@ $(function () {
             utt.lang = navigator.language || 'fr-FR';
         }
         utt.rate = (ttsRate > 0) ? ttsRate : 1;
+        utt.onend = function () {
+            if (ttsCurrentMsg && ttsCurrentMsg[0] === $msgEl[0]) {
+                setMsgTtsState($msgEl, 'idle');
+                ttsCurrentMsg = null;
+                ttsCurrentUtt = null;
+            }
+        };
+        return utt;
+    }
+
+    function setMsgTtsState($msg, state) {
+        $msg.find('.alfred-tts-play').toggleClass('hidden', state !== 'idle');
+        $msg.find('.alfred-tts-pause').toggleClass('hidden', state !== 'playing');
+        $msg.find('.alfred-tts-resume').toggleClass('hidden', state !== 'paused');
+        $msg.find('.alfred-tts-stop').toggleClass('hidden', state !== 'paused');
+    }
+
+    function speakMsg($msg) {
+        if (!window.speechSynthesis) return;
+        if (ttsCurrentMsg && ttsCurrentMsg[0] !== $msg[0]) {
+            setMsgTtsState(ttsCurrentMsg, 'idle');
+        }
+        speechSynthesis.cancel();
+        var text = $msg.data('tts-text');
+        if (!text) return;
+        var clean = cleanTtsText(text);
+        if (!clean) return;
+        var utt = buildMsgUtterance(clean, $msg);
+        ttsCurrentMsg = $msg;
+        ttsCurrentUtt = utt;
+        setMsgTtsState($msg, 'playing');
         speechSynthesis.speak(utt);
+    }
+
+    function pauseMsg($msg) {
+        if (!ttsCurrentMsg || ttsCurrentMsg[0] !== $msg[0]) return;
+        speechSynthesis.pause();
+        setMsgTtsState($msg, 'paused');
+    }
+
+    function resumeMsg($msg) {
+        if (!ttsCurrentMsg || ttsCurrentMsg[0] !== $msg[0]) return;
+        speechSynthesis.resume();
+        setMsgTtsState($msg, 'playing');
+    }
+
+    function stopMsg($msg) {
+        if (!ttsCurrentMsg || ttsCurrentMsg[0] !== $msg[0]) return;
+        speechSynthesis.cancel();
+        setMsgTtsState($msg, 'idle');
+        ttsCurrentMsg = null;
+        ttsCurrentUtt = null;
+    }
+
+    function speak(text, $msgEl) {
+        if (!ttsEnabled || !window.speechSynthesis || !text) return;
+        if (ttsCurrentMsg) {
+            setMsgTtsState(ttsCurrentMsg, 'idle');
+        }
+        speechSynthesis.cancel();
+        var clean = cleanTtsText(text);
+        if (!clean) return;
+        if ($msgEl) {
+            var utt = buildMsgUtterance(clean, $msgEl);
+            ttsCurrentMsg = $msgEl;
+            ttsCurrentUtt = utt;
+            setMsgTtsState($msgEl, 'playing');
+            speechSynthesis.speak(utt);
+        } else {
+            speechSynthesis.speak(new SpeechSynthesisUtterance(clean));
+        }
     }
 
     // =========================================================================
@@ -440,13 +557,17 @@ $(function () {
         source.addEventListener('done', function (e) {
             var d = JSON.parse(e.data);
             hideTyping();
-            if (!$assistantBubble && d.text) {
-                appendBubble('assistant', d.text);
+            var finalText = d.text || assistantText;
+            if (!$assistantBubble && finalText) {
+                $assistantBubble = appendBubble('assistant', finalText);
+            }
+            if ($assistantBubble) {
+                $assistantBubble.data('tts-text', finalText);
             }
             if (d.limit_reached) {
                 appendLimitReached(sessionId);
             } else {
-                speak(d.text || assistantText);
+                speak(finalText, $assistantBubble);
             }
             source.close();
             currentSource = null;
@@ -513,6 +634,20 @@ $(function () {
     function appendBubble(role, text) {
         var $bubble = $('<div class="alfred-msg-bubble">').html(markdownToHtml(text));
         var $msg    = $('<div class="alfred-msg ' + role + '">').append($bubble);
+        if (role === 'assistant' && window.speechSynthesis) {
+            $msg.data('tts-text', text);
+            var $actions = $('<div class="alfred-msg-actions">');
+            var $btnPlay   = $('<button class="alfred-tts-btn alfred-tts-play"          title="{{Play}}"><i class="fas fa-play"></i></button>');
+            var $btnPause  = $('<button class="alfred-tts-btn alfred-tts-pause  hidden" title="{{Pause}}"><i class="fas fa-pause"></i></button>');
+            var $btnResume = $('<button class="alfred-tts-btn alfred-tts-resume hidden" title="{{Resume}}"><i class="fas fa-play"></i></button>');
+            var $btnStop   = $('<button class="alfred-tts-btn alfred-tts-stop   hidden" title="{{Stop}}"><i class="fas fa-stop"></i></button>');
+            $btnPlay.on('click',   function () { speakMsg($msg); });
+            $btnPause.on('click',  function () { pauseMsg($msg); });
+            $btnResume.on('click', function () { resumeMsg($msg); });
+            $btnStop.on('click',   function () { stopMsg($msg); });
+            $actions.append($btnPlay, $btnPause, $btnResume, $btnStop);
+            $msg.append($actions);
+        }
         $('#alfred-messages').append($msg);
         scrollToBottom();
         return $msg;
@@ -622,7 +757,13 @@ $(function () {
     // Boot
     // =========================================================================
 
-    loadSessions();
-    startNewSession();
-    setInputEnabled(!!alfred_config.isConfigured);
+    loadSessions(function () {
+        var lastSessionId = localStorage.getItem('alfred_last_session');
+        if (lastSessionId && $('[data-session-id="' + lastSessionId + '"]').length) {
+            loadSession(lastSessionId);
+        } else {
+            startNewSession();
+            setInputEnabled(!!alfred_config.isConfigured);
+        }
+    });
 });

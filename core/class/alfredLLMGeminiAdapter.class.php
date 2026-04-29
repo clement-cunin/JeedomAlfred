@@ -16,7 +16,7 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
             $body['tools'] = [['function_declarations' => $this->toGeminiFunctions($tools)]];
         }
 
-        $data = $this->httpPost($url, ['Content-Type: application/json'], $body);
+        $data = $this->httpPost($url, ['Content-Type: application/json'], $body, 120);
 
         return $this->normalize($data);
     }

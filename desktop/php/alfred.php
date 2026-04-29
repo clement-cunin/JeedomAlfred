@@ -18,6 +18,7 @@ $_userHash     = $_SESSION['user']->getHash();
                 <i class="fas fa-plus"></i> <span class="alfred-label">{{New conversation}}</span>
             </button>
         </div>
+        <div id="alfred-conversations-label">{{Conversations}}</div>
         <div id="alfred-conversations"></div>
     </div>
 

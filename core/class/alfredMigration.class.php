@@ -5,18 +5,24 @@ class alfredMigration
     const MIGRATIONS = [
         1 => 'migration_001_initial_schema',
         2 => 'migration_002_memory_label',
+        3 => 'migration_003_repair_schema',
     ];
 
     public static function runPending()
     {
-        // If the core tables are missing, reset version to force re-creation
-        $tableCheck = DB::Prepare(
-            "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'alfred_message'",
-            [],
-            DB::FETCH_TYPE_ROW
-        );
-        if (isset($tableCheck['cnt']) && (int)$tableCheck['cnt'] === 0) {
-            config::save('schemaVersion', 0, 'alfred');
+        // Reset version if any required table is missing (all migrations are idempotent)
+        $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_schedule'];
+        foreach ($required as $table) {
+            $row = DB::Prepare(
+                "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :tbl",
+                [':tbl' => $table],
+                DB::FETCH_TYPE_ROW
+            );
+            if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
+                log::add('alfred', 'info', "Missing table '{$table}', resetting schema version to force migrations");
+                config::save('schemaVersion', 0, 'alfred');
+                break;
+            }
         }
 
         $current = (int) config::byKey('schemaVersion', 'alfred', 0);
@@ -24,8 +30,10 @@ class alfredMigration
 
         for ($v = $current + 1; $v <= $target; $v++) {
             $method = self::MIGRATIONS[$v];
+            log::add('alfred', 'info', "Running migration {$v}: {$method}");
             self::$method();
             config::save('schemaVersion', $v, 'alfred');
+            log::add('alfred', 'info', "Migration {$v} complete");
         }
     }
 
@@ -88,6 +96,48 @@ class alfredMigration
 
     private static function migration_002_memory_label()
     {
-        DB::Prepare('ALTER TABLE `alfred_memory` ADD COLUMN IF NOT EXISTS `label` VARCHAR(100) NOT NULL DEFAULT \'\'', [], DB::FETCH_TYPE_ROW);
+        // Use information_schema check to avoid ADD COLUMN IF NOT EXISTS (MySQL compat)
+        $row = DB::Prepare(
+            "SELECT COUNT(*) as cnt FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = 'alfred_memory' AND column_name = 'label'",
+            [], DB::FETCH_TYPE_ROW
+        );
+        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
+            DB::Prepare(
+                "ALTER TABLE `alfred_memory` ADD COLUMN `label` VARCHAR(100) NOT NULL DEFAULT ''",
+                [], DB::FETCH_TYPE_ROW
+            );
+        }
+    }
+
+    private static function migration_003_repair_schema()
+    {
+        // Create alfred_schedule if it was missing from early installations
+        DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_schedule` (
+            `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+            `session_id`  VARCHAR(36)   NOT NULL,
+            `instruction` TEXT          NOT NULL,
+            `run_at`      DATETIME      NOT NULL,
+            `strategy`    ENUM(\'background\',\'cron\') NOT NULL,
+            `status`      ENUM(\'pending\',\'running\',\'done\',\'error\') NOT NULL DEFAULT \'pending\',
+            `error_msg`   TEXT          DEFAULT NULL,
+            `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY (`status`, `run_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', [], DB::FETCH_TYPE_ROW);
+
+        // Add updated_at to alfred_conversation if missing (use information_schema check for MySQL compat)
+        $row = DB::Prepare(
+            "SELECT COUNT(*) as cnt FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = 'alfred_conversation' AND column_name = 'updated_at'",
+            [], DB::FETCH_TYPE_ROW
+        );
+        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
+            DB::Prepare(
+                'ALTER TABLE `alfred_conversation` ADD COLUMN `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+                [], DB::FETCH_TYPE_ROW
+            );
+            log::add('alfred', 'info', 'Added missing updated_at column to alfred_conversation');
+        }
     }
 }
