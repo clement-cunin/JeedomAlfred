@@ -306,6 +306,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.alfred-tool-call-header::marker,
+.alfred-tool-call-header::-webkit-details-marker {
+    display: none;
 }
 
 .alfred-tool-call i {
@@ -313,19 +321,12 @@
 }
 
 .alfred-tool-details {
-    margin-top: 6px;
     font-size: 11px;
 }
 
-.alfred-tool-details > summary {
-    cursor: pointer;
-    color: #bbb;
-    user-select: none;
-    padding: 2px 0;
-}
-
-.alfred-tool-details > summary:hover {
-    color: #888;
+.alfred-tool-details.alfred-tool-no-content > summary {
+    pointer-events: none;
+    cursor: default;
 }
 
 .alfred-tool-section {
