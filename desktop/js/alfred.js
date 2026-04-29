@@ -153,7 +153,7 @@ $(function () {
             } else if (msg.role === 'assistant' && msg.content !== '') {
                 appendBubble('assistant', msg.content);
             } else if (msg.role === 'tool') {
-                // skip tool results in history display
+                appendToolCall(msg.name, 'done');
             }
         });
         scrollToBottom();
