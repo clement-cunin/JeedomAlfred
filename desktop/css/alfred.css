@@ -299,14 +299,60 @@
     border: 1px solid #e8e8e8;
     border-radius: 6px;
     padding: 6px 10px;
+    max-width: 80%;
+}
+
+.alfred-tool-call-header {
     display: flex;
     align-items: center;
     gap: 6px;
-    max-width: 80%;
 }
 
 .alfred-tool-call i {
     color: #337ab7;
+}
+
+.alfred-tool-details {
+    margin-top: 6px;
+    font-size: 11px;
+}
+
+.alfred-tool-details > summary {
+    cursor: pointer;
+    color: #bbb;
+    user-select: none;
+    padding: 2px 0;
+}
+
+.alfred-tool-details > summary:hover {
+    color: #888;
+}
+
+.alfred-tool-section {
+    margin-top: 4px;
+}
+
+.alfred-tool-label {
+    display: block;
+    font-weight: bold;
+    color: #aaa;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.alfred-tool-pre {
+    background: #f0f0f0;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    padding: 4px 6px;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #555;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 /* Typing indicator */

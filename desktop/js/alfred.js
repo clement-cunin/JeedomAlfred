@@ -147,13 +147,24 @@ $(function () {
 
     function renderHistory(messages) {
         $('#alfred-messages').empty();
+        var toolInputMap = {};
         messages.forEach(function (msg) {
-            if (msg.role === 'user') {
+            if (msg.role === 'assistant') {
+                if (msg.tool_calls) {
+                    msg.tool_calls.forEach(function (tc) {
+                        toolInputMap[tc.id] = tc.input;
+                    });
+                }
+                if (msg.content !== '') {
+                    appendBubble('assistant', msg.content);
+                }
+            } else if (msg.role === 'user') {
                 appendBubble('user', msg.content);
-            } else if (msg.role === 'assistant' && msg.content !== '') {
-                appendBubble('assistant', msg.content);
             } else if (msg.role === 'tool') {
-                appendToolCall(msg.name, 'done');
+                var input = toolInputMap[msg.tool_call_id];
+                var result;
+                try { result = JSON.parse(msg.content); } catch (e) { result = msg.content; }
+                appendToolCall(msg.name, 'done', input, result);
             }
         });
         scrollToBottom();
@@ -522,12 +533,12 @@ $(function () {
         source.addEventListener('tool_call', function (e) {
             var d = JSON.parse(e.data);
             hideTyping();
-            appendToolCall(d.name, 'running');
+            appendToolCall(d.name, 'running', d.input);
         });
 
         source.addEventListener('tool_result', function (e) {
             var d = JSON.parse(e.data);
-            updateToolCall(d.name, 'done');
+            updateToolCall(d.name, 'done', d.result);
         });
 
         source.addEventListener('debug', function (e) {
@@ -655,20 +666,61 @@ $(function () {
 
     var _toolCallMap = {};
 
-    function appendToolCall(name, status) {
-        var icon = status === 'running' ? 'fa-spinner fa-spin' : 'fa-check';
-        var $el = $('<div class="alfred-tool-call" data-tool="' + name + '">')
-            .html('<i class="fas ' + icon + '"></i> <code>' + escHtml(name) + '</code>');
+    function appendToolCall(name, status, input, result) {
+        var icon = status === 'running' ? 'fa-spinner fa-spin' : 'fa-check text-success';
+        var $header = $('<div class="alfred-tool-call-header">')
+            .append($('<i>').addClass('fas ' + icon))
+            .append($('<code>').text(name));
+        var $el = $('<div class="alfred-tool-call">').attr('data-tool', name).append($header);
+
+        var hasInput = input && Object.keys(input).length > 0;
+        var hasResult = result !== undefined && result !== null;
+        if (hasInput || hasResult) {
+            var $details = $('<details>').addClass('alfred-tool-details')
+                .append($('<summary>').text('détails'));
+            if (hasInput) {
+                $details.append(
+                    $('<div class="alfred-tool-section">')
+                        .append($('<span class="alfred-tool-label">').text('Paramètres'))
+                        .append($('<pre class="alfred-tool-pre">').text(JSON.stringify(input, null, 2)))
+                );
+            }
+            if (hasResult) {
+                var resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+                $details.append(
+                    $('<div class="alfred-tool-section">')
+                        .append($('<span class="alfred-tool-label">').text('Résultat'))
+                        .append($('<pre class="alfred-tool-pre">').text(resultStr))
+                );
+            }
+            $el.append($details);
+        }
+
         _toolCallMap[name] = $el;
         $('#alfred-messages').append($el);
         scrollToBottom();
     }
 
-    function updateToolCall(name, status) {
+    function updateToolCall(name, status, result) {
         var $el = _toolCallMap[name];
         if (!$el) return;
         var icon = status === 'done' ? 'fa-check text-success' : 'fa-times text-danger';
         $el.find('i').attr('class', 'fas ' + icon);
+
+        if (result !== undefined && result !== null) {
+            var resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+            var $details = $el.find('.alfred-tool-details');
+            if ($details.length === 0) {
+                $details = $('<details>').addClass('alfred-tool-details')
+                    .append($('<summary>').text('détails'));
+                $el.append($details);
+            }
+            $details.append(
+                $('<div class="alfred-tool-section">')
+                    .append($('<span class="alfred-tool-label">').text('Résultat'))
+                    .append($('<pre class="alfred-tool-pre">').text(resultStr))
+            );
+        }
     }
 
     function showTyping() {
