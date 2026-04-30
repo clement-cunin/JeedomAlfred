@@ -3,7 +3,7 @@
     "short_name": "Alfred",
     "description": "AI assistant for your Jeedom home automation system.",
     "start_url": "./index.php",
-    "display": "standalone",
+    "display": "fullscreen",
     "orientation": "portrait",
     "background_color": "#ffffff",
     "theme_color": "#337ab7",
