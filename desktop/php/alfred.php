@@ -99,6 +99,11 @@ var alfred_config = {
 localStorage.setItem('alfred_user_hash',     alfred_config.userHash);
 localStorage.setItem('alfred_is_configured', alfred_config.isConfigured ? '1' : '0');
 localStorage.setItem('alfred_is_admin',      alfred_config.isAdmin ? '1' : '0');
+// Auto-redirect back to chat if login was initiated from there
+if (localStorage.getItem('alfred_return_to_chat') === '1') {
+    localStorage.removeItem('alfred_return_to_chat');
+    window.location.replace('<?php echo htmlspecialchars($_chatUrl, ENT_QUOTES); ?>');
+}
 </script>
 <script>
 <?php readfile(__DIR__ . '/../js/alfred.js'); ?>

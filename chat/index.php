@@ -711,8 +711,8 @@ if (isConnect()) {
 <div id="alfred-login">
     <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
     <h2>Alfred</h2>
-    <p>Sign in to Jeedom, then come back to this page.</p>
-    <a href="/" class="login-btn">
+    <p>Sign in to Jeedom to continue. You will be redirected back here automatically.</p>
+    <a href="/index.php?v=d&p=plugin&id=alfred" class="login-btn">
         <i class="fas fa-sign-in-alt"></i> Sign in to Jeedom
     </a>
 </div>
@@ -1443,6 +1443,7 @@ $(function () {
     // =========================================================================
 
     if (!alfred_config.userHash) {
+        localStorage.setItem('alfred_return_to_chat', '1');
         document.getElementById('alfred-login').style.display = 'flex';
         return;
     }
