@@ -5,17 +5,20 @@
  */
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
-if (!isConnect()) {
-    header('Location: ' . network::getNetworkAccess('external', 'proto:ip:port:comp')
-        . '/index.php?v=d&p=connection&redirect=' . urlencode($_SERVER['REQUEST_URI']));
-    exit;
+$_loggedIn = isConnect();
+
+// Stay within PWA scope — show inline login form instead of redirecting out
+if (!$_loggedIn) {
+    $_loginUrl = network::getNetworkAccess('external', 'proto:ip:port:comp')
+        . '/index.php?v=d&p=connection&redirect=' . urlencode($_SERVER['REQUEST_URI']);
 }
 
-require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
-
-$_isConfigured = alfred::getApiKey() !== '';
-$_userHash     = $_SESSION['user']->getHash();
-$_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
+if ($_loggedIn) {
+    require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
+    $_isConfigured = alfred::getApiKey() !== '';
+    $_userHash     = $_SESSION['user']->getHash();
+    $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
+}
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -634,10 +637,56 @@ $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
             .alfred-msg { max-width: 92%; }
             #alfred-messages { padding: 50px 12px 12px; }
         }
+
+        /* ---- Login screen ---- */
+        #alfred-login {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            height: 100dvh;
+            padding: 40px 24px;
+            padding-top: calc(40px + env(safe-area-inset-top, 0px));
+            padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+            text-align: center;
+            background: #fff;
+        }
+
+        #alfred-login .alfred-welcome-icon { font-size: 48px; color: #337ab7; margin-bottom: 20px; }
+        #alfred-login h2 { font-size: 22px; font-weight: 500; color: #333; margin: 0 0 8px; }
+        #alfred-login p  { font-size: 14px; color: #666; margin: 0 0 28px; }
+
+        #alfred-login .login-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            background: #337ab7;
+            color: #fff;
+            border: none;
+            border-radius: 24px;
+            font-size: 15px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+
+        #alfred-login .login-btn:hover { background: #286090; }
     </style>
 </head>
 <body>
 
+<?php if (!$_loggedIn): ?>
+<div id="alfred-login">
+    <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
+    <h2>Alfred</h2>
+    <p>Sign in to your Jeedom account to continue.</p>
+    <a href="<?php echo htmlspecialchars($_loginUrl, ENT_QUOTES); ?>" class="login-btn">
+        <i class="fas fa-sign-in-alt"></i> Sign in
+    </a>
+</div>
+<?php else: ?>
 <div id="alfred-app">
 
     <div id="alfred-sidebar">
@@ -689,7 +738,9 @@ $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
 
     </div>
 </div>
+<?php endif; ?>
 
+<?php if ($_loggedIn): ?>
 <script>
 var alfred_config = {
     isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
@@ -1374,6 +1425,7 @@ $(function () {
     });
 });
 </script>
+<?php endif; ?>
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
