@@ -7,12 +7,6 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 $_loggedIn = isConnect();
 
-// Stay within PWA scope — show inline login form instead of redirecting out
-if (!$_loggedIn) {
-    $_loginUrl = network::getNetworkAccess('external', 'proto:ip:port:comp')
-        . '/index.php?v=d&p=connection&redirect=' . urlencode($_SERVER['REQUEST_URI']);
-}
-
 if ($_loggedIn) {
     require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
     $_isConfigured = alfred::getApiKey() !== '';
@@ -682,10 +676,14 @@ if ($_loggedIn) {
     <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
     <h2>Alfred</h2>
     <p>Sign in to your Jeedom account to continue.</p>
-    <a href="<?php echo htmlspecialchars($_loginUrl, ENT_QUOTES); ?>" class="login-btn">
+    <a href="/index.php?v=d&p=connection" id="alfred-login-btn" class="login-btn">
         <i class="fas fa-sign-in-alt"></i> Sign in
     </a>
 </div>
+<script>
+var btn = document.getElementById('alfred-login-btn');
+if (btn) btn.href = '/index.php?v=d&p=connection&redirect=' + encodeURIComponent(window.location.href);
+</script>
 <?php else: ?>
 <div id="alfred-app">
 
