@@ -65,7 +65,9 @@ try {
 
     if ($action === 'getSessions') {
         require_once __DIR__ . '/../class/alfredConversation.class.php';
-        ajax::success(alfredConversation::listSessions());
+        $connectedUser = $_SESSION['user'] ?? null;
+        $currentLogin  = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
+        ajax::success(alfredConversation::listSessions(50, $currentLogin));
     }
 
     if ($action === 'deleteSession') {
@@ -74,6 +76,11 @@ try {
             throw new Exception('Missing session_id');
         }
         require_once __DIR__ . '/../class/alfredConversation.class.php';
+        $connectedUser = $_SESSION['user'] ?? null;
+        $currentLogin  = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
+        if (!isConnect('admin') && !alfredConversation::sessionBelongsTo($sessionId, $currentLogin)) {
+            throw new Exception(__('401 - Unauthorized access', __FILE__));
+        }
         alfredConversation::deleteSession($sessionId);
         ajax::success();
     }
@@ -83,6 +90,11 @@ try {
         $title     = init('title');
         if ($sessionId === '') throw new Exception('Missing session_id');
         require_once __DIR__ . '/../class/alfredConversation.class.php';
+        $connectedUser = $_SESSION['user'] ?? null;
+        $currentLogin  = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
+        if (!isConnect('admin') && !alfredConversation::sessionBelongsTo($sessionId, $currentLogin)) {
+            throw new Exception(__('401 - Unauthorized access', __FILE__));
+        }
         alfredConversation::updateSessionTitle($sessionId, $title);
         ajax::success();
     }
@@ -91,6 +103,11 @@ try {
         $sessionId = init('session_id');
         if ($sessionId === '') throw new Exception('Missing session_id');
         require_once __DIR__ . '/../class/alfredConversation.class.php';
+        $connectedUser = $_SESSION['user'] ?? null;
+        $currentLogin  = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
+        if (!isConnect('admin') && !alfredConversation::sessionBelongsTo($sessionId, $currentLogin)) {
+            throw new Exception(__('401 - Unauthorized access', __FILE__));
+        }
         ajax::success(alfredConversation::getMessages($sessionId));
     }
 

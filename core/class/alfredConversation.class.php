@@ -37,14 +37,30 @@ class alfredConversation
         return $row ?: null;
     }
 
-    public static function listSessions(int $limit = 50): array
+    public static function listSessions(int $limit = 50, ?string $userLogin = null): array
     {
         $n = max(1, (int)$limit);
+        if ($userLogin !== null) {
+            return DB::Prepare(
+                "SELECT * FROM alfred_conversation WHERE user_login = :user_login ORDER BY updated_at DESC LIMIT {$n}",
+                [':user_login' => $userLogin],
+                DB::FETCH_TYPE_ALL
+            ) ?: [];
+        }
         return DB::Prepare(
             "SELECT * FROM alfred_conversation ORDER BY updated_at DESC LIMIT {$n}",
             [],
             DB::FETCH_TYPE_ALL
         ) ?: [];
+    }
+
+    public static function sessionBelongsTo(string $sessionId, ?string $userLogin): bool
+    {
+        $session = self::getSession($sessionId);
+        if ($session === null) {
+            return false;
+        }
+        return $session['user_login'] === $userLogin;
     }
 
     public static function updateSessionTitle(string $sessionId, string $title): void

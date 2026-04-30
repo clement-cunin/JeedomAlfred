@@ -158,6 +158,8 @@ class alfredAgent
             $session = alfredConversation::getSession($sessionId);
             if ($session === null) {
                 alfredConversation::createSession($sessionId, alfredConversation::autoTitle($userMessage), $this->userLogin);
+            } elseif ($this->userProfil !== 'admin' && !alfredConversation::sessionBelongsTo($sessionId, $this->userLogin)) {
+                throw new Exception('Access denied');
             }
             alfredConversation::addMessage($sessionId, 'user', $userMessage);
         }
