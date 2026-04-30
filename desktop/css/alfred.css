@@ -320,6 +320,14 @@
     color: #337ab7;
 }
 
+.alfred-tool-call-header code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
+}
+
 .alfred-tool-details {
     font-size: 11px;
 }
