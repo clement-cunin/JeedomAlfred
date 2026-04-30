@@ -195,7 +195,7 @@ $(function () {
 
     $('#alfred-send').on('click', function () {
         if (isStreaming) return;
-        if (isListening) { recognition.stop(); }
+        if (isListening) { isListening = false; recognition.stop(); }
         if (ttsCurrentMsg) {
             setMsgTtsState(ttsCurrentMsg, 'idle');
             ttsCurrentMsg = null;
@@ -760,7 +760,7 @@ $(function () {
 
     function setInputEnabled(enabled) {
         $('#alfred-input, #alfred-send, #alfred-mic, #alfred-mic-autosend').prop('disabled', !enabled);
-        if (!enabled && isListening) { recognition.stop(); }
+        if (!enabled && isListening) { isListening = false; recognition.stop(); }
     }
 
     function scrollToBottom() {
