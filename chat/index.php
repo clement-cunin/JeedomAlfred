@@ -712,7 +712,7 @@ if (isConnect()) {
     <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
     <h2>Alfred</h2>
     <p>Sign in to Jeedom to continue. You will be redirected back here automatically.</p>
-    <a href="/index.php?v=d&p=plugin&id=alfred" class="login-btn">
+    <a href="/index.php?v=d&m=alfred&p=alfred" class="login-btn">
         <i class="fas fa-sign-in-alt"></i> Sign in to Jeedom
     </a>
 </div>
