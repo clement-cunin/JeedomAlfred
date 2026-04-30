@@ -95,6 +95,10 @@ var alfred_config = {
         ask:   "{{Ask me anything about your home automation system.}}"
     }
 };
+// Persist auth info so the standalone PWA can work without a PHP session
+localStorage.setItem('alfred_user_hash',     alfred_config.userHash);
+localStorage.setItem('alfred_is_configured', alfred_config.isConfigured ? '1' : '0');
+localStorage.setItem('alfred_is_admin',      alfred_config.isAdmin ? '1' : '0');
 </script>
 <script>
 <?php readfile(__DIR__ . '/../js/alfred.js'); ?>

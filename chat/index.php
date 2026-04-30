@@ -5,12 +5,15 @@
  */
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
-$_loggedIn = isConnect();
-
-if ($_loggedIn) {
+// PHP session works only when accessed through Jeedom's router.
+// Fallback: JS reads user_hash from localStorage (saved by the desktop page).
+$_userHash     = '';
+$_isConfigured = false;
+$_isAdmin      = false;
+if (isConnect()) {
     require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
-    $_isConfigured = alfred::getApiKey() !== '';
     $_userHash     = $_SESSION['user']->getHash();
+    $_isConfigured = alfred::getApiKey() !== '';
     $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
 }
 ?><!DOCTYPE html>
@@ -634,17 +637,18 @@ if ($_loggedIn) {
 
         /* ---- Login screen ---- */
         #alfred-login {
-            display: flex;
+            display: none; /* shown by JS when no user_hash available */
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            height: 100dvh;
+            position: fixed;
+            inset: 0;
             padding: 40px 24px;
             padding-top: calc(40px + env(safe-area-inset-top, 0px));
             padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
             text-align: center;
             background: #fff;
+            z-index: 999;
         }
 
         #alfred-login .alfred-welcome-icon { font-size: 48px; color: #337ab7; margin-bottom: 20px; }
@@ -671,7 +675,6 @@ if ($_loggedIn) {
 </head>
 <body>
 
-<?php if (!$_loggedIn): ?>
 <div id="alfred-login">
     <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
     <h2>Alfred</h2>
@@ -680,7 +683,7 @@ if ($_loggedIn) {
         <i class="fas fa-sign-in-alt"></i> Sign in to Jeedom
     </a>
 </div>
-<?php else: ?>
+
 <div id="alfred-app">
 
     <div id="alfred-sidebar">
@@ -702,39 +705,19 @@ if ($_loggedIn) {
         <div id="alfred-messages"></div>
 
         <div id="alfred-input-bar">
-            <textarea id="alfred-input"
-                      placeholder="Type a message…"
-                      rows="1"
-                      <?php echo !$_isConfigured ? 'disabled' : ''; ?>></textarea>
+            <textarea id="alfred-input" placeholder="Type a message…" rows="1"></textarea>
             <div id="alfred-tts-wrap">
-                <button id="alfred-tts" title="Text-to-speech"
-                        <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
-                    <i class="fas fa-volume-up"></i>
-                </button>
-                <button id="alfred-tts-settings" title="TTS settings"
-                        <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
-                    <i class="fas fa-sliders-h"></i>
-                </button>
+                <button id="alfred-tts" title="Text-to-speech"><i class="fas fa-volume-up"></i></button>
+                <button id="alfred-tts-settings" title="TTS settings"><i class="fas fa-sliders-h"></i></button>
             </div>
-            <button id="alfred-mic-autosend" title="Auto-send: OFF"
-                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
-                <i class="fas fa-bolt"></i>
-            </button>
-            <button id="alfred-mic" title="Voice input"
-                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
-                <i class="fas fa-microphone"></i>
-            </button>
-            <button id="alfred-send" title="Send"
-                    <?php echo !$_isConfigured ? 'disabled' : ''; ?>>
-                <i class="fas fa-paper-plane"></i>
-            </button>
+            <button id="alfred-mic-autosend" title="Auto-send: OFF"><i class="fas fa-bolt"></i></button>
+            <button id="alfred-mic" title="Voice input"><i class="fas fa-microphone"></i></button>
+            <button id="alfred-send" title="Send"><i class="fas fa-paper-plane"></i></button>
         </div>
 
     </div>
 </div>
-<?php endif; ?>
 
-<?php if ($_loggedIn): ?>
 <script>
 var alfred_config = {
     isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
@@ -742,6 +725,18 @@ var alfred_config = {
     isAdmin:      <?php echo $_isAdmin ? 'true' : 'false'; ?>,
     basePath:     '/plugins/alfred'
 };
+// PHP session unavailable when accessed outside Jeedom router — fall back to localStorage
+if (!alfred_config.userHash) {
+    alfred_config.userHash     = localStorage.getItem('alfred_user_hash') || '';
+    alfred_config.isConfigured = localStorage.getItem('alfred_is_configured') === '1';
+    alfred_config.isAdmin      = localStorage.getItem('alfred_is_admin') === '1';
+}
+// Persist whenever we have fresh data from the server
+if ("<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>") {
+    localStorage.setItem('alfred_user_hash',     alfred_config.userHash);
+    localStorage.setItem('alfred_is_configured', alfred_config.isConfigured ? '1' : '0');
+    localStorage.setItem('alfred_is_admin',      alfred_config.isAdmin ? '1' : '0');
+}
 </script>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script>
@@ -1408,6 +1403,11 @@ $(function () {
     // Boot
     // =========================================================================
 
+    if (!alfred_config.userHash) {
+        document.getElementById('alfred-login').style.display = 'flex';
+        return;
+    }
+
     loadSessions(function () {
         var lastId = localStorage.getItem('alfred_last_session');
         if (lastId && $('[data-session-id="' + lastId + '"]').length) {
@@ -1419,7 +1419,6 @@ $(function () {
     });
 });
 </script>
-<?php endif; ?>
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
