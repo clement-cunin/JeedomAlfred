@@ -675,15 +675,11 @@ if ($_loggedIn) {
 <div id="alfred-login">
     <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
     <h2>Alfred</h2>
-    <p>Sign in to your Jeedom account to continue.</p>
-    <a href="/index.php?v=d&p=connection" id="alfred-login-btn" class="login-btn">
-        <i class="fas fa-sign-in-alt"></i> Sign in
+    <p>Sign in to Jeedom, then come back to this page.</p>
+    <a href="/" class="login-btn">
+        <i class="fas fa-sign-in-alt"></i> Sign in to Jeedom
     </a>
 </div>
-<script>
-var btn = document.getElementById('alfred-login-btn');
-if (btn) btn.href = '/index.php?v=d&p=connection&redirect=' + encodeURIComponent(window.location.href);
-</script>
 <?php else: ?>
 <div id="alfred-app">
 
