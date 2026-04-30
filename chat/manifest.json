@@ -12,13 +12,13 @@
     "icons": [
         {
             "src": "../plugin_info/alfred_icon.png",
-            "sizes": "192x192",
+            "sizes": "2048x2048",
             "type": "image/png",
             "purpose": "any"
         },
         {
             "src": "../plugin_info/alfred_icon.png",
-            "sizes": "192x192",
+            "sizes": "2048x2048",
             "type": "image/png",
             "purpose": "maskable"
         },
