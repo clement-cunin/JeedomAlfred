@@ -1,4 +1,5 @@
 {
+    "id": "/plugins/alfred/chat/",
     "name": "Alfred — Jeedom AI",
     "short_name": "Alfred",
     "description": "AI assistant for your Jeedom home automation system.",
