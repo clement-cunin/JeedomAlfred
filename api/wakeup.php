@@ -40,6 +40,7 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 require_once __DIR__ . '/../core/class/alfred.class.php';
 require_once __DIR__ . '/../core/class/alfredLLM.class.php';
 require_once __DIR__ . '/../core/class/alfredMCP.class.php';
+require_once __DIR__ . '/../core/class/alfredMCPRegistry.class.php';
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
 require_once __DIR__ . '/../core/class/alfredScheduler.class.php';
 require_once __DIR__ . '/../core/class/alfredMemory.class.php';
@@ -53,7 +54,7 @@ $row = DB::Prepare(
 ) ?: null;
 
 if ($row === null) {
-    fwrite(STDERR, "wakeup.php: schedule #{$scheduleId} not found\n");
+    log::add('alfred_cron', 'error', "schedule #{$scheduleId}: row not found");
     exit(1);
 }
 
@@ -62,15 +63,29 @@ if ($row['status'] !== 'pending') {
     exit(0);
 }
 
+log::add('alfred_cron', 'info', "=== schedule #{$scheduleId} starting: {$row['instruction']} ===");
+
+// ---- Resolve user from session ----
+$userLogin  = alfredConversation::getUserLogin($row['session_id']);
+$userProfil = null;
+if ($userLogin !== null) {
+    try {
+        $u = user::byLogin($userLogin);
+        $userProfil = ($u && $u->getProfils() === 'admin') ? 'admin' : 'user';
+    } catch (Exception $ignored) {}
+}
+log::add('alfred_cron', 'info', "schedule #{$scheduleId}: user={$userLogin}, session={$row['session_id']}");
+
 // ---- Run agent ----
 alfredScheduler::markRunning($scheduleId);
 
 try {
-    $agent = new alfredAgent();
+    $agent = new alfredAgent(null, null, null, $userLogin, $userProfil);
     $agent->run($row['session_id'], '[SCHEDULED] ' . $row['instruction']);
     alfredScheduler::markDone($scheduleId);
+    log::add('alfred_cron', 'info', "=== schedule #{$scheduleId} done ===");
 } catch (Exception $e) {
     alfredScheduler::markError($scheduleId, $e->getMessage());
-    fwrite(STDERR, "wakeup.php error: " . $e->getMessage() . "\n");
+    log::add('alfred_cron', 'error', "schedule #{$scheduleId} failed: " . $e->getMessage());
     exit(1);
 }

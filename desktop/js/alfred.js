@@ -9,9 +9,10 @@ $(function () {
     // State
     // =========================================================================
 
-    var currentSessionId = null;
-    var isStreaming      = false;
-    var currentSource    = null; // active EventSource
+    var currentSessionId  = null;
+    var isStreaming       = false;
+    var currentSource     = null; // active EventSource
+    var knownMsgCount     = 0;    // number of messages last rendered, for background poll
 
     // Voice dictation state
     var recognition     = null;
@@ -53,6 +54,7 @@ $(function () {
 
     function startNewSession() {
         currentSessionId = generateUUID();
+        knownMsgCount    = 0;
         localStorage.setItem('alfred_last_session', currentSessionId);
         renderWelcome();
         setInputEnabled(true);
@@ -146,6 +148,7 @@ $(function () {
     }
 
     function renderHistory(messages) {
+        knownMsgCount = messages.length;
         $('#alfred-messages').empty();
         var toolInputMap = {};
         messages.forEach(function (msg) {
@@ -159,7 +162,11 @@ $(function () {
                     appendBubble('assistant', msg.content);
                 }
             } else if (msg.role === 'user') {
-                appendBubble('user', msg.content);
+                if (msg.content.indexOf('[SCHEDULED]') === 0) {
+                    appendScheduledBubble(msg.content.replace('[SCHEDULED]', '').trim());
+                } else {
+                    appendBubble('user', msg.content);
+                }
             } else if (msg.role === 'tool') {
                 var input = toolInputMap[msg.tool_call_id];
                 var result;
@@ -642,6 +649,16 @@ $(function () {
     // DOM helpers
     // =========================================================================
 
+    function appendScheduledBubble(instruction) {
+        var $summary = $('<summary class="alfred-tool-call-header">')
+            .append($('<i>').addClass('fas fa-clock'))
+            .append($('<span>').text(instruction));
+        var $el = $('<div class="alfred-tool-call">')
+            .append($('<details class="alfred-tool-details alfred-tool-no-content">').append($summary));
+        $('#alfred-messages').append($el);
+        scrollToBottom();
+    }
+
     function appendBubble(role, text) {
         var $bubble = $('<div class="alfred-msg-bubble">').html(markdownToHtml(text));
         var $msg    = $('<div class="alfred-msg ' + role + '">').append($bubble);
@@ -799,6 +816,27 @@ $(function () {
             return v.toString(16);
         });
     }
+
+    // =========================================================================
+    // Background poll — picks up messages written by scheduled tasks
+    // =========================================================================
+
+    setInterval(function () {
+        if (isStreaming || !currentSessionId) return;
+        $.ajax({
+            type: 'POST',
+            url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+            data: { action: 'getMessages', session_id: currentSessionId },
+            dataType: 'json',
+            success: function (resp) {
+                if (resp.state !== 'ok' || !resp.result) return;
+                if (resp.result.length > knownMsgCount) {
+                    renderHistory(resp.result);
+                    loadSessions();
+                }
+            }
+        });
+    }, 10000);
 
     // =========================================================================
     // Boot

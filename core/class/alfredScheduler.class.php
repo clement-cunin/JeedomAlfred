@@ -27,21 +27,27 @@ class alfredScheduler
      * @param string $sessionId     Session to re-invoke on
      * @param int    $delaySeconds  Delay before execution
      * @param string $instruction   What to ask the agent when it wakes up
-     * @return string Human-readable confirmation message
+     * @return array Confirmation with status and human-readable message
      */
-    public static function schedule(string $sessionId, int $delaySeconds, string $instruction): string
+    public static function schedule(string $sessionId, int $delaySeconds, string $instruction): array
     {
         $runAt = (new DateTime())->modify("+{$delaySeconds} seconds");
 
         if ($delaySeconds < self::BACKGROUND_THRESHOLD) {
             $id = self::persist($sessionId, $instruction, $runAt, 'background');
             self::spawnBackground($id, $delaySeconds);
+            $strategy = 'background';
         } else {
             self::persist($sessionId, $instruction, $runAt, 'cron');
-            // Picked up by alfred::cron() when run_at is reached
+            $strategy = 'cron';
         }
 
-        return self::confirmationMessage($delaySeconds, $instruction);
+        return [
+            'status'    => 'scheduled',
+            'strategy'  => $strategy,
+            'run_at'    => $runAt->format('Y-m-d H:i:s'),
+            'message'   => self::confirmationMessage($delaySeconds, $instruction),
+        ];
     }
 
     /**
@@ -125,16 +131,25 @@ class alfredScheduler
      */
     private static function spawnBackground(int $scheduleId, int $delaySeconds): void
     {
-        $php    = PHP_BINARY;
+        $php = PHP_BINARY !== '' ? PHP_BINARY : trim((string)shell_exec('which php 2>/dev/null'));
+        if ($php === '') {
+            log::add('alfred_cron', 'error', "schedule #{$scheduleId}: cannot find PHP binary, background spawn aborted");
+            return;
+        }
         // __DIR__ = core/class/  →  dirname x2 = plugin root
         $script = dirname(__DIR__, 2) . '/api/wakeup.php';
+        // dirname x4: core/class → core → plugin root → plugins → jeedom root
+        $jeedomRoot = dirname(__DIR__, 4);
+        $logDir  = is_dir($jeedomRoot . '/log') ? $jeedomRoot . '/log' : sys_get_temp_dir();
+        $logFile = $logDir . '/alfred_cron';
 
         $cmd = escapeshellarg($php)
              . ' ' . escapeshellarg($script)
              . ' --schedule_id=' . (int)$scheduleId
              . ' --delay=' . (int)$delaySeconds;
 
-        exec('nohup ' . $cmd . ' > /dev/null 2>&1 &');
+        exec('nohup ' . $cmd . ' >> ' . escapeshellarg($logFile) . ' 2>&1 &');
+        log::add('alfred_cron', 'info', "schedule #{$scheduleId} spawned (php={$php})");
     }
 
     /**
@@ -142,14 +157,36 @@ class alfredScheduler
      */
     private static function execute(array $row): void
     {
-        self::markRunning((int)$row['id']);
+        $id = (int)$row['id'];
+        log::add('alfred_cron', 'info', "=== schedule #{$id} starting: {$row['instruction']} ===");
+        self::markRunning($id);
         try {
-            $agent = new alfredAgent();
+            list($userLogin, $userProfil) = self::resolveUser($row['session_id']);
+            log::add('alfred_cron', 'info', "schedule #{$id}: user={$userLogin}, session={$row['session_id']}");
+            $agent = new alfredAgent(null, null, null, $userLogin, $userProfil);
             $agent->run($row['session_id'], '[SCHEDULED] ' . $row['instruction']);
-            self::markDone((int)$row['id']);
+            self::markDone($id);
+            log::add('alfred_cron', 'info', "=== schedule #{$id} done ===");
         } catch (Exception $e) {
-            self::markError((int)$row['id'], $e->getMessage());
+            self::markError($id, $e->getMessage());
+            log::add('alfred_cron', 'error', "schedule #{$id} failed: " . $e->getMessage());
         }
+    }
+
+    private static function resolveUser(string $sessionId): array
+    {
+        $userLogin = alfredConversation::getUserLogin($sessionId);
+        if ($userLogin === null) {
+            return [null, null];
+        }
+        $userProfil = 'user';
+        try {
+            $u = user::byLogin($userLogin);
+            if ($u && $u->getProfils() === 'admin') {
+                $userProfil = 'admin';
+            }
+        } catch (Exception $ignored) {}
+        return [$userLogin, $userProfil];
     }
 
     /**

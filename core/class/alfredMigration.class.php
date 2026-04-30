@@ -6,6 +6,7 @@ class alfredMigration
         1 => 'migration_001_initial_schema',
         2 => 'migration_002_memory_label',
         3 => 'migration_003_repair_schema',
+        4 => 'migration_004_conversation_user_login',
     ];
 
     public static function runPending()
@@ -105,6 +106,21 @@ class alfredMigration
         if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
             DB::Prepare(
                 "ALTER TABLE `alfred_memory` ADD COLUMN `label` VARCHAR(100) NOT NULL DEFAULT ''",
+                [], DB::FETCH_TYPE_ROW
+            );
+        }
+    }
+
+    private static function migration_004_conversation_user_login()
+    {
+        $row = DB::Prepare(
+            "SELECT COUNT(*) as cnt FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = 'alfred_conversation' AND column_name = 'user_login'",
+            [], DB::FETCH_TYPE_ROW
+        );
+        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
+            DB::Prepare(
+                "ALTER TABLE `alfred_conversation` ADD COLUMN `user_login` VARCHAR(100) DEFAULT NULL",
                 [], DB::FETCH_TYPE_ROW
             );
         }

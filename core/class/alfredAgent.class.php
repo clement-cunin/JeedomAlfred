@@ -157,7 +157,7 @@ class alfredAgent
         if ($userMessage !== '') {
             $session = alfredConversation::getSession($sessionId);
             if ($session === null) {
-                alfredConversation::createSession($sessionId, alfredConversation::autoTitle($userMessage));
+                alfredConversation::createSession($sessionId, alfredConversation::autoTitle($userMessage), $this->userLogin);
             }
             alfredConversation::addMessage($sessionId, 'user', $userMessage);
         }
@@ -265,13 +265,13 @@ class alfredAgent
      * Handle a call to the synthetic alfred_schedule tool.
      * Delegates to alfredScheduler and returns a confirmation string.
      */
-    private function handleScheduleTool(string $sessionId, array $input): string
+    private function handleScheduleTool(string $sessionId, array $input): array
     {
         $delaySeconds = (int)($input['delay_seconds'] ?? 0);
         $instruction  = trim((string)($input['instruction'] ?? ''));
 
         if ($delaySeconds <= 0 || $instruction === '') {
-            return 'Error: delay_seconds must be positive and instruction must not be empty.';
+            return ['error' => 'delay_seconds must be positive and instruction must not be empty.'];
         }
 
         return alfredScheduler::schedule($sessionId, $delaySeconds, $instruction);

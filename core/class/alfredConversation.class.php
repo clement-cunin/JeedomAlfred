@@ -12,14 +12,19 @@ class alfredConversation
     // Sessions
     // -------------------------------------------------------------------------
 
-    public static function createSession(string $sessionId, string $title = ''): void
+    public static function createSession(string $sessionId, string $title = '', ?string $userLogin = null): void
     {
-        $db = DB::getLastInsertId();
         DB::Prepare(
-            'INSERT INTO alfred_conversation (session_id, title) VALUES (:session_id, :title)',
-            [':session_id' => $sessionId, ':title' => $title],
+            'INSERT INTO alfred_conversation (session_id, title, user_login) VALUES (:session_id, :title, :user_login)',
+            [':session_id' => $sessionId, ':title' => $title, ':user_login' => $userLogin],
             DB::FETCH_TYPE_ROW
         );
+    }
+
+    public static function getUserLogin(string $sessionId): ?string
+    {
+        $row = self::getSession($sessionId);
+        return ($row && isset($row['user_login'])) ? ($row['user_login'] ?: null) : null;
     }
 
     public static function getSession(string $sessionId): ?array
