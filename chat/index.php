@@ -27,7 +27,7 @@ if (isConnect()) {
     <meta name="apple-mobile-web-app-title" content="Alfred">
     <meta name="theme-color" content="#337ab7">
     <title>Alfred</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.php">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="../plugin_info/alfred_icon.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
