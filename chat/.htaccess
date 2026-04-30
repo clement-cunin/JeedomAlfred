@@ -1,0 +1,4 @@
+# Allow PWA static files without Jeedom session authentication
+<FilesMatch "^(manifest\.json|sw\.js|favicon\.ico)$">
+    Require all granted
+</FilesMatch>
