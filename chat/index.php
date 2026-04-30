@@ -167,6 +167,39 @@ if (isConnect()) {
             font-size: 14px;
         }
 
+        /* ---- Install banner ---- */
+        #alfred-install-banner {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            background: #337ab7;
+            color: #fff;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        #alfred-install-banner span { flex: 1; }
+        #alfred-install-btn {
+            padding: 4px 12px;
+            background: #fff;
+            color: #337ab7;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        #alfred-install-dismiss {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+            line-height: 1;
+        }
+
         /* ---- Main ---- */
         #alfred-main {
             flex: 1;
@@ -701,6 +734,12 @@ if (isConnect()) {
     </button>
 
     <div id="alfred-main">
+
+        <div id="alfred-install-banner">
+            <span><i class="fas fa-download"></i> Install Alfred as an app for the best experience</span>
+            <button id="alfred-install-btn">Install</button>
+            <button id="alfred-install-dismiss">✕</button>
+        </div>
 
         <div id="alfred-messages"></div>
 
@@ -1417,6 +1456,34 @@ $(function () {
             setInputEnabled(!!alfred_config.isConfigured);
         }
     });
+});
+</script>
+<script>
+// PWA install prompt — fires when Chrome considers the site a valid installable PWA
+var _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    var banner = document.getElementById('alfred-install-banner');
+    if (banner) banner.style.display = 'flex';
+});
+document.getElementById('alfred-install-btn').addEventListener('click', function () {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    _deferredInstallPrompt.userChoice.then(function () {
+        _deferredInstallPrompt = null;
+        var banner = document.getElementById('alfred-install-banner');
+        if (banner) banner.style.display = 'none';
+    });
+});
+document.getElementById('alfred-install-dismiss').addEventListener('click', function () {
+    var banner = document.getElementById('alfred-install-banner');
+    if (banner) banner.style.display = 'none';
+});
+window.addEventListener('appinstalled', function () {
+    _deferredInstallPrompt = null;
+    var banner = document.getElementById('alfred-install-banner');
+    if (banner) banner.style.display = 'none';
 });
 </script>
 <script>
