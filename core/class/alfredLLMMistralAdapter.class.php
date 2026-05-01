@@ -170,8 +170,8 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
         $deprecated = [];
         foreach ($data['data'] as $m) {
             $id = $m['id'] ?? '';
+            if (!($m['capabilities']['completion_chat'] ?? false)) continue;
             if (!($m['capabilities']['function_calling'] ?? false)) continue;
-            if ($m['capabilities']['vision'] ?? false) continue;
 
             $ctx        = $m['max_context_length'] ?? 0;
             $ctxLabel   = $ctx >= 1000000 ? round($ctx / 1000000) . 'M ctx'
