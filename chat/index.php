@@ -313,7 +313,8 @@ if (isConnect()) {
             transition: opacity 0.15s;
         }
 
-        .alfred-msg.assistant:hover .alfred-msg-actions { opacity: 1; }
+        .alfred-msg.assistant:hover .alfred-msg-actions,
+        .alfred-msg.tts-active .alfred-msg-actions { opacity: 1; }
 
         .alfred-tts-btn {
             width: 24px;
@@ -1057,6 +1058,7 @@ $(function () {
     }
 
     function setMsgTtsState($msg, state) {
+        $msg.toggleClass('tts-active', state !== 'idle');
         $msg.find('.alfred-tts-play').toggleClass('hidden', state !== 'idle');
         $msg.find('.alfred-tts-pause').toggleClass('hidden', state !== 'playing');
         $msg.find('.alfred-tts-resume').toggleClass('hidden', state !== 'paused');
