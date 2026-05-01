@@ -166,14 +166,30 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             throw new Exception('Mistral models API error (HTTP ' . $code . ')');
         }
 
-        $models = [];
+        $active     = [];
+        $deprecated = [];
         foreach ($data['data'] as $m) {
             $id = $m['id'] ?? '';
             if (!($m['capabilities']['function_calling'] ?? false)) continue;
-            $models[] = ['id' => $id, 'name' => $id];
+            if ($m['capabilities']['vision'] ?? false) continue;
+
+            $ctx        = $m['max_context_length'] ?? 0;
+            $ctxLabel   = $ctx >= 1000000 ? round($ctx / 1000000) . 'M ctx'
+                        : ($ctx >= 1000   ? round($ctx / 1000)     . 'k ctx' : '');
+            $deprDate   = $m['deprecation'] ?? null;
+
+            if ($deprDate) {
+                $dateShort = substr($deprDate, 0, 10); // YYYY-MM-DD
+                $label     = $id . ' — deprecated ' . $dateShort . ($ctxLabel ? ' — ' . $ctxLabel : '');
+                $deprecated[] = ['id' => $id, 'name' => $label];
+            } else {
+                $label    = $id . ($ctxLabel ? ' — ' . $ctxLabel : '');
+                $active[] = ['id' => $id, 'name' => $label];
+            }
         }
-        usort($models, function ($a, $b) { return strcmp($b['id'], $a['id']); });
-        return $models;
+        usort($active,     function ($a, $b) { return strcmp($b['id'], $a['id']); });
+        usort($deprecated, function ($a, $b) { return strcmp($b['id'], $a['id']); });
+        return array_merge($active, $deprecated);
     }
 
     // -------------------------------------------------------------------------
