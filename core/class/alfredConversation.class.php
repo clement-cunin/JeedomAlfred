@@ -127,7 +127,8 @@ class alfredConversation
     }
 
     /**
-     * Load all messages for a session as internal Alfred format.
+     * Load messages for a session as internal Alfred format (for LLM context).
+     * Error messages are excluded — they are display-only and must not pollute the LLM context.
      */
     public static function getMessages(string $sessionId): array
     {
@@ -143,6 +144,9 @@ class alfredConversation
             $meta    = $row['metadata'] ? json_decode($row['metadata'], true) : [];
             $content = $row['content'];
 
+            // Skip error messages — they are display-only
+            if (!empty($meta['error'])) continue;
+
             $msg = ['role' => $row['role'], 'content' => $content];
 
             // Restore tool_calls on assistant messages
@@ -155,6 +159,43 @@ class alfredConversation
                 }
             }
             // Restore tool result fields
+            if ($row['role'] === 'tool') {
+                $msg['tool_call_id'] = $meta['tool_call_id'] ?? '';
+                $msg['name']         = $meta['name'] ?? '';
+            }
+
+            $out[] = $msg;
+        }
+        return $out;
+    }
+
+    /**
+     * Load messages for display in the UI (includes error messages with error=true flag).
+     */
+    public static function getDisplayMessages(string $sessionId): array
+    {
+        $rows = DB::Prepare(
+            'SELECT role, content, metadata FROM alfred_message
+             WHERE session_id = :session_id ORDER BY id ASC',
+            [':session_id' => $sessionId],
+            DB::FETCH_TYPE_ALL
+        ) ?: [];
+
+        $out = [];
+        foreach ($rows as $row) {
+            $meta    = $row['metadata'] ? json_decode($row['metadata'], true) : [];
+            $content = $row['content'];
+
+            $msg = ['role' => $row['role'], 'content' => $content];
+
+            if ($row['role'] === 'assistant') {
+                if (!empty($meta['tool_calls'])) {
+                    $msg['tool_calls'] = $meta['tool_calls'];
+                }
+                if (!empty($meta['error'])) {
+                    $msg['error'] = true;
+                }
+            }
             if ($row['role'] === 'tool') {
                 $msg['tool_call_id'] = $meta['tool_call_id'] ?? '';
                 $msg['name']         = $meta['name'] ?? '';

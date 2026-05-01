@@ -117,6 +117,17 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             throw new Exception("HTTP request failed: {$err}");
         }
         if ($code >= 400) {
+            // Flush any partial buffer (error body without trailing newline)
+            if ($buffer !== '') {
+                $error_body .= trim($buffer);
+            }
+            // Extract message from JSON error body if possible
+            if ($error_body !== '') {
+                $parsed = json_decode($error_body, true);
+                if (is_array($parsed)) {
+                    $error_body = $parsed['message'] ?? $parsed['error']['message'] ?? $error_body;
+                }
+            }
             $msg = $error_body !== '' ? $error_body : "HTTP {$code}";
             throw new Exception("Mistral API error: {$msg}");
         }

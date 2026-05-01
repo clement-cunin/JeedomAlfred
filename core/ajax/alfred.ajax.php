@@ -108,7 +108,7 @@ try {
         if (!isConnect('admin') && !alfredConversation::sessionBelongsTo($sessionId, $currentLogin)) {
             throw new Exception(__('401 - Unauthorized access', __FILE__));
         }
-        ajax::success(alfredConversation::getMessages($sessionId));
+        ajax::success(alfredConversation::getDisplayMessages($sessionId));
     }
 
     if ($action === 'runMigrations') {

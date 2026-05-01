@@ -914,7 +914,13 @@ $(function () {
         messages.forEach(function (msg) {
             if (msg.role === 'assistant') {
                 if (msg.tool_calls) msg.tool_calls.forEach(function (tc) { toolInputMap[tc.id] = tc.input; });
-                if (msg.content !== '') appendBubble('assistant', msg.content);
+                if (msg.content !== '') {
+                    if (msg.error) {
+                        appendBubble('assistant', '⚠️ ' + msg.content);
+                    } else {
+                        appendBubble('assistant', msg.content);
+                    }
+                }
             } else if (msg.role === 'user') {
                 if (msg.content.indexOf('[SCHEDULED]') === 0) {
                     appendScheduledBubble(msg.content.replace('[SCHEDULED]', '').trim());
