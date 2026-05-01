@@ -118,12 +118,9 @@ class alfredLLM
         }
 
         switch ($provider) {
-            case 'anthropic':
-                require_once __DIR__ . '/alfredLLMAnthropicAdapter.class.php';
-                return new alfredLLMAnthropicAdapter($apiKey, $model);
-            case 'openai':
-                require_once __DIR__ . '/alfredLLMOpenAIAdapter.class.php';
-                return new alfredLLMOpenAIAdapter($apiKey, $model);
+            case 'mistral':
+                require_once __DIR__ . '/alfredLLMMistralAdapter.class.php';
+                return new alfredLLMMistralAdapter($apiKey, $model);
             case 'gemini':
                 require_once __DIR__ . '/alfredLLMGeminiAdapter.class.php';
                 return new alfredLLMGeminiAdapter($apiKey, $model);

@@ -1,26 +1,26 @@
 <?php
 
-class alfredLLMOpenAIAdapter extends alfredLLMAdapter
+class alfredLLMMistralAdapter extends alfredLLMAdapter
 {
-    private const API_URL    = 'https://api.openai.com/v1/chat/completions';
-    private const MODELS_URL = 'https://api.openai.com/v1/models';
+    private const API_URL    = 'https://api.mistral.ai/v1/chat/completions';
+    private const MODELS_URL = 'https://api.mistral.ai/v1/models';
 
     public function chat(array $messages, array $tools, string $systemPrompt): array
     {
-        $oaiMessages = [];
+        $mistralMessages = [];
         if ($systemPrompt !== '') {
-            $oaiMessages[] = ['role' => 'system', 'content' => $systemPrompt];
+            $mistralMessages[] = ['role' => 'system', 'content' => $systemPrompt];
         }
-        foreach ($this->toOpenAIMessages($messages) as $m) {
-            $oaiMessages[] = $m;
+        foreach ($this->toMistralMessages($messages) as $m) {
+            $mistralMessages[] = $m;
         }
 
         $body = [
             'model'    => $this->model,
-            'messages' => $oaiMessages,
+            'messages' => $mistralMessages,
         ];
         if (!empty($tools)) {
-            $body['tools'] = $this->toOpenAITools($tools);
+            $body['tools'] = $this->toMistralTools($tools);
         }
 
         $data = $this->httpPost(self::API_URL, $this->headers(), $body, 120);
@@ -30,21 +30,21 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
 
     public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
     {
-        $oaiMessages = [];
+        $mistralMessages = [];
         if ($systemPrompt !== '') {
-            $oaiMessages[] = ['role' => 'system', 'content' => $systemPrompt];
+            $mistralMessages[] = ['role' => 'system', 'content' => $systemPrompt];
         }
-        foreach ($this->toOpenAIMessages($messages) as $m) {
-            $oaiMessages[] = $m;
+        foreach ($this->toMistralMessages($messages) as $m) {
+            $mistralMessages[] = $m;
         }
 
         $body = [
             'model'    => $this->model,
-            'messages' => $oaiMessages,
+            'messages' => $mistralMessages,
             'stream'   => true,
         ];
         if (!empty($tools)) {
-            $body['tools'] = $this->toOpenAITools($tools);
+            $body['tools'] = $this->toMistralTools($tools);
         }
 
         $text        = '';
@@ -75,7 +75,6 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
                     $d = json_decode(substr($line, 6), true);
                     if (!is_array($d)) continue;
 
-                    // Accumulate error messages from non-2xx responses
                     if (isset($d['error'])) {
                         $error_body = $d['error']['message'] ?? json_encode($d['error']);
                         continue;
@@ -89,14 +88,12 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
                         $stop_reason = 'tool_use';
                     }
 
-                    // Text chunk
                     if (isset($delta['content']) && $delta['content'] !== '') {
                         $chunk  = $delta['content'];
                         $text  .= $chunk;
                         $onDelta($chunk);
                     }
 
-                    // Tool call accumulation (index-based, streamed in parts)
                     foreach ($delta['tool_calls'] ?? [] as $tc) {
                         $idx = $tc['index'];
                         if (!isset($tool_acc[$idx])) {
@@ -121,7 +118,7 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
         }
         if ($code >= 400) {
             $msg = $error_body !== '' ? $error_body : "HTTP {$code}";
-            throw new Exception("OpenAI API error: {$msg}");
+            throw new Exception("Mistral API error: {$msg}");
         }
 
         $tool_calls = [];
@@ -149,7 +146,7 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
             'messages'   => [['role' => 'user', 'content' => 'Hi']],
         ];
         $this->httpPost(self::API_URL, $this->headers(), $body, 15);
-        return ['ok' => true, 'provider' => 'openai', 'model' => $this->model];
+        return ['ok' => true, 'provider' => 'mistral', 'model' => $this->model];
     }
 
     public function listModels(): array
@@ -166,17 +163,18 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
 
         $data = json_decode($raw, true);
         if ($code >= 400 || !isset($data['data'])) {
-            throw new Exception('OpenAI models API error (HTTP ' . $code . ')');
+            throw new Exception('Mistral models API error (HTTP ' . $code . ')');
         }
 
         $models = [];
         foreach ($data['data'] as $m) {
             $id = $m['id'] ?? '';
-            // Keep only chat-capable models
-            if (!preg_match('/^(gpt-|o1|o3)/', $id)) continue;
+            // Skip embedding and moderation models
+            if (strpos($id, 'embed') !== false) continue;
+            if (strpos($id, 'moderation') !== false) continue;
             $models[] = ['id' => $id, 'name' => $id];
         }
-        usort($models, fn($a, $b) => strcmp($b['id'], $a['id']));
+        usort($models, function ($a, $b) { return strcmp($b['id'], $a['id']); });
         return $models;
     }
 
@@ -190,7 +188,7 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
         ];
     }
 
-    private function toOpenAIMessages(array $messages): array
+    private function toMistralMessages(array $messages): array
     {
         $out = [];
         foreach ($messages as $msg) {
@@ -220,13 +218,14 @@ class alfredLLMOpenAIAdapter extends alfredLLMAdapter
                     'role'         => 'tool',
                     'tool_call_id' => $msg['tool_call_id'],
                     'content'      => $msg['content'],
+                    'name'         => $msg['name'] ?? '',
                 ];
             }
         }
         return $out;
     }
 
-    private function toOpenAITools(array $tools): array
+    private function toMistralTools(array $tools): array
     {
         return array_map(function ($t) {
             return [

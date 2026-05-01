@@ -12,13 +12,12 @@ class alfred extends eqLogic {
         alfredMigration::runPending();
         // Set default provider
         if (config::byKey('provider', __CLASS__) === '') {
-            config::save('provider', 'anthropic', __CLASS__);
+            config::save('provider', 'mistral', __CLASS__);
         }
         // Set default models
         $defaults = [
-            'anthropic_model' => 'claude-sonnet-4-6',
-            'openai_model'    => 'gpt-4o',
-            'gemini_model'    => 'gemini-1.5-pro',
+            'mistral_model'  => 'mistral-large-latest',
+            'gemini_model'   => 'gemini-1.5-pro',
             'max_iterations'  => '10',
             'system_prompt'   => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
         ];

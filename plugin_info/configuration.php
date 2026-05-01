@@ -30,9 +30,8 @@ $_js_i18n = [
 ];
 
 $_providers = [
-    'anthropic' => 'Anthropic (Claude)',
-    'openai'    => 'OpenAI (GPT)',
-    'gemini'    => 'Google (Gemini)',
+    'mistral' => 'Mistral AI',
+    'gemini'  => 'Google (Gemini)',
 ];
 
 // Auto-detect JeedomMCP settings (used for add button default URL)
@@ -72,40 +71,20 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
             <span class="help-block col-sm-4">{{Select the AI provider to use.}}</span>
         </div>
 
-        <!-- Anthropic -->
-        <div class="alfred-provider-section" data-provider="anthropic">
+        <!-- Mistral -->
+        <div class="alfred-provider-section" data-provider="mistral">
             <div class="form-group">
-                <label class="col-sm-4 control-label">{{Anthropic API key}}</label>
+                <label class="col-sm-4 control-label">{{Mistral API key}}</label>
                 <div class="col-sm-4">
-                    <input type="password" class="configKey form-control alfred-api-key" data-l1key="anthropic_api_key"
-                           placeholder="sk-ant-..." autocomplete="new-password" />
+                    <input type="password" class="configKey form-control alfred-api-key" data-l1key="mistral_api_key"
+                           placeholder="..." autocomplete="new-password" />
                 </div>
             </div>
             <div class="form-group">
                 <label class="col-sm-4 control-label">{{Model}}</label>
                 <div class="col-sm-4">
-                    <select class="configKey form-control alfred-model-select" data-l1key="anthropic_model">
-                        <?php $_saved = config::byKey('anthropic_model', 'alfred'); ?>
-                        <option value="<?php echo htmlspecialchars($_saved); ?>"><?php echo htmlspecialchars($_saved ?: '—'); ?></option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- OpenAI -->
-        <div class="alfred-provider-section" data-provider="openai">
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{OpenAI API key}}</label>
-                <div class="col-sm-4">
-                    <input type="password" class="configKey form-control alfred-api-key" data-l1key="openai_api_key"
-                           placeholder="sk-..." autocomplete="new-password" />
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{Model}}</label>
-                <div class="col-sm-4">
-                    <select class="configKey form-control alfred-model-select" data-l1key="openai_model">
-                        <?php $_saved = config::byKey('openai_model', 'alfred'); ?>
+                    <select class="configKey form-control alfred-model-select" data-l1key="mistral_model">
+                        <?php $_saved = config::byKey('mistral_model', 'alfred'); ?>
                         <option value="<?php echo htmlspecialchars($_saved); ?>"><?php echo htmlspecialchars($_saved ?: '—'); ?></option>
                     </select>
                 </div>
@@ -645,8 +624,7 @@ function alfredShowProvider(provider) {
 var _alfredPollCount = 0;
 var _alfredProviderPoll = setInterval(function () {
     _alfredPollCount++;
-    var hasKey = !!($('[data-l1key="anthropic_api_key"]').val()
-                  || $('[data-l1key="openai_api_key"]').val()
+    var hasKey = !!($('[data-l1key="mistral_api_key"]').val()
                   || $('[data-l1key="gemini_api_key"]').val());
     if (hasKey || _alfredPollCount >= 20) {
         clearInterval(_alfredProviderPoll);
