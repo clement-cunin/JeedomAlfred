@@ -939,7 +939,7 @@ $(function () {
                 if (msg.tool_calls) msg.tool_calls.forEach(function (tc) { toolInputMap[tc.id] = tc.input; });
                 if (msg.content !== '') {
                     if (msg.error) {
-                        appendErrorBubble(msg.content, sessionId);
+                        appendErrorBubble(msg.content, currentSessionId);
                     } else {
                         appendBubble('assistant', msg.content);
                     }
