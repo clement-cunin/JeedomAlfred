@@ -169,9 +169,7 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
         $models = [];
         foreach ($data['data'] as $m) {
             $id = $m['id'] ?? '';
-            // Skip embedding and moderation models
-            if (strpos($id, 'embed') !== false) continue;
-            if (strpos($id, 'moderation') !== false) continue;
+            if (!($m['capabilities']['function_calling'] ?? false)) continue;
             $models[] = ['id' => $id, 'name' => $id];
         }
         usort($models, function ($a, $b) { return strcmp($b['id'], $a['id']); });
