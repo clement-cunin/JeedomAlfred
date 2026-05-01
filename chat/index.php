@@ -300,6 +300,29 @@ if (isConnect()) {
             border-bottom-left-radius: 2px;
         }
 
+        .alfred-msg-bubble.alfred-msg-error {
+            background: #fdf3f3;
+            border: 1px solid #e8b4b4;
+            color: #7a2020;
+        }
+
+        .alfred-retry-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 8px;
+            padding: 4px 10px;
+            font-size: 12px;
+            border: 1px solid #c9a0a0;
+            border-radius: 4px;
+            background: #fff;
+            color: #7a2020;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .alfred-retry-btn:hover { background: #7a2020; border-color: #7a2020; color: #fff; }
+
         /* Per-message TTS actions */
         .alfred-msg-actions {
             display: flex;
@@ -916,7 +939,7 @@ $(function () {
                 if (msg.tool_calls) msg.tool_calls.forEach(function (tc) { toolInputMap[tc.id] = tc.input; });
                 if (msg.content !== '') {
                     if (msg.error) {
-                        appendBubble('assistant', '⚠️ ' + msg.content);
+                        appendErrorBubble(msg.content, sessionId);
                     } else {
                         appendBubble('assistant', msg.content);
                     }
@@ -1254,14 +1277,7 @@ $(function () {
             var technical = null;
             try { technical = JSON.parse(e.data).message; } catch (_) {}
             var display = alfred_config.isAdmin && technical ? technical : 'An error occurred.';
-            var $bubble = appendBubble('assistant', '⚠️ ' + display);
-            if (alfred_config.isAdmin && technical && technical !== display) {
-                $bubble.find('.alfred-msg-bubble').append(
-                    $('<details style="margin-top:6px;font-size:11px;opacity:0.7">')
-                        .append($('<summary>').text('Details'))
-                        .append($('<pre style="white-space:pre-wrap;margin:4px 0 0">').text(technical))
-                );
-            }
+            appendErrorBubble(display, sessionId);
             source.close(); currentSource = null; isStreaming = false; setInputEnabled(true);
         });
 
@@ -1316,6 +1332,26 @@ $(function () {
             $actions.append($btnPlay, $btnPause, $btnResume, $btnStop);
             $msg.append($actions);
         }
+        $('#alfred-messages').append($msg);
+        scrollToBottom();
+        return $msg;
+    }
+
+    function appendErrorBubble(message, sessionId) {
+        var $bubble = $('<div class="alfred-msg-bubble alfred-msg-error">');
+        $bubble.append(
+            $('<div>').append($('<i class="fas fa-exclamation-triangle" style="margin-right:6px">'))
+                      .append($('<span>').text(message))
+        );
+        var $retry = $('<button class="alfred-retry-btn">')
+            .append($('<i class="fas fa-redo">'))
+            .append(' {{Retry}}');
+        $retry.on('click', function () {
+            $(this).closest('.alfred-msg').remove();
+            sendContinue(sessionId, 1);
+        });
+        $bubble.append($retry);
+        var $msg = $('<div class="alfred-msg assistant">').append($bubble);
         $('#alfred-messages').append($msg);
         scrollToBottom();
         return $msg;
