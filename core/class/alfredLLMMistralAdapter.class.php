@@ -253,15 +253,46 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
     private function toMistralTools(array $tools): array
     {
         return array_map(function ($t) {
+            $schema = $t['inputSchema'] ?? ['type' => 'object', 'properties' => []];
             return [
                 'type'     => 'function',
                 'function' => [
                     'name'        => $t['name'],
                     'description' => $t['description'] ?? '',
-                    'parameters'  => $t['inputSchema'] ?? ['type' => 'object', 'properties' => []],
+                    'parameters'  => $this->normalizeSchemaForJson($schema),
                 ],
             ];
         }, $tools);
+    }
+
+    /**
+     * Recursively convert PHP arrays to proper JSON types.
+     *
+     * json_decode($json, true) turns {} into [] in PHP. Re-encoding that gives []
+     * instead of {}, which fails JSON Schema validation. This converts:
+     *   - empty arrays → stdClass (encodes as {})
+     *   - associative arrays → stdClass (encodes as JSON object)
+     *   - sequential arrays → plain array (encodes as JSON array)
+     */
+    private function normalizeSchemaForJson($value)
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        if (empty($value)) {
+            return new stdClass();
+        }
+        $keys = array_keys($value);
+        if ($keys === range(0, count($keys) - 1)) {
+            // Sequential array → JSON array
+            return array_map([$this, 'normalizeSchemaForJson'], $value);
+        }
+        // Associative array → JSON object
+        $obj = new stdClass();
+        foreach ($value as $k => $v) {
+            $obj->$k = $this->normalizeSchemaForJson($v);
+        }
+        return $obj;
     }
 
     private function normalize(array $data): array
