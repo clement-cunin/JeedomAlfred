@@ -12,7 +12,6 @@ $(function () {
     var currentSessionId  = null;
     var isStreaming       = false;
     var currentSource     = null; // active EventSource
-    var knownMsgCount     = 0;    // number of messages last rendered, for background poll
 
     // Voice dictation state
     var recognition     = null;
@@ -816,27 +815,6 @@ $(function () {
             return v.toString(16);
         });
     }
-
-    // =========================================================================
-    // Background poll — picks up messages written by scheduled tasks
-    // =========================================================================
-
-    setInterval(function () {
-        if (isStreaming || !currentSessionId) return;
-        $.ajax({
-            type: 'POST',
-            url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-            data: { action: 'getMessages', session_id: currentSessionId },
-            dataType: 'json',
-            success: function (resp) {
-                if (resp.state !== 'ok' || !resp.result) return;
-                if (resp.result.length > knownMsgCount) {
-                    renderHistory(resp.result);
-                    loadSessions();
-                }
-            }
-        });
-    }, 10000);
 
     // =========================================================================
     // Boot
