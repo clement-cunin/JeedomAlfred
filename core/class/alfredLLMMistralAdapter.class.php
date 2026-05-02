@@ -274,10 +274,16 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
      *   - associative arrays → stdClass (encodes as JSON object)
      *   - sequential arrays → plain array (encodes as JSON array)
      */
-    private function normalizeSchemaForJson($value)
+    private static $JSON_ARRAY_KEYS = ['required', 'enum', 'anyOf', 'oneOf', 'allOf', 'not'];
+
+    private function normalizeSchemaForJson($value, string $parentKey = '')
     {
         if (!is_array($value)) {
             return $value;
+        }
+        // Keys that must stay as JSON arrays even when empty
+        if (in_array($parentKey, self::$JSON_ARRAY_KEYS, true)) {
+            return array_map(function ($v) { return $this->normalizeSchemaForJson($v); }, $value);
         }
         if (empty($value)) {
             return new stdClass();
@@ -285,12 +291,12 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
         $keys = array_keys($value);
         if ($keys === range(0, count($keys) - 1)) {
             // Sequential array → JSON array
-            return array_map([$this, 'normalizeSchemaForJson'], $value);
+            return array_map(function ($v) { return $this->normalizeSchemaForJson($v); }, $value);
         }
         // Associative array → JSON object
         $obj = new stdClass();
         foreach ($value as $k => $v) {
-            $obj->$k = $this->normalizeSchemaForJson($v);
+            $obj->$k = $this->normalizeSchemaForJson($v, $k);
         }
         return $obj;
     }

@@ -934,12 +934,12 @@ $(function () {
         knownMsgCount = messages.length;
         $('#alfred-messages').empty();
         var toolInputMap = {};
-        messages.forEach(function (msg) {
+        messages.forEach(function (msg, idx) {
             if (msg.role === 'assistant') {
                 if (msg.tool_calls) msg.tool_calls.forEach(function (tc) { toolInputMap[tc.id] = tc.input; });
                 if (msg.content !== '') {
                     if (msg.error) {
-                        appendErrorBubble(msg.content, currentSessionId);
+                        appendErrorBubble(msg.content, currentSessionId, idx === messages.length - 1);
                     } else {
                         appendBubble('assistant', msg.content);
                     }
@@ -1337,20 +1337,21 @@ $(function () {
         return $msg;
     }
 
-    function appendErrorBubble(message, sessionId) {
+    function appendErrorBubble(message, sessionId, showRetry) {
         var $bubble = $('<div class="alfred-msg-bubble alfred-msg-error">');
         $bubble.append(
             $('<div>').append($('<i class="fas fa-exclamation-triangle" style="margin-right:6px">'))
                       .append($('<span>').text(message))
         );
-        var $retry = $('<button class="alfred-retry-btn">')
-            .append($('<i class="fas fa-redo">'))
-            .append(' {{Retry}}');
-        $retry.on('click', function () {
-            $(this).closest('.alfred-msg').remove();
-            sendContinue(sessionId, 1);
-        });
-        $bubble.append($retry);
+        if (showRetry !== false) {
+            var $retry = $('<button class="alfred-retry-btn" title="Retry">')
+                .append($('<i class="fas fa-redo">'));
+            $retry.on('click', function () {
+                $(this).closest('.alfred-msg').remove();
+                sendContinue(sessionId, 1);
+            });
+            $bubble.append($retry);
+        }
         var $msg = $('<div class="alfred-msg assistant">').append($bubble);
         $('#alfred-messages').append($msg);
         scrollToBottom();
