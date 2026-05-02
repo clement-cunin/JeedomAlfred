@@ -44,7 +44,10 @@
         "Save": "Enregistrer",
         "Cancel": "Annuler",
         "Delete this memory?": "Supprimer ce souvenir ?",
-        "Label": "Libellé"
+        "Label": "Libellé",
+        "Add memory": "Ajouter un souvenir",
+        "e.g. vacation-july": "ex. vacances-juillet",
+        "Memory content…": "Contenu du souvenir…"
     },
     "plugins\/alfred\/desktop\/php\/alfred.php": {
         "401 - Unauthorized access": "401 - Accès non autorisé",

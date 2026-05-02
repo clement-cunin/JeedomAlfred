@@ -148,6 +148,20 @@ try {
         ajax::success();
     }
 
+    if ($action === 'createMemory') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        $label   = trim(init('label'));
+        $content = trim(init('content'));
+        $scope   = trim(init('scope'));
+        if ($label === '')   throw new Exception('Label must not be empty');
+        if ($content === '') throw new Exception('Content must not be empty');
+        if ($scope === '')   throw new Exception('Scope must not be empty');
+        require_once __DIR__ . '/../class/alfredMemory.class.php';
+        $id  = alfredMemory::save($scope, $label, $content);
+        $now = date('Y-m-d H:i:s');
+        ajax::success(['id' => $id, 'scope' => $scope, 'label' => $label, 'content' => $content, 'created_at' => $now, 'updated_at' => $now]);
+    }
+
     throw new Exception(__('No method found for: ', __FILE__) . $action);
 
 } catch (Exception $e) {

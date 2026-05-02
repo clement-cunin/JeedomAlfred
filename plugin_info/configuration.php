@@ -27,6 +27,9 @@ $_js_i18n = [
     'test_ok'            => __('OK — %d tool(s) found', __FILE__),
     'conflict_warning'   => __('Tool name conflicts detected — first declared server wins. Conflicting names: %s. Enable tool prefix on one of the servers to resolve.', __FILE__),
     'no_servers'         => __('No MCP servers configured. Alfred will work as a plain LLM without tools.', __FILE__),
+    'add_memory'         => __('Add memory', __FILE__),
+    'memory_label_ph'    => __('e.g. vacation-july', __FILE__),
+    'memory_content_ph'  => __('Memory content…', __FILE__),
 ];
 
 $_providers = [
@@ -229,6 +232,9 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
             <div class="col-sm-offset-4 col-sm-8" style="margin-bottom:8px">
                 <button type="button" class="btn btn-default btn-sm" id="bt_alfred_load_memories">
                     <i class="fas fa-sync-alt"></i> {{Load memories}}
+                </button>
+                <button type="button" class="btn btn-success btn-sm" id="bt_alfred_add_memory" style="margin-left:8px">
+                    <i class="fas fa-plus"></i> {{Add memory}}
                 </button>
             </div>
         </div>
@@ -832,6 +838,67 @@ $(document).on('click', '.alfred-memory-delete', function () {
             }
         }
     });
+});
+
+$('#bt_alfred_add_memory').on('click', function () {
+    var $tbody = $('#alfred_memory_tbody');
+    var $table = $('#alfred_memory_table');
+    var $empty = $('#alfred_memory_empty');
+
+    // Avoid duplicate new-memory rows
+    if ($tbody.find('.alfred-memory-create-save').length > 0) {
+        $tbody.find('.alfred-mem-label-input').first().focus();
+        return;
+    }
+
+    $empty.hide();
+    $table.show();
+    $tbody.prepend($('<tr data-new="1">').html(alfredMemoryRowNew()));
+    $tbody.find('[data-new] .alfred-mem-label-input').focus();
+});
+
+function alfredMemoryRowNew() {
+    return '<td><small>—</small></td>'
+        + '<td><select class="form-control input-sm alfred-mem-scope-input" style="min-width:110px">' + alfredScopeOptions('global') + '</select></td>'
+        + '<td><input type="text" class="form-control input-sm alfred-mem-label-input" placeholder="' + _alfredI18n.memory_label_ph + '" style="font-size:12px;font-family:monospace"></td>'
+        + '<td><textarea class="form-control alfred-mem-content-input" rows="2" style="font-size:12px" placeholder="' + _alfredI18n.memory_content_ph + '"></textarea></td>'
+        + '<td></td>'
+        + '<td style="white-space:nowrap">'
+        + '<button class="btn btn-xs btn-success alfred-memory-create-save" title="{{Save}}"><i class="fas fa-check"></i></button> '
+        + '<button class="btn btn-xs btn-default alfred-memory-create-cancel" title="{{Cancel}}"><i class="fas fa-times"></i></button>'
+        + '</td>';
+}
+
+$(document).on('click', '.alfred-memory-create-save', function () {
+    var $btn    = $(this);
+    var $tr     = $btn.closest('tr');
+    var label   = $tr.find('.alfred-mem-label-input').val().trim();
+    var content = $tr.find('.alfred-mem-content-input').val().trim();
+    var scope   = $tr.find('.alfred-mem-scope-input').val();
+    if (!label || !content) return;
+    $btn.prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: { action: 'createMemory', label: label, content: content, scope: scope },
+        dataType: 'json',
+        success: function (resp) {
+            if (resp.state === 'ok') {
+                var m = resp.result;
+                _alfredMemories.unshift(m);
+                $tr.attr('data-id', m.id).removeAttr('data-new').html(alfredMemoryRowView(m));
+            }
+        },
+        complete: function () { $btn.prop('disabled', false); }
+    });
+});
+
+$(document).on('click', '.alfred-memory-create-cancel', function () {
+    $(this).closest('tr').remove();
+    if ($('#alfred_memory_tbody tr').length === 0) {
+        $('#alfred_memory_table').hide();
+        $('#alfred_memory_empty').show();
+    }
 });
 
 $('#bt_alfred_test_llm').on('click', function () {
