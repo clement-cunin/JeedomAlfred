@@ -17,6 +17,8 @@
  *   delta      — LLM text chunk                   {text}
  *   done       — turn complete                    {text, iterations}
  *   error      — fatal error                      {message}
+ *   timing     — per-stage latency breakdown (admin only)
+ *                {session_load, prompt_build, llm_calls, tool_calls, db_writes, total}
  *
  * Synthetic tools (handled locally, never forwarded to MCP):
  *   alfred_schedule — schedule a deferred re-invocation of the agent
@@ -153,7 +155,18 @@ class alfredAgent
      */
     public function run(string $sessionId, string $userMessage): string
     {
+        $tStart = microtime(true);
+        $timing = [
+            'session_load' => 0,
+            'prompt_build' => 0,
+            'llm_calls'    => [],
+            'tool_calls'   => [],
+            'db_writes'    => 0,
+            'total'        => 0,
+        ];
+
         // Ensure session exists and persist user message (skipped for continuation turns)
+        $tPhase = microtime(true);
         if ($userMessage !== '') {
             $session = alfredConversation::getSession($sessionId);
             if ($session === null) {
@@ -166,9 +179,12 @@ class alfredAgent
 
         // Load full history
         $messages = alfredConversation::getMessages($sessionId);
+        $timing['session_load'] = (int)round((microtime(true) - $tPhase) * 1000);
 
         // Build effective system prompt (base + persistent memory block)
+        $tPhase = microtime(true);
         $effectiveSystemPrompt = $this->buildSystemPrompt();
+        $timing['prompt_build'] = (int)round((microtime(true) - $tPhase) * 1000);
 
         // Emit full system prompt for admin debugging
         if ($this->userProfil === 'admin') {
@@ -192,17 +208,26 @@ class alfredAgent
             $onDelta  = function (string $chunk): void {
                 $this->emit('delta', ['text' => $chunk]);
             };
+            $tLlm     = microtime(true);
             $response = $this->llm->chatStream($messages, $tools, $effectiveSystemPrompt, $onDelta);
+            $timing['llm_calls'][] = [
+                'iteration'   => $iterations,
+                'duration_ms' => (int)round((microtime(true) - $tLlm) * 1000),
+            ];
 
             if ($response['stop_reason'] === 'end_turn' || empty($response['tool_calls'])) {
                 // Final text response — delta events were already emitted chunk by chunk
                 $finalText = $response['text'];
+                $tDb = microtime(true);
                 alfredConversation::saveAssistantResponse($sessionId, $response);
+                $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
                 break;
             }
 
             // Assistant wants to call tools — persist the assistant turn first
+            $tDb = microtime(true);
             alfredConversation::saveAssistantResponse($sessionId, $response);
+            $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
 
             // Add to in-memory messages for next iteration
             $assistantMsg = [
@@ -220,6 +245,7 @@ class alfredAgent
                 $this->emit('tool_call', ['name' => $tc['name'], 'input' => $tc['input']]);
 
                 // Intercept synthetic tools before forwarding to registry
+                $tTool = microtime(true);
                 if ($tc['name'] === 'alfred_schedule') {
                     $result = $this->handleScheduleTool($sessionId, $tc['input']);
                 } elseif (strpos($tc['name'], 'alfred_memory_') === 0) {
@@ -231,6 +257,10 @@ class alfredAgent
                         $result = ['error' => $e->getMessage()];
                     }
                 }
+                $timing['tool_calls'][] = [
+                    'tool'        => $tc['name'],
+                    'duration_ms' => (int)round((microtime(true) - $tTool) * 1000),
+                ];
 
                 $resultStr = is_array($result)
                     ? json_encode($result, JSON_UNESCAPED_UNICODE)
@@ -238,7 +268,9 @@ class alfredAgent
 
                 $this->emit('tool_result', ['name' => $tc['name'], 'result' => $result]);
 
+                $tDb = microtime(true);
                 alfredConversation::saveToolResult($sessionId, $tc['id'], $tc['name'], $result);
+                $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
 
                 $messages[] = [
                     'role'        => 'tool',
@@ -249,11 +281,19 @@ class alfredAgent
             }
         }
 
+        $timing['total'] = (int)round((microtime(true) - $tStart) * 1000);
+
         if ($iterations >= $this->maxIterations && $finalText === '') {
+            if ($this->userProfil === 'admin') {
+                $this->emit('timing', $timing);
+            }
             $this->emit('done', ['text' => '', 'iterations' => $iterations, 'limit_reached' => true]);
             return '';
         }
 
+        if ($this->userProfil === 'admin') {
+            $this->emit('timing', $timing);
+        }
         $this->emit('done', ['text' => $finalText, 'iterations' => $iterations]);
 
         return $finalText;
