@@ -152,6 +152,40 @@ if (isConnect()) {
         .alfred-session-item:hover { background: #e8e8e8; }
         .alfred-session-item.active { background: #d6e4f0; font-weight: 500; }
 
+        .alfred-session-rename {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            background: transparent;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            border-radius: 4px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+
+        .alfred-session-item:hover .alfred-session-rename { display: flex; }
+        .alfred-session-rename:hover { color: #337ab7; }
+
+        .alfred-session-title-input {
+            flex: 1;
+            min-width: 0;
+            font-size: 13px;
+            border: none;
+            border-bottom: 1px solid #337ab7;
+            outline: none;
+            background: transparent;
+            color: #333;
+            padding: 0 0 1px;
+            font-family: inherit;
+        }
+
         /* Sidebar toggle (mobile) */
         #alfred-sidebar-toggle {
             display: none;
@@ -884,14 +918,24 @@ $(function () {
             return;
         }
         sessions.forEach(function (s) {
-            var $title = $('<span class="alfred-session-title">').text(s.title || s.session_id.substr(0, 8) + '…');
-            var $del   = $('<button class="alfred-session-delete" title="Delete">')
+            var $title  = $('<span class="alfred-session-title">').text(s.title || s.session_id.substr(0, 8) + '…');
+            var $rename = $('<button type="button" class="alfred-session-rename" title="Rename">')
+                .html('<i class="fas fa-pencil-alt"></i>');
+            var $del    = $('<button type="button" class="alfred-session-delete" title="Delete">')
                 .html('<i class="fas fa-trash"></i>')
                 .on('click', function (e) { e.stopPropagation(); deleteSession(s.session_id); });
-            var $item  = $('<div class="alfred-session-item">')
+            var $item   = $('<div class="alfred-session-item">')
                 .attr('data-session-id', s.session_id)
-                .append($title, $del)
+                .append($title, $rename, $del)
                 .on('click', function () { loadSession(s.session_id); $('#alfred-sidebar').removeClass('open'); });
+            $rename.on('click', function (e) {
+                e.stopPropagation();
+                startRenameSession($item, s.session_id, $title);
+            });
+            $title.on('dblclick', function (e) {
+                e.stopPropagation();
+                startRenameSession($item, s.session_id, $title);
+            });
             if (s.session_id === currentSessionId) $item.addClass('active');
             $container.append($item);
         });
@@ -909,6 +953,44 @@ $(function () {
                 loadSessions();
             }
         });
+    }
+
+    function startRenameSession($item, sessionId, $titleSpan) {
+        var currentTitle = $titleSpan.text();
+        var committed = false;
+
+        function commit(newTitle) {
+            if (committed) return;
+            committed = true;
+            if (newTitle && newTitle !== currentTitle) {
+                $titleSpan.text(newTitle);
+                $.ajax({
+                    type:     'POST',
+                    url:      alfred_config.basePath + '/core/ajax/alfred.ajax.php',
+                    data:     { action: 'renameSession', session_id: sessionId, title: newTitle },
+                    dataType: 'json'
+                });
+            }
+            $input.replaceWith($titleSpan);
+        }
+
+        var $input = $('<input class="alfred-session-title-input" type="text">')
+            .val(currentTitle)
+            .on('click', function (e) { e.stopPropagation(); })
+            .on('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    commit($(this).val().trim() || currentTitle);
+                } else if (e.key === 'Escape') {
+                    committed = true;
+                    $input.replaceWith($titleSpan);
+                }
+            })
+            .on('blur', function () {
+                commit($(this).val().trim() || currentTitle);
+            });
+
+        $titleSpan.replaceWith($input);
+        $input.focus().select();
     }
 
     function loadSession(sessionId) {
