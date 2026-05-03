@@ -25,6 +25,8 @@ abstract class alfredLLMAdapter
 {
     protected string $apiKey;
     protected string $model;
+    /** @var array Lowercased response headers from the last httpPost() call */
+    protected array $lastHeaders = [];
 
     public function __construct(string $apiKey, string $model)
     {
@@ -65,13 +67,29 @@ abstract class alfredLLMAdapter
      */
     abstract public function listModels(): array;
 
+    /**
+     * Parse provider-specific rate-limit headers and return the worst-case quota.
+     *
+     * Takes the most unfavorable value across requests and tokens dimensions:
+     * highest used_pct and largest reset_in_s.
+     *
+     * @param  array $headers Lowercased response header name → value map
+     * @return array ['used_pct' => float 0-100, 'reset_in_s' => int|null]
+     *               or [] when no quota headers are present
+     */
+    public function parseQuotaHeaders(array $headers): array
+    {
+        return [];
+    }
+
     // -------------------------------------------------------------------------
     // Shared HTTP helper
     // -------------------------------------------------------------------------
 
     protected function httpPost(string $url, array $headers, array $body, int $timeout = 30): array
     {
-        $ch = curl_init($url);
+        $ch             = curl_init($url);
+        $responseHeaders = [];
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => json_encode($body),
@@ -79,11 +97,23 @@ abstract class alfredLLMAdapter
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $timeout,
             CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_HEADERFUNCTION => function ($ch, $line) use (&$responseHeaders) {
+                $trimmed = trim($line);
+                $colon   = strpos($trimmed, ':');
+                if ($colon !== false) {
+                    $name  = strtolower(trim(substr($trimmed, 0, $colon)));
+                    $value = trim(substr($trimmed, $colon + 1));
+                    $responseHeaders[$name] = $value;
+                }
+                return strlen($line);
+            },
         ]);
         $raw  = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err  = curl_error($ch);
         curl_close($ch);
+
+        $this->lastHeaders = $responseHeaders;
 
         if ($raw === false) {
             throw new Exception("HTTP request failed [{$url}]: {$err}");
