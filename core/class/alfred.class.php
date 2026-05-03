@@ -21,6 +21,7 @@ class alfred extends eqLogic {
             'ollama_base_url' => 'http://localhost:11434',
             'ollama_model'    => 'mistral:latest',
             'max_iterations'  => '10',
+            'show_quota_bar'  => '0',
             'system_prompt'   => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
         ];
         foreach ($defaults as $key => $value) {
@@ -134,6 +135,10 @@ class alfred extends eqLogic {
     public static function getMaxIterations(): int {
         $v = (int)config::byKey('max_iterations', __CLASS__);
         return $v > 0 ? $v : 10;
+    }
+
+    public static function getShowQuotaBar(): bool {
+        return config::byKey('show_quota_bar', __CLASS__) === '1';
     }
 
     // -------------------------------------------------------------------------

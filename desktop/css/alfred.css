@@ -431,6 +431,31 @@
     30%            { transform: translateY(-6px); }
 }
 
+/* ---- Quota bar ---- */
+#alfred-quota-bar {
+    flex-shrink: 0;
+    height: 4px;
+    background: #e9ecef;
+    position: relative;
+    overflow: visible;
+}
+
+#alfred-quota-fill {
+    height: 100%;
+    width: 0;
+    transition: width 0.4s ease, background-color 0.4s ease;
+}
+
+#alfred-quota-label {
+    position: absolute;
+    right: 8px;
+    top: -20px;
+    font-size: 11px;
+    color: #888;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
 /* ---- Input bar ---- */
 #alfred-input-bar {
     display: flex;

@@ -10,11 +10,13 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 $_userHash     = '';
 $_isConfigured = false;
 $_isAdmin      = false;
+$_showQuotaBar = false;
 if (isConnect()) {
     require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
     $_userHash     = $_SESSION['user']->getHash();
     $_isConfigured = alfred::getApiKey() !== '';
     $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
+    $_showQuotaBar = alfred::getShowQuotaBar();
 }
 ?><!DOCTYPE html>
 <html lang="en">
@@ -622,6 +624,32 @@ if (isConnect()) {
         #alfred-attach:disabled { opacity: 0.4; cursor: not-allowed; }
         #alfred-attach.has-file { background: #337ab7; border-color: #337ab7; color: #fff; }
 
+        /* ---- Quota bar ---- */
+        #alfred-quota-bar {
+            flex-shrink: 0;
+            height: 4px;
+            background: #e9ecef;
+            position: relative;
+            overflow: visible;
+        }
+
+        #alfred-quota-fill {
+            height: 100%;
+            width: 0;
+            transition: width 0.4s ease, background-color 0.4s ease;
+        }
+
+        #alfred-quota-label {
+            position: absolute;
+            right: 8px;
+            top: -20px;
+            font-size: 11px;
+            color: #888;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+
         /* ---- Input bar ---- */
         #alfred-input-bar {
             display: flex;
@@ -896,6 +924,11 @@ if (isConnect()) {
         <input type="file" id="alfred-file-input" accept="image/*,.pdf" style="display:none">
         <div id="alfred-attachment-bar"></div>
 
+        <div id="alfred-quota-bar" style="display:none">
+            <div id="alfred-quota-fill"></div>
+            <span id="alfred-quota-label"></span>
+        </div>
+
         <div id="alfred-input-bar">
             <button id="alfred-attach" title="Attach file"><i class="fas fa-paperclip"></i></button>
             <textarea id="alfred-input" placeholder="Type a message…" rows="1"></textarea>
@@ -913,22 +946,25 @@ if (isConnect()) {
 
 <script>
 var alfred_config = {
-    isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
-    userHash:     "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
-    isAdmin:      <?php echo $_isAdmin ? 'true' : 'false'; ?>,
-    basePath:     '/plugins/alfred'
+    isConfigured:  <?php echo $_isConfigured ? 'true' : 'false'; ?>,
+    userHash:      "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
+    isAdmin:       <?php echo $_isAdmin ? 'true' : 'false'; ?>,
+    showQuotaBar:  <?php echo $_showQuotaBar ? 'true' : 'false'; ?>,
+    basePath:      '/plugins/alfred'
 };
 // PHP session unavailable when accessed outside Jeedom router — fall back to localStorage
 if (!alfred_config.userHash) {
     alfred_config.userHash     = localStorage.getItem('alfred_user_hash') || '';
     alfred_config.isConfigured = localStorage.getItem('alfred_is_configured') === '1';
     alfred_config.isAdmin      = localStorage.getItem('alfred_is_admin') === '1';
+    alfred_config.showQuotaBar = localStorage.getItem('alfred_show_quota_bar') === '1';
 }
 // Persist whenever we have fresh data from the server
 if ("<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>") {
-    localStorage.setItem('alfred_user_hash',     alfred_config.userHash);
-    localStorage.setItem('alfred_is_configured', alfred_config.isConfigured ? '1' : '0');
-    localStorage.setItem('alfred_is_admin',      alfred_config.isAdmin ? '1' : '0');
+    localStorage.setItem('alfred_user_hash',      alfred_config.userHash);
+    localStorage.setItem('alfred_is_configured',  alfred_config.isConfigured ? '1' : '0');
+    localStorage.setItem('alfred_is_admin',       alfred_config.isAdmin ? '1' : '0');
+    localStorage.setItem('alfred_show_quota_bar', alfred_config.showQuotaBar ? '1' : '0');
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
@@ -1604,6 +1640,7 @@ $(function () {
             if (!$assistantBubble && finalText) $assistantBubble = appendBubble('assistant', finalText);
             if ($assistantBubble) $assistantBubble.data('tts-text', finalText);
             if (d.limit_reached) { appendLimitReached(sessionId); } else { speak(finalText, $assistantBubble); }
+            if (alfred_config.showQuotaBar && d.quota) { updateQuotaBar(d.quota); }
             source.close(); currentSource = null; isStreaming = false; setInputEnabled(true);
             loadSessions();
             $('.alfred-session-item').removeClass('active');
@@ -1636,6 +1673,18 @@ $(function () {
         });
         $('#alfred-messages').append($el);
         scrollToBottom();
+    }
+
+    function updateQuotaBar(quota) {
+        var pct   = Math.min(100, Math.max(0, quota.used_pct || 0));
+        var color = pct < 50 ? '#28a745' : (pct < 80 ? '#ffc107' : '#dc3545');
+        var label = Math.round(pct) + '% used';
+        if (quota.reset_in_s != null) {
+            label += ' — resets in ' + quota.reset_in_s + 's';
+        }
+        $('#alfred-quota-bar').show();
+        $('#alfred-quota-fill').css({ width: pct + '%', background: color });
+        $('#alfred-quota-label').text(label);
     }
 
     // =========================================================================

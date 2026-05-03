@@ -52,6 +52,12 @@ $_userHash     = $_SESSION['user']->getHash();
             </div>
         </div>
 
+        <!-- Quota bar (hidden until first response with quota data) -->
+        <div id="alfred-quota-bar" style="display:none">
+            <div id="alfred-quota-fill"></div>
+            <span id="alfred-quota-label"></span>
+        </div>
+
         <!-- Input bar -->
         <div id="alfred-input-bar">
             <textarea id="alfred-input"
@@ -87,18 +93,20 @@ $_userHash     = $_SESSION['user']->getHash();
 
 <script>
 var alfred_config = {
-    isConfigured: <?php echo $_isConfigured ? 'true' : 'false'; ?>,
-    userHash: "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
-    isAdmin: <?php echo ($_SESSION['user']->getProfils() === 'admin') ? 'true' : 'false'; ?>,
+    isConfigured:  <?php echo $_isConfigured ? 'true' : 'false'; ?>,
+    userHash:      "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
+    isAdmin:       <?php echo ($_SESSION['user']->getProfils() === 'admin') ? 'true' : 'false'; ?>,
+    showQuotaBar:  <?php echo alfred::getShowQuotaBar() ? 'true' : 'false'; ?>,
     i18n: {
         hello: "{{Hello, I'm Alfred.}}",
         ask:   "{{Ask me anything about your home automation system.}}"
     }
 };
 // Persist auth info so the standalone PWA can work without a PHP session
-localStorage.setItem('alfred_user_hash',     alfred_config.userHash);
-localStorage.setItem('alfred_is_configured', alfred_config.isConfigured ? '1' : '0');
-localStorage.setItem('alfred_is_admin',      alfred_config.isAdmin ? '1' : '0');
+localStorage.setItem('alfred_user_hash',      alfred_config.userHash);
+localStorage.setItem('alfred_is_configured',  alfred_config.isConfigured ? '1' : '0');
+localStorage.setItem('alfred_is_admin',       alfred_config.isAdmin ? '1' : '0');
+localStorage.setItem('alfred_show_quota_bar', alfred_config.showQuotaBar ? '1' : '0');
 // Auto-redirect back to chat if login was initiated from there
 if (localStorage.getItem('alfred_return_to_chat') === '1') {
     localStorage.removeItem('alfred_return_to_chat');

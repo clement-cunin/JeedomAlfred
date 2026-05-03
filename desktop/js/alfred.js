@@ -635,6 +635,7 @@ $(function () {
             } else {
                 speak(finalText, $assistantBubble);
             }
+            if (alfred_config.showQuotaBar && d.quota) { updateQuotaBar(d.quota); }
             source.close();
             currentSource = null;
             isStreaming   = false;
@@ -691,6 +692,18 @@ $(function () {
         }
         $('#alfred-messages').append($el);
         scrollToBottom();
+    }
+
+    function updateQuotaBar(quota) {
+        var pct   = Math.min(100, Math.max(0, quota.used_pct || 0));
+        var color = pct < 50 ? '#28a745' : (pct < 80 ? '#ffc107' : '#dc3545');
+        var label = Math.round(pct) + '% used';
+        if (quota.reset_in_s != null) {
+            label += ' — resets in ' + quota.reset_in_s + 's';
+        }
+        $('#alfred-quota-bar').show();
+        $('#alfred-quota-fill').css({ width: pct + '%', background: color });
+        $('#alfred-quota-label').text(label);
     }
 
     // =========================================================================
