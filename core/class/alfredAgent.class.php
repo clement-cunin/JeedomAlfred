@@ -87,6 +87,18 @@ class alfredAgent
         return $files;
     }
 
+    public static function getFilePath(string $sessionId, string $fileId): ?string
+    {
+        $safeId   = preg_replace('/[^a-zA-Z0-9]/', '', $fileId);
+        $dir      = self::uploadDir($sessionId);
+        $metaPath = $dir . DIRECTORY_SEPARATOR . $safeId . '.json';
+        if (!file_exists($metaPath)) return null;
+        $meta     = json_decode(file_get_contents($metaPath), true);
+        if (!is_array($meta) || !isset($meta['filename'])) return null;
+        $path = $dir . DIRECTORY_SEPARATOR . $meta['filename'];
+        return file_exists($path) ? $path : null;
+    }
+
     public static function cleanupSessionFiles(string $sessionId): void
     {
         $dir = self::uploadDir($sessionId);
