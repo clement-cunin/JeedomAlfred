@@ -1,0 +1,70 @@
+[
+  {
+    "id": "il_fait_chaud",
+    "category": "ambiguous",
+    "description": "Implicit comfort request — model should either ask for clarification or take a reasonable action (open a shutter, not turn on heating)",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Il fait chaud dans le salon" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": false,
+      "max_iterations": 8,
+      "_note": "Acceptable: ask for clarification, OR open a volet/store. Unacceptable: hallucinate a thermostat that doesn't exist."
+    }
+  },
+  {
+    "id": "bonne_nuit",
+    "category": "ambiguous",
+    "description": "Natural goodnight phrase — model should either ask or trigger Mode Nuit / Mode Nuit enfant scenario",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Bonne nuit !" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": false,
+      "max_iterations": 8,
+      "_note": "Acceptable: scenario_run(24) Mode Nuit enfant, or ask what to do. Unacceptable: hallucinate device IDs."
+    }
+  },
+  {
+    "id": "mets_la_tele",
+    "category": "ambiguous",
+    "description": "Turn on 'the TV' without specifying which one — two TVs exist (salon id:118, chambre id:123)",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Mets la télé" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": false,
+      "max_iterations": 8,
+      "_note": "Acceptable: ask which TV, OR default to salon TV (id:1301). Unacceptable: make up a device."
+    }
+  },
+  {
+    "id": "prepare_soiree",
+    "category": "ambiguous",
+    "description": "Open-ended 'evening mode' request — model must interpret and act or clarify",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Prépare la maison pour une soirée" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": false,
+      "max_iterations": 10,
+      "_note": "Acceptable: ask what 'soirée mode' means, OR take reasonable actions (dim lights, etc.). No hallucinated IDs."
+    }
+  }
+]

@@ -1,0 +1,80 @@
+[
+  {
+    "id": "ferme_volets_salon",
+    "category": "multi_device",
+    "description": "Close both salon shutters — model must issue 2 separate command_execute calls",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Ferme les volets du salon" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 912 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 918 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 8
+    }
+  },
+  {
+    "id": "eteins_espace_nuit",
+    "category": "multi_device",
+    "description": "Turn off all lights in the 'Espace nuit' zone (4 lights: Enfant 1, Enfant 2, Parents, Couloir)",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Éteins toutes les lumières de l'espace nuit" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 818  }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 811  }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 825  }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 1243 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 12
+    }
+  },
+  {
+    "id": "monte_tous_volets",
+    "category": "multi_device",
+    "description": "Open all shutters in the house (7 shutters) — tests bulk action",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Ouvre tous les volets de la maison" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 893 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 925 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 887 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 899 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 905 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 911 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 917 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 15
+    }
+  },
+  {
+    "id": "lance_scenario_nuit_enfant",
+    "category": "multi_device",
+    "description": "Trigger the children's night scenario by natural description",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Lance le scénario de coucher des enfants" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "scenario_run", "params": { "scenario_id": 24 }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 6
+    }
+  }
+]

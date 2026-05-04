@@ -1,0 +1,87 @@
+{
+  "name": "Studio",
+  "description": "Small studio apartment. Minimal fixture for baseline tests (7 devices, 4 rooms).",
+  "rooms": [
+    { "id": 1, "name": "Pièce principale", "parent_id": null },
+    { "id": 2, "name": "Salle de bain",    "parent_id": null },
+    { "id": 3, "name": "Entrée",           "parent_id": null },
+    { "id": 4, "name": "Cuisine",          "parent_id": null }
+  ],
+  "devices": [
+    {
+      "id": 1, "name": "Lumière principale", "room_id": 1,
+      "categories": ["light"],
+      "state": { "Etat": false },
+      "actions": [
+        { "id": 1001, "name": "On",  "subType": "other" },
+        { "id": 1002, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 2, "name": "Lumière bureau", "room_id": 1,
+      "description": "Spot au-dessus du bureau.",
+      "categories": ["light"],
+      "state": { "Etat": false },
+      "actions": [
+        { "id": 1003, "name": "On",        "subType": "other" },
+        { "id": 1004, "name": "Off",       "subType": "other" },
+        { "id": 1005, "name": "Intensité", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 3, "name": "Volet", "room_id": 1,
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 1006, "name": "Monter",    "subType": "other" },
+        { "id": 1007, "name": "Descendre", "subType": "other" },
+        { "id": 1008, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 4, "name": "TV", "room_id": 1,
+      "categories": ["multimedia"],
+      "state": { "Etat": "0" },
+      "actions": [
+        { "id": 1009, "name": "Allumer",   "subType": "other" },
+        { "id": 1010, "name": "Eteindre",  "subType": "other" },
+        { "id": 1011, "name": "Volume+",   "subType": "other" },
+        { "id": 1012, "name": "Volume-",   "subType": "other" }
+      ]
+    },
+    {
+      "id": 5, "name": "Lumière SdB", "room_id": 2,
+      "categories": ["light"],
+      "state": { "Etat": false },
+      "actions": [
+        { "id": 1013, "name": "On",  "subType": "other" },
+        { "id": 1014, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 6, "name": "Lumière Entrée", "room_id": 3,
+      "categories": ["light"],
+      "state": { "Etat": false },
+      "actions": [
+        { "id": 1015, "name": "On",  "subType": "other" },
+        { "id": 1016, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 7, "name": "Lumière Cuisine", "room_id": 4,
+      "categories": ["light"],
+      "state": { "Etat": true },
+      "actions": [
+        { "id": 1017, "name": "On",  "subType": "other" },
+        { "id": 1018, "name": "Off", "subType": "other" }
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": 1, "name": "Bonne nuit",
+      "description": "Éteint toutes les lumières et ferme le volet.",
+      "is_active": true, "state": "stop", "mode": "provoke"
+    }
+  ]
+}

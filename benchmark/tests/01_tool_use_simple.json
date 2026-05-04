@@ -1,0 +1,114 @@
+[
+  {
+    "id": "allume_salon",
+    "category": "tool_use_simple",
+    "description": "Turn on the salon light",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Allume la lumière dans le salon" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 803 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "no_guessed_room_ids": true,
+      "max_iterations": 6
+    }
+  },
+  {
+    "id": "eteins_salon",
+    "category": "tool_use_simple",
+    "description": "Turn off the salon light",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Éteins la lumière du salon" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 804 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "no_guessed_room_ids": true,
+      "max_iterations": 6
+    }
+  },
+  {
+    "id": "eteins_plan_travail",
+    "category": "tool_use_simple",
+    "description": "Turn off the kitchen worktop light by exact name",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Éteins le plan de travail" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 779 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "no_guessed_room_ids": true,
+      "max_iterations": 6
+    }
+  },
+  {
+    "id": "slider_salon_30",
+    "category": "tool_use_simple",
+    "description": "Set salon light to 30% via slider",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Mets la lumière du salon à 30%" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        {
+          "name": "command_execute",
+          "params": { "commands": [{ "id": 802, "value": { "min": 25, "max": 35 } }] },
+          "match": "contains"
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "no_guessed_room_ids": true,
+      "max_iterations": 6
+    }
+  },
+  {
+    "id": "lance_roomba",
+    "category": "tool_use_simple",
+    "description": "Start the robot vacuum by natural name",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Lance l'aspirateur robot" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 1213 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "no_guessed_room_ids": true,
+      "max_iterations": 6
+    }
+  },
+  {
+    "id": "allume_tv",
+    "category": "tool_use_simple",
+    "description": "Turn on the salon TV",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Allume la TV du salon" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 1301 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "no_guessed_room_ids": true,
+      "max_iterations": 6
+    }
+  }
+]

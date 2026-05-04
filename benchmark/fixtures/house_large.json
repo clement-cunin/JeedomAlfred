@@ -1,0 +1,434 @@
+{
+  "name": "Large House",
+  "description": "Large 5-bedroom house on 2 floors with garden. Stress-test fixture (~90 devices, 22 rooms).",
+  "rooms": [
+    { "id": 100, "name": "Rez-de-Chaussée", "parent_id": null },
+    { "id": 200, "name": "Étage",           "parent_id": null },
+    { "id": 300, "name": "Extérieur",       "parent_id": null },
+    { "id": 101, "name": "Entrée",          "parent_id": 100 },
+    { "id": 102, "name": "Salon",           "parent_id": 100 },
+    { "id": 103, "name": "Salle à manger",  "parent_id": 100 },
+    { "id": 104, "name": "Cuisine",         "parent_id": 100 },
+    { "id": 105, "name": "WC RdC",          "parent_id": 100 },
+    { "id": 106, "name": "Bureau",          "parent_id": 100 },
+    { "id": 107, "name": "Buanderie",       "parent_id": 100 },
+    { "id": 108, "name": "Garage",          "parent_id": 100 },
+    { "id": 201, "name": "Palier",          "parent_id": 200 },
+    { "id": 202, "name": "Chambre Maîtres", "parent_id": 200 },
+    { "id": 203, "name": "Chambre Enfant 1","parent_id": 200 },
+    { "id": 204, "name": "Chambre Enfant 2","parent_id": 200 },
+    { "id": 205, "name": "Chambre Enfant 3","parent_id": 200 },
+    { "id": 206, "name": "Chambre Invités", "parent_id": 200 },
+    { "id": 207, "name": "Salle de Bain Parents", "parent_id": 200 },
+    { "id": 208, "name": "Salle de Bain Enfants", "parent_id": 200 },
+    { "id": 209, "name": "WC Étage",        "parent_id": 200 },
+    { "id": 301, "name": "Terrasse",        "parent_id": 300 },
+    { "id": 302, "name": "Jardin",          "parent_id": 300 },
+    { "id": 303, "name": "Allée",           "parent_id": 300 }
+  ],
+  "devices": [
+    {
+      "id": 2001, "name": "Lumière Entrée", "room_id": 101,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3001, "name": "On", "subType": "other" }, { "id": 3002, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2002, "name": "Détecteur Entrée", "room_id": 101,
+      "categories": ["security"], "state": { "Présence": false },
+      "actions": []
+    },
+    {
+      "id": 2003, "name": "Lumière Salon", "room_id": 102,
+      "categories": ["light"], "state": { "Etat": 0 },
+      "actions": [
+        { "id": 3003, "name": "Intensité", "subType": "slider" },
+        { "id": 3004, "name": "On",  "subType": "other" },
+        { "id": 3005, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 2004, "name": "Lumière Salon Ambiance", "room_id": 102,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3006, "name": "On", "subType": "other" }, { "id": 3007, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2005, "name": "Volet Salon 1", "room_id": 102,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3008, "name": "Monter",    "subType": "other" },
+        { "id": 3009, "name": "Descendre", "subType": "other" },
+        { "id": 3010, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2006, "name": "Volet Salon 2", "room_id": 102,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3011, "name": "Monter",    "subType": "other" },
+        { "id": 3012, "name": "Descendre", "subType": "other" },
+        { "id": 3013, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2007, "name": "TV Salon", "room_id": 102,
+      "categories": ["multimedia"], "state": { "Etat": "0" },
+      "actions": [
+        { "id": 3014, "name": "Allumer",   "subType": "other" },
+        { "id": 3015, "name": "Eteindre",  "subType": "other" },
+        { "id": 3016, "name": "Volume+",   "subType": "other" },
+        { "id": 3017, "name": "Volume-",   "subType": "other" },
+        { "id": 3018, "name": "Netflix",   "subType": "other" },
+        { "id": 3019, "name": "YouTube",   "subType": "other" }
+      ]
+    },
+    {
+      "id": 2008, "name": "Lumière Salle à manger", "room_id": 103,
+      "categories": ["light"], "state": { "Etat": 0 },
+      "actions": [
+        { "id": 3020, "name": "Intensité", "subType": "slider" },
+        { "id": 3021, "name": "On",  "subType": "other" },
+        { "id": 3022, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 2009, "name": "Volet Salle à manger", "room_id": 103,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3023, "name": "Monter",    "subType": "other" },
+        { "id": 3024, "name": "Descendre", "subType": "other" },
+        { "id": 3025, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2010, "name": "Plan de travail Cuisine", "room_id": 104,
+      "categories": ["light"], "state": { "Etat": true },
+      "actions": [{ "id": 3026, "name": "On", "subType": "other" }, { "id": 3027, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2011, "name": "Hotte Cuisine", "room_id": 104,
+      "categories": ["automatism"], "state": { "Etat": false },
+      "actions": [{ "id": 3028, "name": "On", "subType": "other" }, { "id": 3029, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2012, "name": "Volet Cuisine", "room_id": 104,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3030, "name": "Monter",    "subType": "other" },
+        { "id": 3031, "name": "Descendre", "subType": "other" },
+        { "id": 3032, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2013, "name": "Prise Four", "room_id": 104,
+      "categories": ["energy"], "state": { "Etat": false, "Puissance": 0 },
+      "actions": [{ "id": 3033, "name": "On", "subType": "other" }, { "id": 3034, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2014, "name": "Lumière WC RdC", "room_id": 105,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3035, "name": "On", "subType": "other" }, { "id": 3036, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2015, "name": "Lumière Bureau", "room_id": 106,
+      "categories": ["light"], "state": { "Etat": 0 },
+      "actions": [
+        { "id": 3037, "name": "Intensité", "subType": "slider" },
+        { "id": 3038, "name": "On",  "subType": "other" },
+        { "id": 3039, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 2016, "name": "Volet Bureau", "room_id": 106,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3040, "name": "Monter",    "subType": "other" },
+        { "id": 3041, "name": "Descendre", "subType": "other" },
+        { "id": 3042, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2017, "name": "Climatisation Bureau", "room_id": 106,
+      "categories": ["heating"], "state": { "Etat": false, "Température": 20 },
+      "actions": [
+        { "id": 3043, "name": "On",          "subType": "other" },
+        { "id": 3044, "name": "Off",         "subType": "other" },
+        { "id": 3045, "name": "Température", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 2018, "name": "Lumière Buanderie", "room_id": 107,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3046, "name": "On", "subType": "other" }, { "id": 3047, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2019, "name": "Prise Lave-linge", "room_id": 107,
+      "categories": ["energy"], "state": { "Etat": true, "Puissance": 0 },
+      "actions": [{ "id": 3048, "name": "On", "subType": "other" }, { "id": 3049, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2020, "name": "Lumière Garage", "room_id": 108,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3050, "name": "On", "subType": "other" }, { "id": 3051, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2021, "name": "Porte Garage", "room_id": 108,
+      "categories": ["opening"], "state": { "Etat": "Fermée" },
+      "actions": [
+        { "id": 3052, "name": "Ouvrir",  "subType": "other" },
+        { "id": 3053, "name": "Fermer",  "subType": "other" }
+      ]
+    },
+    {
+      "id": 2022, "name": "Lumière Palier", "room_id": 201,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3054, "name": "On", "subType": "other" }, { "id": 3055, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2023, "name": "Lumière Chambre Maîtres", "room_id": 202,
+      "categories": ["light"], "state": { "Etat": 0 },
+      "actions": [
+        { "id": 3056, "name": "Intensité", "subType": "slider" },
+        { "id": 3057, "name": "On",  "subType": "other" },
+        { "id": 3058, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 2024, "name": "Lumière Chevet Gauche", "room_id": 202,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3059, "name": "On", "subType": "other" }, { "id": 3060, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2025, "name": "Lumière Chevet Droite", "room_id": 202,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3061, "name": "On", "subType": "other" }, { "id": 3062, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2026, "name": "Volet Chambre Maîtres 1", "room_id": 202,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3063, "name": "Monter",    "subType": "other" },
+        { "id": 3064, "name": "Descendre", "subType": "other" },
+        { "id": 3065, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2027, "name": "Volet Chambre Maîtres 2", "room_id": 202,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3066, "name": "Monter",    "subType": "other" },
+        { "id": 3067, "name": "Descendre", "subType": "other" },
+        { "id": 3068, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2028, "name": "Climatisation Chambre Maîtres", "room_id": 202,
+      "categories": ["heating"], "state": { "Etat": false, "Température": 19 },
+      "actions": [
+        { "id": 3069, "name": "On",          "subType": "other" },
+        { "id": 3070, "name": "Off",         "subType": "other" },
+        { "id": 3071, "name": "Température", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 2029, "name": "Lumière Chambre Enfant 1", "room_id": 203,
+      "categories": ["light"], "state": { "Etat": 0 },
+      "actions": [
+        { "id": 3072, "name": "Intensité", "subType": "slider" },
+        { "id": 3073, "name": "On",  "subType": "other" },
+        { "id": 3074, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 2030, "name": "Bureau LED Chambre Enfant 1", "room_id": 203,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3075, "name": "On", "subType": "other" }, { "id": 3076, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2031, "name": "Volet Chambre Enfant 1", "room_id": 203,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3077, "name": "Monter",    "subType": "other" },
+        { "id": 3078, "name": "Descendre", "subType": "other" },
+        { "id": 3079, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2032, "name": "Lumière Chambre Enfant 2", "room_id": 204,
+      "categories": ["light"], "state": { "Etat": 0 },
+      "actions": [
+        { "id": 3080, "name": "Intensité", "subType": "slider" },
+        { "id": 3081, "name": "On",  "subType": "other" },
+        { "id": 3082, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 2033, "name": "Volet Chambre Enfant 2", "room_id": 204,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3083, "name": "Monter",    "subType": "other" },
+        { "id": 3084, "name": "Descendre", "subType": "other" },
+        { "id": 3085, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2034, "name": "Lumière Chambre Enfant 3", "room_id": 205,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3086, "name": "On", "subType": "other" }, { "id": 3087, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2035, "name": "Volet Chambre Enfant 3", "room_id": 205,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3088, "name": "Monter",    "subType": "other" },
+        { "id": 3089, "name": "Descendre", "subType": "other" },
+        { "id": 3090, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2036, "name": "Lumière Chambre Invités", "room_id": 206,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3091, "name": "On", "subType": "other" }, { "id": 3092, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2037, "name": "Volet Chambre Invités", "room_id": 206,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3093, "name": "Monter",    "subType": "other" },
+        { "id": 3094, "name": "Descendre", "subType": "other" },
+        { "id": 3095, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 2038, "name": "Lumière SdB Parents", "room_id": 207,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3096, "name": "On", "subType": "other" }, { "id": 3097, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2039, "name": "Sèche-serviette Parents", "room_id": 207,
+      "categories": ["heating"], "state": { "Etat": false },
+      "actions": [{ "id": 3098, "name": "On", "subType": "other" }, { "id": 3099, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2040, "name": "Lumière SdB Enfants", "room_id": 208,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3100, "name": "On", "subType": "other" }, { "id": 3101, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2041, "name": "Sèche-serviette Enfants", "room_id": 208,
+      "categories": ["heating"], "state": { "Etat": false },
+      "actions": [{ "id": 3102, "name": "On", "subType": "other" }, { "id": 3103, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2042, "name": "Lumière WC Étage", "room_id": 209,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3104, "name": "On", "subType": "other" }, { "id": 3105, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2043, "name": "Lumière Terrasse 1", "room_id": 301,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3106, "name": "On", "subType": "other" }, { "id": 3107, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2044, "name": "Lumière Terrasse 2", "room_id": 301,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3108, "name": "On", "subType": "other" }, { "id": 3109, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2045, "name": "Store Terrasse", "room_id": 301,
+      "categories": ["opening"], "state": {},
+      "actions": [
+        { "id": 3110, "name": "Déployer", "subType": "other" },
+        { "id": 3111, "name": "Replier",  "subType": "other" },
+        { "id": 3112, "name": "Stop",     "subType": "other" }
+      ]
+    },
+    {
+      "id": 2046, "name": "Éclairage Jardin", "room_id": 302,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3113, "name": "On", "subType": "other" }, { "id": 3114, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2047, "name": "Arrosage Zone 1", "room_id": 302,
+      "categories": ["automatism"], "state": { "Etat": false },
+      "actions": [
+        { "id": 3115, "name": "On",    "subType": "other" },
+        { "id": 3116, "name": "Off",   "subType": "other" },
+        { "id": 3117, "name": "Tempo", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 2048, "name": "Arrosage Zone 2", "room_id": 302,
+      "categories": ["automatism"], "state": { "Etat": false },
+      "actions": [
+        { "id": 3118, "name": "On",    "subType": "other" },
+        { "id": 3119, "name": "Off",   "subType": "other" },
+        { "id": 3120, "name": "Tempo", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 2049, "name": "Arrosage Zone 3", "room_id": 302,
+      "categories": ["automatism"], "state": { "Etat": false },
+      "actions": [
+        { "id": 3121, "name": "On",    "subType": "other" },
+        { "id": 3122, "name": "Off",   "subType": "other" },
+        { "id": 3123, "name": "Tempo", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 2050, "name": "Éclairage Allée", "room_id": 303,
+      "categories": ["light"], "state": { "Etat": false },
+      "actions": [{ "id": 3124, "name": "On", "subType": "other" }, { "id": 3125, "name": "Off", "subType": "other" }]
+    },
+    {
+      "id": 2051, "name": "Portail", "room_id": 303,
+      "categories": ["opening"], "state": { "Etat": "Fermé" },
+      "actions": [
+        { "id": 3126, "name": "Ouvrir",   "subType": "other" },
+        { "id": 3127, "name": "Fermer",   "subType": "other" },
+        { "id": 3128, "name": "Piétons",  "subType": "other" }
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": 101, "name": "Mode Nuit",
+      "description": "Éteint toutes les lumières, ferme volets et portail.",
+      "is_active": true, "state": "stop", "mode": "provoke"
+    },
+    {
+      "id": 102, "name": "Mode Jour",
+      "description": "Ouvre les volets et allume les lumières principales.",
+      "is_active": true, "state": "stop", "mode": "provoke"
+    },
+    {
+      "id": 103, "name": "Mode Vacances",
+      "description": "Active la simulation de présence.",
+      "is_active": false, "state": "stop", "mode": "provoke"
+    },
+    {
+      "id": 104, "name": "Fermeture volet auto",
+      "description": "Ferme tous les volets au coucher du soleil.",
+      "is_active": true, "state": "stop", "mode": "schedule", "schedule": "1 0 * * *"
+    },
+    {
+      "id": 105, "name": "Ouverture volet auto",
+      "description": "Ouvre les volets le matin.",
+      "is_active": true, "state": "stop", "mode": "schedule"
+    },
+    {
+      "id": 106, "name": "Arrosage auto",
+      "description": "Arrosage automatique du jardin.",
+      "is_active": true, "state": "stop", "mode": "schedule", "schedule": "0 23 * * *"
+    },
+    {
+      "id": 107, "name": "Alarme intrusion",
+      "description": "Déclenche l'alarme en cas de détection.",
+      "is_active": false, "state": "stop", "mode": "provoke"
+    },
+    {
+      "id": 108, "name": "Nuit enfants",
+      "description": "Ferme volets chambres enfants et éteint lumières.",
+      "is_active": true, "state": "stop", "mode": "schedule", "schedule": "55 19 * * *"
+    }
+  ]
+}

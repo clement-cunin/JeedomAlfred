@@ -1,0 +1,73 @@
+[
+  {
+    "id": "quelle_lumiere_allumee",
+    "category": "discovery",
+    "description": "Ask which light is currently on — model must call devices_list or devices_states, then report (Plan de travail is ON in fixture)",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Quelle lumière est allumée en ce moment ?" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "devices_list", "params": {}, "match": "any" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": false,
+      "max_iterations": 5
+    }
+  },
+  {
+    "id": "etat_roomba",
+    "category": "discovery",
+    "description": "Ask the current state of the Roomba — model must query state, not just guess",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Est-ce que le Roomba est en train de nettoyer ?" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "devices_list", "params": {}, "match": "any" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": false,
+      "max_iterations": 5
+    }
+  },
+  {
+    "id": "volet_cuisine_jardin",
+    "category": "discovery",
+    "description": "Close the garden-side kitchen shutter — model must identify Volet Cuisine 2 (id:88) from description",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Ferme le volet de la cuisine côté jardin" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "id": 906 }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 8
+    }
+  },
+  {
+    "id": "liste_scenarios",
+    "category": "discovery",
+    "description": "Ask which scenarios exist — model must call scenarios_list and report them",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Quels scénarios sont disponibles dans ma maison ?" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "scenarios_list", "params": {}, "match": "any" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": false,
+      "max_iterations": 4
+    }
+  }
+]

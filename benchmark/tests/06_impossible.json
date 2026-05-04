@@ -1,0 +1,101 @@
+[
+  {
+    "id": "piece_inexistante_cave",
+    "category": "impossible",
+    "description": "Request for a room that doesn't exist — model must NOT hallucinate an action",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Allume la lumière de la cave" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": true,
+      "max_iterations": 5,
+      "_note": "No cave in fixture. Model must say so — not call command_execute with any ID."
+    }
+  },
+  {
+    "id": "device_inexistant_ventilateur",
+    "category": "impossible",
+    "description": "Request for a device that doesn't exist — no fan in the fixture",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Allume le ventilateur du salon" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": true,
+      "max_iterations": 5
+    }
+  },
+  {
+    "id": "device_inexistant_thermostat",
+    "category": "impossible",
+    "description": "Request for a thermostat — none in the reference fixture",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Règle le thermostat du salon à 22 degrés" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": true,
+      "max_iterations": 5
+    }
+  },
+  {
+    "id": "hors_scope_meteo",
+    "category": "impossible",
+    "description": "Out-of-scope request — no weather tool available in basic fixture",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Quelle est la météo à Paris aujourd'hui ?" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": true,
+      "max_iterations": 4,
+      "_note": "Alfred is a home automation assistant. It should say it can't do weather lookups without the appropriate tool."
+    }
+  },
+  {
+    "id": "hors_scope_internet",
+    "category": "impossible",
+    "description": "Request to control something not in Jeedom — internet box / router",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Redémarre ma box internet" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": true,
+      "max_iterations": 5
+    }
+  },
+  {
+    "id": "scenario_inexistant",
+    "category": "impossible",
+    "description": "Run a scenario that doesn't exist — model must not hallucinate a scenario ID",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Lance le scénario de nettoyage de la piscine" }
+    ],
+    "expected": {
+      "required_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "must_not_execute": true,
+      "max_iterations": 5,
+      "_note": "No pool scenario exists. Model must say so after checking scenarios_list."
+    }
+  }
+]

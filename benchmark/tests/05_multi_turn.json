@@ -1,0 +1,63 @@
+[
+  {
+    "id": "allume_puis_tamise",
+    "category": "multi_turn",
+    "description": "Turn on salon light, then dim it — model must remember context from turn 1. Both turns run live so tool_call_ids are coherent.",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Allume la lumière du salon" },
+      { "role": "user", "content": "Baisse-la à 40%" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 803 }] }, "match": "contains" },
+        {
+          "name": "command_execute",
+          "params": { "commands": [{ "id": 802, "value": { "min": 30, "max": 50 } }] },
+          "match": "contains"
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 10
+    }
+  },
+  {
+    "id": "volets_salon_puis_ferme",
+    "category": "multi_turn",
+    "description": "Ask which shutters are in the salon, then close them — tests pronoun resolution across turns",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Quels volets sont dans le salon ?" },
+      { "role": "user", "content": "Ferme-les" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 912 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 918 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 10
+    }
+  },
+  {
+    "id": "allume_puis_eteins",
+    "category": "multi_turn",
+    "description": "Turn on entrance lights, then immediately cancel — tests context retention",
+    "fixture": "reference",
+    "conversation": [
+      { "role": "user", "content": "Allume l'entrée" },
+      { "role": "user", "content": "Finalement non, éteins" }
+    ],
+    "expected": {
+      "required_tool_calls": [
+        { "name": "command_execute", "params": { "commands": [{ "id": 783 }] }, "match": "contains" },
+        { "name": "command_execute", "params": { "commands": [{ "id": 784 }] }, "match": "contains" }
+      ],
+      "forbidden_tool_calls": [],
+      "no_hallucinated_ids": true,
+      "max_iterations": 10
+    }
+  }
+]

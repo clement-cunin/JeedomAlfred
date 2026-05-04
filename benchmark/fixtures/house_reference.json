@@ -1,0 +1,343 @@
+{
+  "name": "Reference House",
+  "description": "3-bedroom family home with garden. Primary benchmark fixture (28 devices, 13 rooms).",
+  "rooms": [
+    { "id": 11, "name": "Espace nuit",  "icon": "icon far fa-moon",         "parent_id": null },
+    { "id": 14, "name": "Espace vie",   "icon": "icon fas fa-sun",          "parent_id": null },
+    { "id": 3,  "name": "Hardware",     "icon": "icon divers-vlc1",         "parent_id": null },
+    { "id": 9,  "name": "Extérieur",    "icon": "icon maison-barbecue",     "parent_id": null },
+    { "id": 20, "name": "Couloir",      "icon": "icon fas fa-walking",      "parent_id": 11 },
+    { "id": 13, "name": "Salle de bain","icon": "icon fas fa-bath",         "parent_id": 11 },
+    { "id": 6,  "name": "Chambre Parents",  "icon": "icon maison-hotel4",   "parent_id": 11 },
+    { "id": 7,  "name": "Chambre Enfant 1", "icon": "icon nourriture-gingerbread", "parent_id": 11 },
+    { "id": 10, "name": "Chambre Enfant 2", "icon": "icon nourriture-soft1","parent_id": 11 },
+    { "id": 5,  "name": "WC",           "icon": "icon maison-wc",           "parent_id": 11 },
+    { "id": 16, "name": "Cuisine",      "icon": "icon nourriture-cooking14","parent_id": 14 },
+    { "id": 2,  "name": "Salon",        "icon": "icon maison-sofa3",        "parent_id": 14 },
+    { "id": 8,  "name": "Entrée",       "icon": "icon jeedom-porte-ouverte","parent_id": 14 }
+  ],
+  "devices": [
+    {
+      "id": 72, "name": "Chambre Enfant 1", "room_id": 7,
+      "categories": ["light"],
+      "state": { "Etat": 0, "Puissance": 0 },
+      "actions": [
+        { "id": 816, "name": "Intensité", "subType": "slider" },
+        { "id": 817, "name": "On",        "subType": "other" },
+        { "id": 818, "name": "Off",       "subType": "other" },
+        { "id": 858, "name": "Mode Nuit", "subType": "other" },
+        { "id": 859, "name": "Mode Jour", "subType": "other" }
+      ]
+    },
+    {
+      "id": 70, "name": "Salon", "room_id": 2,
+      "categories": ["light"],
+      "state": { "Etat": 0, "Puissance": 0 },
+      "actions": [
+        { "id": 802, "name": "Intensité", "subType": "slider" },
+        { "id": 803, "name": "On",        "subType": "other" },
+        { "id": 804, "name": "Off",       "subType": "other" }
+      ]
+    },
+    {
+      "id": 105, "name": "Chambre Enfant 1 Lit", "room_id": 7,
+      "categories": ["light"],
+      "state": { "Etat": false },
+      "actions": [
+        { "id": 1166, "name": "On",  "subType": "other" },
+        { "id": 1167, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 86, "name": "Volet Chambre Enfant 1", "room_id": 7,
+      "description": "Commande unidirectionnelle, pas de retour d'état.",
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 893, "name": "Monter",    "subType": "other" },
+        { "id": 894, "name": "Descendre", "subType": "other" },
+        { "id": 895, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 71, "name": "Chambre Enfant 2", "room_id": 10,
+      "categories": ["light"],
+      "state": { "Etat": 0, "Puissance": 0 },
+      "actions": [
+        { "id": 809, "name": "Intensité", "subType": "slider" },
+        { "id": 810, "name": "On",        "subType": "other" },
+        { "id": 811, "name": "Off",       "subType": "other" }
+      ]
+    },
+    {
+      "id": 92, "name": "Volet Chambre Enfant 2", "room_id": 10,
+      "description": "Commande unidirectionnelle, pas de retour d'état.",
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 925, "name": "Monter",    "subType": "other" },
+        { "id": 926, "name": "Descendre", "subType": "other" },
+        { "id": 927, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 124, "name": "Guirlande Chambre Parents", "room_id": 6,
+      "categories": ["light"],
+      "state": { "Etat": false, "Puissance": 0 },
+      "actions": [
+        { "id": 1687, "name": "Arrêt",   "subType": "other" },
+        { "id": 1688, "name": "Marche",  "subType": "other" }
+      ]
+    },
+    {
+      "id": 73, "name": "Lumière Chambre Parents", "room_id": 6,
+      "categories": ["light"],
+      "state": { "Etat": 0, "Puissance": 0 },
+      "actions": [
+        { "id": 823, "name": "Intensité", "subType": "slider" },
+        { "id": 824, "name": "On",        "subType": "other" },
+        { "id": 825, "name": "Off",       "subType": "other" }
+      ]
+    },
+    {
+      "id": 85, "name": "Volet Chambre Parents", "room_id": 6,
+      "description": "Commande unidirectionnelle, pas de retour d'état.",
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 887, "name": "Monter",    "subType": "other" },
+        { "id": 888, "name": "Descendre", "subType": "other" },
+        { "id": 889, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 113, "name": "Couloir", "room_id": 20,
+      "categories": ["light"],
+      "state": { "Etat": 0, "Puissance": 0 },
+      "actions": [
+        { "id": 1241, "name": "Intensité", "subType": "slider" },
+        { "id": 1242, "name": "On",        "subType": "other" },
+        { "id": 1243, "name": "Off",       "subType": "other" }
+      ]
+    },
+    {
+      "id": 66, "name": "Plan de travail", "room_id": 16,
+      "categories": ["light"],
+      "state": { "Etat": true, "Puissance": 19.1 },
+      "actions": [
+        { "id": 778, "name": "On",  "subType": "other" },
+        { "id": 779, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 69, "name": "Table Cuisine", "room_id": 16,
+      "categories": ["light"],
+      "state": { "Etat": 0, "Puissance": 0 },
+      "actions": [
+        { "id": 795, "name": "Intensité", "subType": "slider" },
+        { "id": 796, "name": "On",        "subType": "other" },
+        { "id": 797, "name": "Off",       "subType": "other" }
+      ]
+    },
+    {
+      "id": 87, "name": "Volet Cuisine 1", "room_id": 16,
+      "description": "Exposé au soleil le matin. Commande unidirectionnelle, pas de retour d'état.",
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 899, "name": "Monter",    "subType": "other" },
+        { "id": 900, "name": "Descendre", "subType": "other" },
+        { "id": 901, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 88, "name": "Volet Cuisine 2", "room_id": 16,
+      "description": "Accès extérieur. Commande unidirectionnelle, pas de retour d'état.",
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 905, "name": "Monter",    "subType": "other" },
+        { "id": 906, "name": "Descendre", "subType": "other" },
+        { "id": 907, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 67, "name": "Entrée 1", "room_id": 8,
+      "categories": ["light"],
+      "state": { "Etat": false, "Puissance": 0 },
+      "actions": [
+        { "id": 783, "name": "On",  "subType": "other" },
+        { "id": 784, "name": "Off", "subType": "other" }
+      ]
+    },
+    {
+      "id": 68, "name": "Entrée 2", "room_id": 8,
+      "categories": ["light"],
+      "state": { "Etat": 0, "Puissance": 0 },
+      "actions": [
+        { "id": 788, "name": "Intensité", "subType": "slider" },
+        { "id": 789, "name": "On",        "subType": "other" },
+        { "id": 790, "name": "Off",       "subType": "other" }
+      ]
+    },
+    {
+      "id": 109, "name": "Roomba", "room_id": 8,
+      "description": "Robot aspirateur. Base de recharge dans l'entrée.",
+      "categories": ["automatism"],
+      "state": { "Etat": "Charging", "Bac plein": false, "Batterie": 100 },
+      "actions": [
+        { "id": 1213, "name": "Démarrer",          "subType": "other" },
+        { "id": 1214, "name": "Arrêter",           "subType": "other" },
+        { "id": 1215, "name": "Pause",             "subType": "other" },
+        { "id": 1216, "name": "Continuer",         "subType": "other" },
+        { "id": 1217, "name": "Retour à la base",  "subType": "other" },
+        { "id": 1218, "name": "Vidange",           "subType": "other" }
+      ]
+    },
+    {
+      "id": 101, "name": "Arrosage - Herbe 1", "room_id": 9,
+      "categories": ["automatism"],
+      "state": {},
+      "actions": [
+        { "id": 1081, "name": "On",    "subType": "other" },
+        { "id": 1082, "name": "Off",   "subType": "other" },
+        { "id": 1091, "name": "Tempo", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 102, "name": "Arrosage - Herbe 2", "room_id": 9,
+      "categories": ["automatism"],
+      "state": {},
+      "actions": [
+        { "id": 1098, "name": "On",    "subType": "other" },
+        { "id": 1099, "name": "Off",   "subType": "other" },
+        { "id": 1108, "name": "Tempo", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 103, "name": "Arrosage - Bambou", "room_id": 9,
+      "categories": ["automatism"],
+      "state": {},
+      "actions": [
+        { "id": 1115, "name": "On",    "subType": "other" },
+        { "id": 1116, "name": "Off",   "subType": "other" },
+        { "id": 1125, "name": "Tempo", "subType": "slider" }
+      ]
+    },
+    {
+      "id": 76, "name": "Extérieur", "room_id": 9,
+      "categories": ["light"],
+      "state": { "Etat 1": false, "Etat 2": false },
+      "actions": [
+        { "id": 844, "name": "On 1",  "subType": "other" },
+        { "id": 845, "name": "Off 1", "subType": "other" },
+        { "id": 849, "name": "On 2",  "subType": "other" },
+        { "id": 850, "name": "Off 2", "subType": "other" }
+      ]
+    },
+    {
+      "id": 115, "name": "Imprimante", "room_id": 2,
+      "categories": ["energy"],
+      "state": { "Etat": true, "Puissance": 1.7 },
+      "actions": [
+        { "id": 1256, "name": "Arrêt",   "subType": "other" },
+        { "id": 1257, "name": "Marche",  "subType": "other" }
+      ]
+    },
+    {
+      "id": 116, "name": "Prise Multimédia", "room_id": 2,
+      "categories": ["energy"],
+      "state": { "Etat": true, "Puissance": 51.9 },
+      "actions": [
+        { "id": 1264, "name": "Arrêt",   "subType": "other" },
+        { "id": 1265, "name": "Marche",  "subType": "other" }
+      ]
+    },
+    {
+      "id": 118, "name": "TV", "room_id": 2,
+      "categories": ["multimedia"],
+      "state": { "Etat": "0" },
+      "actions": [
+        { "id": 1280, "name": "Volume-",   "subType": "other" },
+        { "id": 1281, "name": "Volume+",   "subType": "other" },
+        { "id": 1300, "name": "Eteindre",  "subType": "other" },
+        { "id": 1301, "name": "Allumer",   "subType": "other" },
+        { "id": 1304, "name": "Mute",      "subType": "other" },
+        { "id": 1312, "name": "Régler le volume", "subType": "slider" },
+        { "id": 1372, "name": "Netflix",   "subType": "other" },
+        { "id": 1373, "name": "YouTube",   "subType": "other" }
+      ]
+    },
+    {
+      "id": 89, "name": "Volet Salon 1", "room_id": 2,
+      "description": "Exposé au soleil le matin. Commande unidirectionnelle, pas de retour d'état.",
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 911, "name": "Monter",    "subType": "other" },
+        { "id": 912, "name": "Descendre", "subType": "other" },
+        { "id": 913, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 90, "name": "Volet Salon 2", "room_id": 2,
+      "description": "Commande unidirectionnelle, pas de retour d'état.",
+      "categories": ["opening"],
+      "state": {},
+      "actions": [
+        { "id": 917, "name": "Monter",    "subType": "other" },
+        { "id": 918, "name": "Descendre", "subType": "other" },
+        { "id": 919, "name": "Stop",      "subType": "other" }
+      ]
+    },
+    {
+      "id": 123, "name": "TV Chambre Parents", "room_id": 6,
+      "categories": ["multimedia"],
+      "state": {},
+      "actions": [
+        { "id": 1625, "name": "Power On",  "subType": "other" },
+        { "id": 1626, "name": "Power Off", "subType": "other" },
+        { "id": 1632, "name": "Volume Down", "subType": "other" },
+        { "id": 1633, "name": "Volume Up",   "subType": "other" },
+        { "id": 1670, "name": "Netflix",     "subType": "other" }
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": 18, "name": "Fermeture volet - coucher soleil",
+      "description": "Ferme les volets au coucher du soleil.",
+      "is_active": true, "state": "stop", "mode": "provoke"
+    },
+    {
+      "id": 10, "name": "Fermeture volet auto",
+      "description": "Planifie la fermeture des volets à la tombée de la nuit.",
+      "is_active": true, "state": "stop", "mode": "schedule", "schedule": "1 0 * * *"
+    },
+    {
+      "id": 16, "name": "Jardin",
+      "description": "Arrosage du jardin. Désactivé hors saison.",
+      "is_active": false, "state": "stop", "mode": "schedule"
+    },
+    {
+      "id": 22, "name": "Mode Jour",
+      "description": "Scénario de début de journée.",
+      "is_active": true, "state": "stop", "mode": "schedule", "schedule": "30 7 * * *"
+    },
+    {
+      "id": 23, "name": "Mode Nuit",
+      "description": "Scénario de fin de soirée.",
+      "is_active": false, "state": "stop", "mode": "schedule", "schedule": "30 21 * * *"
+    },
+    {
+      "id": 24, "name": "Mode Nuit enfant",
+      "description": "Extinction des lumières enfants et fermeture des volets.",
+      "is_active": true, "state": "stop", "mode": "schedule", "schedule": "55 19 * * *"
+    },
+    {
+      "id": 15, "name": "Ouverture volet auto",
+      "description": "Ouvre les volets le matin selon le jour de la semaine.",
+      "is_active": true, "state": "stop", "mode": "schedule"
+    }
+  ]
+}

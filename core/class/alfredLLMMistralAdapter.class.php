@@ -319,10 +319,15 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
 
         $finishReason = $choice['finish_reason'] ?? 'stop';
 
+        $u = $data['usage'] ?? [];
         return [
             'text'        => trim((string)$text),
             'tool_calls'  => $tool_calls,
             'stop_reason' => $finishReason === 'tool_calls' ? 'tool_use' : 'end_turn',
+            'usage'       => [
+                'input_tokens'  => (int)($u['prompt_tokens']     ?? 0),
+                'output_tokens' => (int)($u['completion_tokens'] ?? 0),
+            ],
         ];
     }
 }

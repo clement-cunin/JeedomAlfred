@@ -223,10 +223,15 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
             }
         }
 
+        $u = $data['usageMetadata'] ?? [];
         $result = [
             'text'        => trim($text),
             'tool_calls'  => $tool_calls,
             'stop_reason' => !empty($tool_calls) ? 'tool_use' : 'end_turn',
+            'usage'       => [
+                'input_tokens'  => (int)($u['promptTokenCount']     ?? 0),
+                'output_tokens' => (int)($u['candidatesTokenCount'] ?? 0),
+            ],
         ];
 
         if (!empty($thought_parts)) {
