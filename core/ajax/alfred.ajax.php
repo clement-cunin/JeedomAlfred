@@ -113,6 +113,28 @@ try {
         ajax::success(alfredConversation::getDisplayMessages($sessionId));
     }
 
+    if ($action === 'getSessionFiles') {
+        $sessionId = init('session_id');
+        if ($sessionId === '') throw new Exception('Missing session_id');
+        require_once __DIR__ . '/../class/alfredConversation.class.php';
+        require_once __DIR__ . '/../class/alfredAgent.class.php';
+        $connectedUser = $_SESSION['user'] ?? null;
+        $currentLogin  = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
+        if (!isConnect('admin') && !alfredConversation::sessionBelongsTo($sessionId, $currentLogin)) {
+            throw new Exception(__('401 - Unauthorized access', __FILE__));
+        }
+        $files = alfredAgent::listUploadedFiles($sessionId);
+        $result = array_map(function ($f) {
+            return [
+                'file_id'   => $f['file_id'],
+                'filename'  => $f['original_name'],
+                'mime_type' => $f['mime_type'],
+                'size'      => $f['size'],
+            ];
+        }, $files);
+        ajax::success($result);
+    }
+
     if ($action === 'runMigrations') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
         include_file('core', 'alfredMigration', 'class', 'alfred');

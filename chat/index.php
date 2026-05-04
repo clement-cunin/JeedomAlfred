@@ -1080,6 +1080,17 @@ $(function () {
                 setInputEnabled(!!alfred_config.isConfigured);
             }
         });
+        $.ajax({
+            type:     'POST',
+            url:      alfred_config.basePath + '/core/ajax/alfred.ajax.php',
+            data:     { action: 'getSessionFiles', session_id: sessionId },
+            dataType: 'json',
+            success:  function (resp) {
+                if (resp.state !== 'ok' || !resp.result) return;
+                pendingFiles = resp.result;
+                renderAttachmentBar();
+            }
+        });
     }
 
     function renderHistory(messages) {

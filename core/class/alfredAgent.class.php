@@ -73,7 +73,7 @@ class alfredAgent
         return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'alfred' . DIRECTORY_SEPARATOR . $safe;
     }
 
-    private static function listUploadedFiles(string $sessionId): array
+    public static function listUploadedFiles(string $sessionId): array
     {
         $dir   = self::uploadDir($sessionId);
         $files = [];
