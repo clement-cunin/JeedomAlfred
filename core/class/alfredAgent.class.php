@@ -21,7 +21,8 @@
  *                {session_load, prompt_build, llm_calls, tool_calls, db_writes, total}
  *
  * Synthetic tools (handled locally, never forwarded to MCP):
- *   alfred_schedule — schedule a deferred re-invocation of the agent
+ *   alfred_schedule        — schedule a deferred re-invocation of the agent
+ *   uploaded_file_read     — read a session-scoped uploaded file as base64
  */
 class alfredAgent
 {
@@ -56,6 +57,44 @@ class alfredAgent
                 $this->emit('error', ['message' => $msg]);
             });
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Synthetic tool definitions
+    // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // Upload helpers
+    // -------------------------------------------------------------------------
+
+    private static function uploadDir(string $sessionId): string
+    {
+        $safe = preg_replace('/[^a-zA-Z0-9\-]/', '', $sessionId);
+        return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'alfred' . DIRECTORY_SEPARATOR . $safe;
+    }
+
+    private static function listUploadedFiles(string $sessionId): array
+    {
+        $dir   = self::uploadDir($sessionId);
+        $files = [];
+        if (!is_dir($dir)) return $files;
+        foreach (glob($dir . DIRECTORY_SEPARATOR . '*.json') as $metaFile) {
+            $meta = json_decode(file_get_contents($metaFile), true);
+            if (is_array($meta) && isset($meta['file_id'])) {
+                $files[] = $meta;
+            }
+        }
+        return $files;
+    }
+
+    public static function cleanupSessionFiles(string $sessionId): void
+    {
+        $dir = self::uploadDir($sessionId);
+        if (!is_dir($dir)) return;
+        foreach (glob($dir . DIRECTORY_SEPARATOR . '*') as $f) {
+            if (is_file($f)) unlink($f);
+        }
+        rmdir($dir);
     }
 
     // -------------------------------------------------------------------------
@@ -142,6 +181,26 @@ class alfredAgent
         ];
     }
 
+    private static function fileReadTool(): array
+    {
+        return [
+            'name'        => 'uploaded_file_read',
+            'description' => 'Read the content of a file attached to this conversation.'
+                           . ' Returns the file as base64-encoded data along with its MIME type.'
+                           . ' Use this when you need to analyse the content of an attached file.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'file_id' => [
+                        'type'        => 'string',
+                        'description' => 'The file_id of the uploaded file, as listed in the system context.',
+                    ],
+                ],
+                'required' => ['file_id'],
+            ],
+        ];
+    }
+
     // -------------------------------------------------------------------------
     // Public entry point
     // -------------------------------------------------------------------------
@@ -181,9 +240,23 @@ class alfredAgent
         $messages = alfredConversation::getMessages($sessionId);
         $timing['session_load'] = (int)round((microtime(true) - $tPhase) * 1000);
 
-        // Build effective system prompt (base + persistent memory block)
+        // Build effective system prompt (base + persistent memory block + attached files)
         $tPhase = microtime(true);
         $effectiveSystemPrompt = $this->buildSystemPrompt();
+
+        $uploadedFiles = self::listUploadedFiles($sessionId);
+        if (!empty($uploadedFiles)) {
+            $fileBlock = "\n\n## Attached files\n"
+                       . "The user has attached the following files to this conversation."
+                       . " Use `uploaded_file_read` to read their content when needed.\n";
+            foreach ($uploadedFiles as $f) {
+                $sizeKb    = round($f['size'] / 1024, 1);
+                $fileBlock .= "\n- **{$f['original_name']}** ({$f['mime_type']}, {$sizeKb} KB)"
+                            . " — file_id: `{$f['file_id']}`";
+            }
+            $effectiveSystemPrompt .= $fileBlock;
+        }
+
         $timing['prompt_build'] = (int)round((microtime(true) - $tPhase) * 1000);
 
         // Emit full system prompt for admin debugging
@@ -197,6 +270,9 @@ class alfredAgent
             array_unshift($tools, $t);
         }
         array_unshift($tools, self::scheduleTool());
+        if (!empty($uploadedFiles)) {
+            array_unshift($tools, self::fileReadTool());
+        }
 
         // ReAct loop
         $finalText  = '';
@@ -248,6 +324,8 @@ class alfredAgent
                 $tTool = microtime(true);
                 if ($tc['name'] === 'alfred_schedule') {
                     $result = $this->handleScheduleTool($sessionId, $tc['input']);
+                } elseif ($tc['name'] === 'uploaded_file_read') {
+                    $result = $this->handleFileReadTool($sessionId, $tc['input']);
                 } elseif (strpos($tc['name'], 'alfred_memory_') === 0) {
                     $result = $this->handleMemoryTool($tc['name'], $tc['input']);
                 } else {
@@ -320,6 +398,40 @@ class alfredAgent
     }
 
     // -------------------------------------------------------------------------
+
+    /**
+     * Handle a call to the uploaded_file_read synthetic tool.
+     */
+    private function handleFileReadTool(string $sessionId, array $input): array
+    {
+        $fileId = trim((string)($input['file_id'] ?? ''));
+        if ($fileId === '') {
+            return ['error' => 'file_id is required'];
+        }
+
+        $safeId   = preg_replace('/[^a-zA-Z0-9]/', '', $fileId);
+        $dir      = self::uploadDir($sessionId);
+        $metaPath = $dir . DIRECTORY_SEPARATOR . $safeId . '.json';
+
+        if (!file_exists($metaPath)) {
+            return ['error' => 'File not found'];
+        }
+
+        $meta     = json_decode(file_get_contents($metaPath), true);
+        $filePath = $dir . DIRECTORY_SEPARATOR . $meta['filename'];
+
+        if (!file_exists($filePath)) {
+            return ['error' => 'File data missing'];
+        }
+
+        return [
+            'file_id'   => $meta['file_id'],
+            'filename'  => $meta['original_name'],
+            'mime_type' => $meta['mime_type'],
+            'size'      => $meta['size'],
+            'data'      => base64_encode(file_get_contents($filePath)),
+        ];
+    }
 
     /**
      * Build the effective system prompt by appending the persistent memory block.

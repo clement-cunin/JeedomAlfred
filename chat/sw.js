@@ -20,7 +20,9 @@ var PRECACHE_ASSETS = [
 // URL substrings that must always go to the network (Jeedom API / SSE stream).
 var API_PATTERNS = [
     '/core/ajax/alfred.ajax.php',
-    '/api/chat.php'
+    '/api/chat.php',
+    '/api/upload.php',
+    '/api/share.php'
 ];
 
 // ── Install: pre-cache app-shell statics ─────────────────────────────────────

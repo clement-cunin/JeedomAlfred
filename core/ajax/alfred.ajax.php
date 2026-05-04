@@ -82,6 +82,8 @@ try {
             throw new Exception(__('401 - Unauthorized access', __FILE__));
         }
         alfredConversation::deleteSession($sessionId);
+        require_once __DIR__ . '/../class/alfredAgent.class.php';
+        alfredAgent::cleanupSessionFiles($sessionId);
         ajax::success();
     }
 

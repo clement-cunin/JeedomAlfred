@@ -530,6 +530,67 @@ if (isConnect()) {
 
         .alfred-limit-btn:hover { background: #337ab7; border-color: #337ab7; color: #fff; }
 
+        /* ---- Attachment bar ---- */
+        #alfred-attachment-bar {
+            display: none;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 16px 0;
+            background: #fff;
+        }
+
+        .alfred-attachment-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px 4px 10px;
+            background: #eef3fb;
+            border: 1px solid #c5d3e8;
+            border-radius: 16px;
+            font-size: 12px;
+            color: #3a6ea5;
+            max-width: 220px;
+        }
+
+        .alfred-attachment-badge i { font-size: 11px; flex-shrink: 0; }
+        .alfred-attachment-badge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+
+        .alfred-attachment-remove {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 0 0 0 2px;
+            font-size: 11px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .alfred-attachment-remove:hover { color: #dc3545; }
+
+        #alfred-attach {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: transparent;
+            color: #aaa;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 13px;
+            padding: 0;
+            transition: all 0.15s;
+        }
+
+        #alfred-attach:hover:not(:disabled) { border-color: #337ab7; color: #337ab7; }
+        #alfred-attach:disabled { opacity: 0.4; cursor: not-allowed; }
+        #alfred-attach.has-file { background: #337ab7; border-color: #337ab7; color: #fff; }
+
         /* ---- Input bar ---- */
         #alfred-input-bar {
             display: flex;
@@ -801,7 +862,11 @@ if (isConnect()) {
 
         <div id="alfred-messages"></div>
 
+        <input type="file" id="alfred-file-input" accept="image/*,.pdf" style="display:none">
+        <div id="alfred-attachment-bar"></div>
+
         <div id="alfred-input-bar">
+            <button id="alfred-attach" title="Attach file"><i class="fas fa-paperclip"></i></button>
             <textarea id="alfred-input" placeholder="Type a message…" rows="1"></textarea>
             <div id="alfred-tts-wrap">
                 <button id="alfred-tts" title="Text-to-speech"><i class="fas fa-volume-up"></i></button>
@@ -849,6 +914,7 @@ $(function () {
     var isStreaming        = false;
     var currentSource     = null;
     var knownMsgCount     = 0;
+    var pendingFiles      = [];
 
     var recognition    = null;
     var isListening    = false;
@@ -887,6 +953,8 @@ $(function () {
     function startNewSession() {
         currentSessionId = generateUUID();
         knownMsgCount    = 0;
+        pendingFiles     = [];
+        renderAttachmentBar();
         localStorage.setItem('alfred_last_session', currentSessionId);
         renderWelcome();
         setInputEnabled(true);
@@ -995,6 +1063,8 @@ $(function () {
 
     function loadSession(sessionId) {
         currentSessionId = sessionId;
+        pendingFiles     = [];
+        renderAttachmentBar();
         localStorage.setItem('alfred_last_session', sessionId);
         $('.alfred-session-item').removeClass('active');
         $('[data-session-id="' + sessionId + '"]').addClass('active');
@@ -1282,6 +1352,78 @@ $(function () {
     }());
 
     // =========================================================================
+    // File attachment
+    // =========================================================================
+
+    function mimeToIcon(mimeType) {
+        if (mimeType === 'application/pdf')          return 'fa-file-pdf';
+        if (mimeType.indexOf('image/') === 0)        return 'fa-file-image';
+        return 'fa-file';
+    }
+
+    function renderAttachmentBar() {
+        var $bar = $('#alfred-attachment-bar').empty();
+        if (pendingFiles.length === 0) { $bar.hide(); $('#alfred-attach').removeClass('has-file'); return; }
+        $bar.show();
+        $('#alfred-attach').addClass('has-file');
+        pendingFiles.forEach(function (f) {
+            var $badge = $('<div class="alfred-attachment-badge">')
+                .append($('<i>').addClass('fas ' + mimeToIcon(f.mime_type)))
+                .append($('<span>').text(f.filename))
+                .append(
+                    $('<button type="button" class="alfred-attachment-remove" title="Remove">').html('&times;')
+                        .on('click', function () {
+                            pendingFiles = pendingFiles.filter(function (x) { return x.file_id !== f.file_id; });
+                            renderAttachmentBar();
+                        })
+                );
+            $bar.append($badge);
+        });
+    }
+
+    function uploadFile(file) {
+        var $attach = $('#alfred-attach');
+        $attach.prop('disabled', true);
+        var formData = new FormData();
+        formData.append('file', file);
+        formData.append('session_id', currentSessionId);
+        formData.append('user_hash', alfred_config.userHash);
+
+        $.ajax({
+            type:        'POST',
+            url:         alfred_config.basePath + '/api/upload.php',
+            data:        formData,
+            processData: false,
+            contentType: false,
+            success: function (resp) {
+                if (resp.file_id) {
+                    pendingFiles.push({ file_id: resp.file_id, filename: resp.filename, mime_type: resp.mime_type });
+                    renderAttachmentBar();
+                } else {
+                    alert(resp.error || 'Upload failed');
+                }
+            },
+            error: function (xhr) {
+                var msg = 'Upload failed';
+                try { msg = JSON.parse(xhr.responseText).error || msg; } catch (_) {}
+                alert(msg);
+            },
+            complete: function () { $attach.prop('disabled', false); }
+        });
+    }
+
+    $('#alfred-attach').on('click', function () {
+        if (!isStreaming) $('#alfred-file-input').val('').trigger('click');
+    });
+
+    $('#alfred-file-input').on('change', function () {
+        if (this.files && this.files[0]) {
+            if (!currentSessionId) currentSessionId = generateUUID();
+            uploadFile(this.files[0]);
+        }
+    });
+
+    // =========================================================================
     // SSE streaming
     // =========================================================================
 
@@ -1501,7 +1643,7 @@ $(function () {
     }
 
     function setInputEnabled(enabled) {
-        $('#alfred-input, #alfred-send, #alfred-mic, #alfred-mic-autosend').prop('disabled', !enabled);
+        $('#alfred-input, #alfred-send, #alfred-mic, #alfred-mic-autosend, #alfred-attach').prop('disabled', !enabled);
         if (!enabled && isListening) { isListening = false; recognition.stop(); }
     }
 
@@ -1575,13 +1717,38 @@ $(function () {
         return;
     }
 
+    // Parse Web Share Target params (?share_session=...&share_file_id=...&share_name=...)
+    var _urlParams    = new URLSearchParams(window.location.search);
+    var _shareSession = _urlParams.get('share_session');
+    var _shareFileId  = _urlParams.get('share_file_id');
+    var _shareName    = _urlParams.get('share_name');
+    var _shareType    = _urlParams.get('share_type') || 'application/octet-stream';
+
     loadSessions(function () {
-        var lastId = localStorage.getItem('alfred_last_session');
-        if (lastId && $('[data-session-id="' + lastId + '"]').length) {
-            loadSession(lastId);
-        } else {
-            startNewSession();
+        if (_shareSession && _shareFileId && _shareName) {
+            // Clean URL so a refresh doesn't re-trigger the share
+            if (window.history && window.history.replaceState) {
+                history.replaceState(null, '', window.location.pathname);
+            }
+            currentSessionId = _shareSession;
+            localStorage.setItem('alfred_last_session', _shareSession);
+            renderWelcome();
             setInputEnabled(!!alfred_config.isConfigured);
+            pendingFiles.push({ file_id: _shareFileId, filename: _shareName, mime_type: _shareType });
+            renderAttachmentBar();
+            if (alfred_config.isConfigured) {
+                setTimeout(function () {
+                    sendMessage(_shareSession, 'I shared a file with you: ' + _shareName);
+                }, 400);
+            }
+        } else {
+            var lastId = localStorage.getItem('alfred_last_session');
+            if (lastId && $('[data-session-id="' + lastId + '"]').length) {
+                loadSession(lastId);
+            } else {
+                startNewSession();
+                setInputEnabled(!!alfred_config.isConfigured);
+            }
         }
     });
 });
