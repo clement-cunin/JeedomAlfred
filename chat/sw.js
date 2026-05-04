@@ -22,7 +22,8 @@ var API_PATTERNS = [
     '/core/ajax/alfred.ajax.php',
     '/api/chat.php',
     '/api/upload.php',
-    '/api/share.php'
+    '/api/share.php',
+    '/api/file.php'
 ];
 
 // ── Install: pre-cache app-shell statics ─────────────────────────────────────

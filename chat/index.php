@@ -542,33 +542,39 @@ if (isConnect()) {
         .alfred-attachment-badge {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 4px 8px 4px 10px;
-            background: #eef3fb;
-            border: 1px solid #c5d3e8;
-            border-radius: 16px;
+            gap: 6px;
+            padding: 6px 10px;
+            background: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 6px;
             font-size: 12px;
-            color: #3a6ea5;
+            color: #888;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
             max-width: 220px;
         }
 
-        .alfred-attachment-badge i { font-size: 11px; flex-shrink: 0; }
+        .alfred-attachment-badge:hover { background: #f0f4fa; border-color: #c5d3e8; color: #337ab7; }
+        .alfred-attachment-badge i { color: #337ab7; font-size: 12px; flex-shrink: 0; }
         .alfred-attachment-badge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 
         .alfred-attachment-remove {
             flex-shrink: 0;
             background: none;
             border: none;
-            color: #999;
+            color: #ccc;
             cursor: pointer;
-            padding: 0 0 0 2px;
-            font-size: 11px;
+            padding: 0;
+            font-size: 10px;
             line-height: 1;
             display: flex;
             align-items: center;
+            opacity: 0;
+            transition: opacity 0.15s, color 0.15s;
         }
 
-        .alfred-attachment-remove:hover { color: #dc3545; }
+        .alfred-attachment-badge:hover .alfred-attachment-remove { opacity: 1; }
+        .alfred-attachment-remove:hover { color: #dc3545 !important; }
 
         #alfred-attach {
             width: 34px;
@@ -1372,6 +1378,41 @@ $(function () {
         return 'fa-file';
     }
 
+    function fileUrl(fileId) {
+        return alfred_config.basePath + '/api/file.php'
+            + '?session_id=' + encodeURIComponent(currentSessionId)
+            + '&file_id='    + encodeURIComponent(fileId)
+            + '&user_hash='  + encodeURIComponent(alfred_config.userHash);
+    }
+
+    function shareOrDownload(f) {
+        var url = fileUrl(f.file_id);
+        if (typeof navigator.share === 'function') {
+            fetch(url)
+                .then(function (r) { return r.blob(); })
+                .then(function (blob) {
+                    var file = new File([blob], f.filename, { type: f.mime_type });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        return navigator.share({ files: [file], title: f.filename });
+                    }
+                    throw new Error('files not supported');
+                })
+                .catch(function () { openInline(url, f.filename); });
+        } else {
+            openInline(url, f.filename);
+        }
+    }
+
+    function openInline(url, filename) {
+        var a = document.createElement('a');
+        a.href     = url;
+        a.target   = '_blank';
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { document.body.removeChild(a); }, 100);
+    }
+
     function renderAttachmentBar() {
         var $bar = $('#alfred-attachment-bar').empty();
         if (pendingFiles.length === 0) { $bar.hide(); $('#alfred-attach').removeClass('has-file'); return; }
@@ -1383,11 +1424,13 @@ $(function () {
                 .append($('<span>').text(f.filename))
                 .append(
                     $('<button type="button" class="alfred-attachment-remove" title="Remove">').html('&times;')
-                        .on('click', function () {
+                        .on('click', function (e) {
+                            e.stopPropagation();
                             pendingFiles = pendingFiles.filter(function (x) { return x.file_id !== f.file_id; });
                             renderAttachmentBar();
                         })
-                );
+                )
+                .on('click', function () { shareOrDownload(f); });
             $bar.append($badge);
         });
     }

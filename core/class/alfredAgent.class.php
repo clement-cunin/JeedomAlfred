@@ -87,6 +87,15 @@ class alfredAgent
         return $files;
     }
 
+    public static function getFileMeta(string $sessionId, string $fileId): ?array
+    {
+        $safeId   = preg_replace('/[^a-zA-Z0-9]/', '', $fileId);
+        $metaPath = self::uploadDir($sessionId) . DIRECTORY_SEPARATOR . $safeId . '.json';
+        if (!file_exists($metaPath)) return null;
+        $meta = json_decode(file_get_contents($metaPath), true);
+        return is_array($meta) ? $meta : null;
+    }
+
     public static function getFilePath(string $sessionId, string $fileId): ?string
     {
         $safeId   = preg_replace('/[^a-zA-Z0-9]/', '', $fileId);
