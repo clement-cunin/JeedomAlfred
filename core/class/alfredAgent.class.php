@@ -472,6 +472,12 @@ class alfredAgent
                  . "\n- Current user login: " . $this->userLogin
                  . "\n- Current user role: " . $role;
 
+        // Inject tool error reporting instructions
+        $prompt .= "\n\n## Tool error reporting"
+                 . "\nWhen a tool returns an error, always report the exact error message to the user verbatim,"
+                 . " formatted as: \"L'outil `<tool_name>` a retourné une erreur : `<exact_error_message>`\"."
+                 . " Do not paraphrase, interpret, or summarize tool errors — always quote them exactly.";
+
         $memories = alfredMemory::loadForUser($this->userLogin);
 
         // Inject memory block
