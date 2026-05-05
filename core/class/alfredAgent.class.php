@@ -145,6 +145,12 @@ class alfredAgent
             'filename'      => $filename,
         ];
         file_put_contents($dir . DIRECTORY_SEPARATOR . $fileId . '.json', json_encode($meta));
+
+        $eventsFile = $dir . DIRECTORY_SEPARATOR . '_events.json';
+        $pending    = file_exists($eventsFile) ? (json_decode(file_get_contents($eventsFile), true) ?: []) : [];
+        $pending[]  = ['file_id' => $fileId, 'filename' => $originalName, 'mime_type' => $mimeType, 'size' => strlen($content)];
+        file_put_contents($eventsFile, json_encode($pending), LOCK_EX);
+
         return $fileId;
     }
 
@@ -460,6 +466,7 @@ class alfredAgent
                     ? json_encode($result, JSON_UNESCAPED_UNICODE)
                     : (string)$result;
 
+                $this->flushPendingFileEvents($sessionId);
                 $this->emit('tool_result', ['name' => $tc['name'], 'result' => $result]);
 
                 $tDb = microtime(true);
@@ -590,6 +597,21 @@ class alfredAgent
             'mime_type' => $mimeType,
             'size'      => strlen($content),
         ];
+    }
+
+    /**
+     * Flush any file_added events queued by registerFile() (possibly from an external plugin process).
+     * Must be called from within the active agent turn so events reach the SSE stream.
+     */
+    private function flushPendingFileEvents(string $sessionId): void
+    {
+        $eventsFile = self::uploadDir($sessionId) . DIRECTORY_SEPARATOR . '_events.json';
+        if (!file_exists($eventsFile)) return;
+        $pending = json_decode(file_get_contents($eventsFile), true) ?: [];
+        unlink($eventsFile);
+        foreach ($pending as $ev) {
+            $this->emit('file_added', $ev);
+        }
     }
 
     /**
