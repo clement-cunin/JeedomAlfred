@@ -23,6 +23,7 @@
  * Synthetic tools (handled locally, never forwarded to MCP):
  *   alfred_schedule        — schedule a deferred re-invocation of the agent
  *   uploaded_file_read     — read a session-scoped uploaded file as base64
+ *   file_create            — register base64 content as a downloadable session file
  */
 class alfredAgent
 {
@@ -116,6 +117,67 @@ class alfredAgent
             if (is_file($f)) unlink($f);
         }
         rmdir($dir);
+    }
+
+    /**
+     * Register binary content as a session file. For use by external plugins.
+     * Returns the new file_id.
+     */
+    public static function registerFile(
+        string $sessionId,
+        string $content,
+        string $originalName,
+        string $mimeType
+    ): string {
+        $dir = self::uploadDir($sessionId);
+        if (!is_dir($dir) && !mkdir($dir, 0700, true)) {
+            throw new Exception("Cannot create upload directory for session {$sessionId}");
+        }
+        $fileId   = bin2hex(random_bytes(8));
+        $ext      = self::extensionForMime($mimeType);
+        $filename = $fileId . ($ext !== '' ? '.' . $ext : '');
+        file_put_contents($dir . DIRECTORY_SEPARATOR . $filename, $content);
+        $meta = [
+            'file_id'       => $fileId,
+            'original_name' => $originalName,
+            'mime_type'     => $mimeType,
+            'size'          => strlen($content),
+            'filename'      => $filename,
+        ];
+        file_put_contents($dir . DIRECTORY_SEPARATOR . $fileId . '.json', json_encode($meta));
+        return $fileId;
+    }
+
+    /**
+     * Register a file from an existing path. For use by external plugins.
+     * Returns the new file_id.
+     */
+    public static function registerFileFromPath(
+        string $sessionId,
+        string $sourcePath,
+        string $originalName,
+        string $mimeType
+    ): string {
+        $content = file_get_contents($sourcePath);
+        if ($content === false) {
+            throw new Exception("Cannot read source file: {$sourcePath}");
+        }
+        return self::registerFile($sessionId, $content, $originalName, $mimeType);
+    }
+
+    private static function extensionForMime(string $mimeType): string
+    {
+        $map = [
+            'application/pdf'  => 'pdf',
+            'image/jpeg'       => 'jpg',
+            'image/png'        => 'png',
+            'image/gif'        => 'gif',
+            'image/webp'       => 'webp',
+            'text/plain'       => 'txt',
+            'text/html'        => 'html',
+            'application/json' => 'json',
+        ];
+        return $map[$mimeType] ?? '';
     }
 
     // -------------------------------------------------------------------------
@@ -222,6 +284,36 @@ class alfredAgent
         ];
     }
 
+    private static function fileCreateTool(): array
+    {
+        return [
+            'name'        => 'file_create',
+            'description' => 'Save content as a downloadable file in the current session.'
+                           . ' Returns a file_id. The file will appear in the "Attached files" list'
+                           . ' from the next turn onward and can be downloaded by the user.'
+                           . ' Use this when you have produced or retrieved binary content'
+                           . ' (e.g. a PDF from Paperless) that the user should be able to download.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'content_base64' => [
+                        'type'        => 'string',
+                        'description' => 'Base64-encoded file content.',
+                    ],
+                    'filename' => [
+                        'type'        => 'string',
+                        'description' => 'Desired filename with extension (e.g. "invoice.pdf").',
+                    ],
+                    'mime_type' => [
+                        'type'        => 'string',
+                        'description' => 'MIME type (e.g. "application/pdf"). Guessed from filename extension if omitted.',
+                    ],
+                ],
+                'required' => ['content_base64', 'filename'],
+            ],
+        ];
+    }
+
     // -------------------------------------------------------------------------
     // Public entry point
     // -------------------------------------------------------------------------
@@ -291,6 +383,7 @@ class alfredAgent
             array_unshift($tools, $t);
         }
         array_unshift($tools, self::scheduleTool());
+        array_unshift($tools, self::fileCreateTool());
         if (!empty($uploadedFiles)) {
             array_unshift($tools, self::fileReadTool());
         }
@@ -347,6 +440,8 @@ class alfredAgent
                     $result = $this->handleScheduleTool($sessionId, $tc['input']);
                 } elseif ($tc['name'] === 'uploaded_file_read') {
                     $result = $this->handleFileReadTool($sessionId, $tc['input']);
+                } elseif ($tc['name'] === 'file_create') {
+                    $result = $this->handleFileCreateTool($sessionId, $tc['input']);
                 } elseif (strpos($tc['name'], 'alfred_memory_') === 0) {
                     $result = $this->handleMemoryTool($tc['name'], $tc['input']);
                 } else {
@@ -451,6 +546,49 @@ class alfredAgent
             'mime_type' => $meta['mime_type'],
             'size'      => $meta['size'],
             'data'      => base64_encode(file_get_contents($filePath)),
+        ];
+    }
+
+    /**
+     * Handle a call to the file_create synthetic tool.
+     */
+    private function handleFileCreateTool(string $sessionId, array $input): array
+    {
+        $b64      = trim((string)($input['content_base64'] ?? ''));
+        $filename = trim((string)($input['filename'] ?? ''));
+        if ($b64 === '' || $filename === '') {
+            return ['error' => 'content_base64 and filename are required'];
+        }
+        $content = base64_decode($b64, true);
+        if ($content === false) {
+            return ['error' => 'Invalid base64 content'];
+        }
+        $mimeType = trim((string)($input['mime_type'] ?? ''));
+        if ($mimeType === '') {
+            $ext      = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            $mimeMap  = [
+                'pdf'  => 'application/pdf',
+                'jpg'  => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png'  => 'image/png',
+                'gif'  => 'image/gif',
+                'webp' => 'image/webp',
+                'txt'  => 'text/plain',
+                'html' => 'text/html',
+                'json' => 'application/json',
+            ];
+            $mimeType = $mimeMap[$ext] ?? 'application/octet-stream';
+        }
+        try {
+            $fileId = self::registerFile($sessionId, $content, $filename, $mimeType);
+        } catch (Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        return [
+            'file_id'   => $fileId,
+            'filename'  => $filename,
+            'mime_type' => $mimeType,
+            'size'      => strlen($content),
         ];
     }
 
