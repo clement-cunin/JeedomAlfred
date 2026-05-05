@@ -576,6 +576,31 @@ if (isConnect()) {
         .alfred-attachment-badge:hover .alfred-attachment-remove { opacity: 1; }
         .alfred-attachment-remove:hover { color: #dc3545 !important; }
 
+        .alfred-file-menu {
+            position: fixed;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            z-index: 9999;
+            min-width: 160px;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+        .alfred-file-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            cursor: pointer;
+            color: #333;
+            transition: background 0.12s;
+            white-space: nowrap;
+        }
+        .alfred-file-menu-item:hover { background: #f0f4fa; color: #337ab7; }
+        .alfred-file-menu-item i { width: 14px; text-align: center; color: #337ab7; }
+        .alfred-file-menu-separator { height: 1px; background: #eee; margin: 4px 0; }
+
         #alfred-attach {
             width: 34px;
             height: 34px;
@@ -1385,32 +1410,59 @@ $(function () {
             + '&user_hash='  + encodeURIComponent(alfred_config.userHash);
     }
 
-    function shareOrDownload(f) {
-        var url = fileUrl(f.file_id);
-        if (typeof navigator.share === 'function') {
-            fetch(url)
-                .then(function (r) { return r.blob(); })
-                .then(function (blob) {
-                    var file = new File([blob], f.filename, { type: f.mime_type });
-                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        return navigator.share({ files: [file], title: f.filename });
-                    }
-                    throw new Error('files not supported');
-                })
-                .catch(function () { openInline(url, f.filename); });
-        } else {
-            openInline(url, f.filename);
-        }
-    }
+    function showFileMenu(f, badgeEl) {
+        $('#alfred-file-menu').remove();
 
-    function openInline(url, filename) {
-        var a = document.createElement('a');
-        a.href     = url;
-        a.target   = '_blank';
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { document.body.removeChild(a); }, 100);
+        var url  = fileUrl(f.file_id);
+        var $menu = $('<div id="alfred-file-menu" class="alfred-file-menu">');
+
+        $('<div class="alfred-file-menu-item">')
+            .append($('<i class="fas fa-external-link-alt">'))
+            .append($('<span>').text('Ouvrir'))
+            .on('click', function () { $menu.remove(); window.open(url, '_blank'); })
+            .appendTo($menu);
+
+        if (typeof navigator.share === 'function') {
+            $('<div class="alfred-file-menu-item">')
+                .append($('<i class="fas fa-share-alt">'))
+                .append($('<span>').text('Partager'))
+                .on('click', function () {
+                    $menu.remove();
+                    fetch(url)
+                        .then(function (r) { return r.blob(); })
+                        .then(function (blob) {
+                            var file = new File([blob], f.filename, { type: f.mime_type });
+                            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                                return navigator.share({ files: [file], title: f.filename });
+                            }
+                        })
+                        .catch(function () {});
+                })
+                .appendTo($menu);
+        }
+
+        $('<div class="alfred-file-menu-separator">').appendTo($menu);
+
+        $('<div class="alfred-file-menu-item">')
+            .append($('<i class="fas fa-download">'))
+            .append($('<span>').text('Télécharger'))
+            .on('click', function () {
+                $menu.remove();
+                var a = document.createElement('a');
+                a.href = url; a.download = f.filename;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function () { document.body.removeChild(a); }, 100);
+            })
+            .appendTo($menu);
+
+        var rect = badgeEl.getBoundingClientRect();
+        $menu.css({ left: rect.left, top: rect.top - 4, transform: 'translateY(-100%)' });
+        $('body').append($menu);
+
+        setTimeout(function () {
+            $(document).one('click.fileMenu', function () { $('#alfred-file-menu').remove(); });
+        }, 0);
     }
 
     function renderAttachmentBar() {
@@ -1430,7 +1482,7 @@ $(function () {
                             renderAttachmentBar();
                         })
                 )
-                .on('click', function () { shareOrDownload(f); });
+                .on('click', function (e) { e.stopPropagation(); showFileMenu(f, this); });
             $bar.append($badge);
         });
     }
@@ -1516,6 +1568,14 @@ $(function () {
 
         source.addEventListener('tool_result', function (e) {
             var d = JSON.parse(e.data); updateToolCall(d.name, 'done', d.result);
+        });
+
+        source.addEventListener('file_added', function (e) {
+            var f = JSON.parse(e.data);
+            if (!pendingFiles.some(function (pf) { return pf.file_id === f.file_id; })) {
+                pendingFiles.push(f);
+                renderAttachmentBar();
+            }
         });
 
         source.addEventListener('debug', function (e) {
