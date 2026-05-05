@@ -351,7 +351,7 @@ class alfredAgent
                     $result = $this->handleMemoryTool($tc['name'], $tc['input']);
                 } else {
                     try {
-                        $result = $this->registry->callTool($tc['name'], $tc['input']);
+                        $result = $this->registry->callTool($tc['name'], $tc['input'], $sessionId);
                     } catch (Exception $e) {
                         $result = ['error' => $e->getMessage()];
                     }

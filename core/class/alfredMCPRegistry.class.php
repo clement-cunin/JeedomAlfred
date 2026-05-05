@@ -101,14 +101,14 @@ class alfredMCPRegistry
      * Route a tool call to the correct server.
      * The $name is the exposed (possibly prefixed) name returned by listTools().
      */
-    public function callTool(string $name, array $arguments)
+    public function callTool(string $name, array $arguments, ?string $sessionId = null)
     {
         if (!isset($this->toolMap[$name])) {
             throw new Exception("No MCP server registered for tool '{$name}'.");
         }
 
         $entry = $this->toolMap[$name];
-        return $entry['mcp']->callTool($entry['original_name'], $arguments);
+        return $entry['mcp']->callTool($entry['original_name'], $arguments, $sessionId);
     }
 
     /**

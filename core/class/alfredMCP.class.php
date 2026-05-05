@@ -61,12 +61,12 @@ class alfredMCP
     /**
      * Call a single MCP tool and return its result as a PHP value.
      */
-    public function callTool(string $name, array $arguments)
+    public function callTool(string $name, array $arguments, ?string $sessionId = null)
     {
         $response = $this->send('tools/call', [
             'name'      => $name,
             'arguments' => $arguments,
-        ]);
+        ], $sessionId);
 
         // MCP tool result: {content: [{type:'text', text:'...'}], isError: bool}
         if (!empty($response['isError'])) {
@@ -85,7 +85,7 @@ class alfredMCP
     // JSON-RPC transport
     // -------------------------------------------------------------------------
 
-    private function send(string $method, $params): array
+    private function send(string $method, $params, ?string $sessionId = null): array
     {
         if ($this->url === '') {
             throw new Exception('MCP server URL is not configured.');
@@ -104,6 +104,9 @@ class alfredMCP
         ];
         if ($this->authHeader !== '' && $this->authValue !== '') {
             $headers[] = $this->authHeader . ': ' . $this->authValue;
+        }
+        if ($sessionId !== null && $sessionId !== '') {
+            $headers[] = 'X-Alfred-Session-Id: ' . $sessionId;
         }
 
         $ch = curl_init($this->url);
