@@ -86,7 +86,7 @@ abstract class alfredLLMAdapter
         curl_close($ch);
 
         if ($raw === false) {
-            throw new Exception("HTTP request failed: {$err}");
+            throw new Exception("HTTP request failed [{$url}]: {$err}");
         }
         $data = json_decode($raw, true);
         if (!is_array($data)) {

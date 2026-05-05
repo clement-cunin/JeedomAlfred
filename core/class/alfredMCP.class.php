@@ -125,7 +125,7 @@ class alfredMCP
         curl_close($ch);
 
         if ($raw === false) {
-            throw new Exception("MCP HTTP request failed: {$err}");
+            throw new Exception("MCP HTTP request failed [{$this->url}]: {$err}");
         }
 
         // Strip UTF-8 BOM if present (some PHP setups emit it)
