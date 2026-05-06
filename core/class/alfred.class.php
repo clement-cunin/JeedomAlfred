@@ -19,7 +19,7 @@ class alfred extends eqLogic {
             'mistral_model'   => 'mistral-large-latest',
             'gemini_model'    => 'gemini-1.5-pro',
             'ollama_base_url' => 'http://localhost:11434',
-            'ollama_model'    => 'mistral',
+            'ollama_model'    => 'mistral:latest',
             'max_iterations'  => '10',
             'system_prompt'   => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
         ];

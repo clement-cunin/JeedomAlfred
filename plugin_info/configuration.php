@@ -672,13 +672,13 @@ var _alfredModelsLoaded = {};
 function alfredLoadModels($section) {
     var provider = $section.data('provider');
     if (_alfredModelsLoaded[provider]) return;
-    _alfredModelsLoaded[provider] = true;
 
     var $select  = $section.find('.alfred-model-select');
     var apiKey   = $section.find('.alfred-api-key').val().trim();
     var savedVal = $select.val();
 
     if (!apiKey) return;
+    _alfredModelsLoaded[provider] = true;
 
     $select.empty().append($('<option>').val('').text(_alfredI18n.loading).prop('disabled', true).prop('selected', true));
     $select.prop('disabled', true);
@@ -716,6 +716,13 @@ function alfredLoadModels($section) {
 
 $(document).on('mousedown', '.alfred-model-select', function () {
     alfredLoadModels($(this).closest('.alfred-provider-section'));
+});
+
+// For Ollama, also load models when the URL field loses focus
+$(document).on('blur', '.alfred-provider-section[data-provider="ollama"] .alfred-api-key', function () {
+    var $section = $(this).closest('.alfred-provider-section');
+    _alfredModelsLoaded['ollama'] = false; // reset so we reload with the new URL
+    alfredLoadModels($section);
 });
 
 // ---- Memory management ----
