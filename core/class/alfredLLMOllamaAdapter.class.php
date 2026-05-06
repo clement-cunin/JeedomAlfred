@@ -231,10 +231,36 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
                 'function' => [
                     'name'        => $t['name'],
                     'description' => $t['description'] ?? '',
-                    'parameters'  => $schema,
+                    'parameters'  => $this->normalizeSchemaForJson($schema),
                 ],
             ];
         }, $tools);
+    }
+
+    // json_decode($json, true) turns {} into [] in PHP; re-encoding gives [] instead of {}.
+    // This recursively converts empty/assoc arrays to stdClass so they encode as JSON objects.
+    private static $JSON_ARRAY_KEYS = ['required', 'enum', 'anyOf', 'oneOf', 'allOf', 'not'];
+
+    private function normalizeSchemaForJson($value, string $parentKey = '')
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        if (in_array($parentKey, self::$JSON_ARRAY_KEYS, true)) {
+            return array_map(function ($v) { return $this->normalizeSchemaForJson($v); }, $value);
+        }
+        if (empty($value)) {
+            return new stdClass();
+        }
+        $keys = array_keys($value);
+        if ($keys === range(0, count($keys) - 1)) {
+            return array_map(function ($v) { return $this->normalizeSchemaForJson($v); }, $value);
+        }
+        $obj = new stdClass();
+        foreach ($value as $k => $v) {
+            $obj->$k = $this->normalizeSchemaForJson($v, $k);
+        }
+        return $obj;
     }
 
     private function normalize(array $data): array
