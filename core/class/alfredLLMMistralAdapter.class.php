@@ -5,6 +5,8 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
     private const API_URL    = 'https://api.mistral.ai/v1/chat/completions';
     private const MODELS_URL = 'https://api.mistral.ai/v1/models';
 
+    public function getProvider(): string { return 'mistral'; }
+
     public function chat(array $messages, array $tools, string $systemPrompt): array
     {
         $mistralMessages = [];
