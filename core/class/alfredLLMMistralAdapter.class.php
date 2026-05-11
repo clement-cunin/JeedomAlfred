@@ -52,6 +52,7 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
         $text        = '';
         $tool_acc    = []; // index => ['id', 'name', 'arguments']
         $stop_reason = 'end_turn';
+        $usage       = [];
         $buffer      = '';
         $error_body  = '';
 
@@ -62,7 +63,7 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             CURLOPT_HTTPHEADER     => $this->headers(),
             CURLOPT_TIMEOUT        => 120,
             CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_WRITEFUNCTION  => function ($ch, $raw) use (&$buffer, &$text, &$tool_acc, &$stop_reason, &$error_body, $onDelta) {
+            CURLOPT_WRITEFUNCTION  => function ($ch, $raw) use (&$buffer, &$text, &$tool_acc, &$stop_reason, &$usage, &$error_body, $onDelta) {
                 $buffer .= $raw;
                 while (($pos = strpos($buffer, "\n")) !== false) {
                     $line   = trim(substr($buffer, 0, $pos));
@@ -80,6 +81,10 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
                     if (isset($d['error'])) {
                         $error_body = $d['error']['message'] ?? json_encode($d['error']);
                         continue;
+                    }
+
+                    if (isset($d['usage'])) {
+                        $usage = $d['usage'];
                     }
 
                     $choice = $d['choices'][0] ?? [];
@@ -148,6 +153,10 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             'text'        => trim($text),
             'tool_calls'  => $tool_calls,
             'stop_reason' => $stop_reason,
+            'usage'       => [
+                'input_tokens'  => (int)($usage['prompt_tokens']     ?? 0),
+                'output_tokens' => (int)($usage['completion_tokens'] ?? 0),
+            ],
         ];
     }
 
