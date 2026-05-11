@@ -186,6 +186,26 @@ try {
         ajax::success(['id' => $id, 'scope' => $scope, 'label' => $label, 'content' => $content, 'created_at' => $now, 'updated_at' => $now]);
     }
 
+    if ($action === 'previewCategories') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfred.class.php';
+        require_once __DIR__ . '/../class/alfredMCP.class.php';
+        require_once __DIR__ . '/../class/alfredMCPRegistry.class.php';
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+
+        $registry = alfredMCPRegistry::fromConfig();
+        $tools    = $registry->listTools();
+
+        // Categorize each tool
+        $byCategory = [];
+        foreach ($tools as $tool) {
+            $cat = alfredToolRouter::deriveCategory($tool['name']);
+            $byCategory[$cat][] = $tool['name'];
+        }
+        ksort($byCategory);
+        ajax::success($byCategory);
+    }
+
     if ($action === 'listToolCategories') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
         require_once __DIR__ . '/../class/alfredToolRouter.class.php';

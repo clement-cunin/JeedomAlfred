@@ -8,14 +8,15 @@ class alfredToolRouter
         'JEEDOM_CORE'   => ['device', 'light', 'lumiere', 'lumière', 'switch', 'temperature', 'température',
                             'sensor', 'room', 'pièce', 'piece', 'scenario', 'turn on', 'turn off',
                             'allume', 'éteins', 'status', 'state', 'home', 'equipment', 'command', 'jeedom'],
-        'DOCUMENTS'     => ['document', 'paperless', 'pdf', 'scan', 'invoice', 'facture', 'lettre',
-                            'letter', 'correspondence', 'courrier', 'tag', 'archiv'],
+        'DOCUMENTS'     => ['document', 'paperless', 'pdf', 'invoice', 'facture', 'lettre',
+                            'letter', 'correspondence', 'courrier', 'tag', 'archiv', 'numérisation', 'numériser'],
         'MEDIA'         => ['media', 'video', 'music', 'musique', 'download', 'télécharge', 'telecharge',
                             'film', 'série', 'serie', 'movie', 'torrent', 'radarr', 'sonarr'],
         'AUTOCLAUDE'    => ['ticket', 'issue', 'task', 'tâche', 'tache', 'board', 'project', 'development', 'bug'],
         'ZWAVE'         => ['zwave', 'z-wave', 'node', 'inclusion', 'exclusion', 'pairing', 'appairage'],
         'NOTIFICATIONS' => ['notification', 'push', 'mobile', 'alert', 'geofence', 'localisation', 'location'],
-        'ADMIN'         => ['plugin', 'update', 'mise à jour', 'log', 'message', 'system', 'install'],
+        'ADMIN'         => ['plugin', 'update', 'mise à jour', 'log', 'message', 'system', 'install',
+                            'scan', 'scanner'],
     ];
 
     // Tool name prefix/pattern → category mapping (first match wins)
