@@ -8,27 +8,27 @@ class alfredToolRouter
         'JEEDOM_CORE'   => ['device', 'light', 'lumiere', 'lumière', 'switch', 'temperature', 'température',
                             'sensor', 'room', 'pièce', 'piece', 'scenario', 'turn on', 'turn off',
                             'allume', 'éteins', 'status', 'state', 'home', 'equipment', 'command', 'jeedom'],
-        'DOCUMENTS'     => ['document', 'paperless', 'pdf', 'invoice', 'facture', 'lettre',
-                            'letter', 'correspondence', 'courrier', 'tag', 'archiv', 'numérisation', 'numériser'],
+        'DOCUMENTS'     => ['document', 'paperless', 'pdf', 'scan', 'scanner', 'invoice', 'facture',
+                            'lettre', 'letter', 'correspondence', 'courrier', 'tag', 'archiv',
+                            'numérisation', 'numériser'],
         'MEDIA'         => ['media', 'video', 'music', 'musique', 'download', 'télécharge', 'telecharge',
                             'film', 'série', 'serie', 'movie', 'torrent', 'radarr', 'sonarr'],
         'AUTOCLAUDE'    => ['ticket', 'issue', 'task', 'tâche', 'tache', 'board', 'project', 'development', 'bug'],
         'ZWAVE'         => ['zwave', 'z-wave', 'node', 'inclusion', 'exclusion', 'pairing', 'appairage'],
         'NOTIFICATIONS' => ['notification', 'push', 'mobile', 'alert', 'geofence', 'localisation', 'location'],
-        'ADMIN'         => ['plugin', 'update', 'mise à jour', 'log', 'message', 'system', 'install',
-                            'scan', 'scanner'],
+        'ADMIN'         => ['plugin', 'update', 'mise à jour', 'log', 'message', 'system', 'install'],
     ];
 
     // Tool name prefix/pattern → category mapping (first match wins)
     private static $CATEGORY_PATTERNS = [
         'ALFRED'        => '/^(alfred_|file_create$|uploaded_file_read$)/',
         'JEEDOM_CORE'   => '/^(device|devices|room|rooms|command|scenario|scenarios|acl_)/',
-        'DOCUMENTS'     => '/^ext_jaganin_paperless_/',
+        'DOCUMENTS'     => '/^(ext_jaganin_paperless_|ext_jaganin_scanner_)/',
         'MEDIA'         => '/^ext_jaganin_media_/',
         'AUTOCLAUDE'    => '/^ext_jaganin_autoclaude_/',
         'ZWAVE'         => '/^ext_openzwave_/',
         'NOTIFICATIONS' => '/^ext_JeedomConnect_/',
-        'ADMIN'         => '/^(plugin_|update_|message_|log_|ext_jaganin_plugin_|ext_MerosSync_|ext_jaganin_scanner_|ext_weather_)/',
+        'ADMIN'         => '/^(plugin_|update_|message_|log_|ext_jaganin_plugin_|ext_MerosSync_|ext_weather_)/',
     ];
 
     /**

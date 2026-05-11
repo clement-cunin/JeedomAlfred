@@ -202,9 +202,6 @@ $_routerStrategy = (string)config::byKey('router_strategy', 'alfred') ?: 'A';
                     <button type="button" class="btn btn-success btn-sm" id="bt_alfred_save_categories" style="margin-left:8px" disabled>
                         <i class="fas fa-save"></i> {{Save keywords}}
                     </button>
-                    <button type="button" class="btn btn-default btn-sm" id="bt_alfred_preview_categories" style="margin-left:8px" disabled>
-                        <i class="fas fa-eye"></i> {{Preview tools}}
-                    </button>
                     <button type="button" class="btn btn-default btn-sm" id="bt_alfred_backtest" style="margin-left:8px" disabled>
                         <i class="fas fa-vial"></i> {{Backtest}}
                     </button>
@@ -217,18 +214,13 @@ $_routerStrategy = (string)config::byKey('router_strategy', 'alfred') ?: 'A';
                     <table class="table table-bordered table-condensed" id="alfred_categories_table" style="display:none">
                         <thead>
                             <tr>
-                                <th style="width:140px" id="alfred_th_category">{{Category}}</th>
-                                <th id="alfred_th_keywords">{{Keywords (comma-separated)}}</th>
+                                <th style="width:120px">{{Category}}</th>
+                                <th style="width:45%">{{Keywords (comma-separated)}}</th>
+                                <th>{{Tools}}</th>
                             </tr>
                         </thead>
                         <tbody id="alfred_categories_tbody"></tbody>
                     </table>
-                </div>
-            </div>
-
-            <div id="alfred-preview-results" class="form-group" style="display:none">
-                <div class="col-sm-offset-1 col-sm-10">
-                    <div id="alfred-preview-content"></div>
                 </div>
             </div>
 
@@ -1025,7 +1017,7 @@ $('#alfred_router_strategy').on('change', function () {
     alfredRouterUpdateVisibility($(this).val());
 });
 
-function alfredRenderCategories(categories) {
+function alfredRenderCategories(categories, byCategory) {
     _alfredCategories = categories || [];
     var $tbody = $('#alfred_categories_tbody');
     var $table = $('#alfred_categories_table');
@@ -1045,10 +1037,17 @@ function alfredRenderCategories(categories) {
                 _alfredCategories[i].keywords = $(this).val();
             });
         $tr.append($('<td>').append($input));
+        // Tools column
+        var tools = (byCategory && byCategory[row.category]) || [];
+        var toolsHtml = tools.length === 0
+            ? '<em style="color:#aaa">—</em>'
+            : tools.map(function (t) {
+                return '<code style="font-size:11px;display:inline-block;margin:1px 2px">' + $('<span>').text(t).html() + '</code>';
+              }).join(' ');
+        $tr.append($('<td style="font-size:12px">').html(toolsHtml));
         $tbody.append($tr);
     });
     $('#bt_alfred_save_categories').prop('disabled', false);
-    $('#bt_alfred_preview_categories').prop('disabled', false);
     $('#bt_alfred_backtest').prop('disabled', false);
 }
 
@@ -1057,25 +1056,35 @@ $('#bt_alfred_load_categories').on('click', function () {
     var $result = $('#alfred_categories_result');
     $btn.prop('disabled', true).find('i').addClass('fa-spin');
     $result.html('<i class="fas fa-spinner fa-spin"></i>');
-    $.ajax({
+
+    // Fire both requests in parallel
+    var reqCategories = $.ajax({
         type: 'POST',
         url: 'plugins/alfred/core/ajax/alfred.ajax.php',
         data: { action: 'listToolCategories' },
-        dataType: 'json',
-        success: function (resp) {
-            if (resp.state === 'ok') {
-                alfredRenderCategories(resp.result);
-                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> ' + resp.result.length + ' {{categories}}</span>');
-            } else {
-                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (resp.result || resp.state) + '</span>');
-            }
-        },
-        error: function (jqXHR) {
-            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
-        },
-        complete: function () {
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+        dataType: 'json'
+    });
+    var reqPreview = $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: { action: 'previewCategories' },
+        dataType: 'json'
+    });
+
+    $.when(reqCategories, reqPreview).always(function (catResp, previewResp) {
+        var categories  = (catResp[0]     && catResp[0].state     === 'ok') ? catResp[0].result     : null;
+        var byCategory  = (previewResp[0] && previewResp[0].state === 'ok') ? previewResp[0].result : null;
+
+        if (!categories) {
+            var err = (catResp[0] && catResp[0].result) || 'Error loading categories';
+            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + err + '</span>');
+        } else {
+            alfredRenderCategories(categories, byCategory);
+            var toolCount = byCategory ? Object.values(byCategory).reduce(function (s, t) { return s + t.length; }, 0) : '?';
+            $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> '
+                + categories.length + ' {{categories}}, ' + toolCount + ' {{tools}}</span>');
         }
+        $btn.prop('disabled', false).find('i').removeClass('fa-spin');
     });
 });
 
@@ -1104,53 +1113,6 @@ $('#bt_alfred_save_categories').on('click', function () {
             $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
         },
         complete: function () { $btn.prop('disabled', false); }
-    });
-});
-
-$('#bt_alfred_preview_categories').on('click', function () {
-    var $btn     = $(this);
-    var $panel   = $('#alfred-preview-results');
-    var $content = $('#alfred-preview-content');
-    $btn.prop('disabled', true).find('i').addClass('fa-spin');
-    $panel.hide();
-    $.ajax({
-        type: 'POST',
-        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-        data: { action: 'previewCategories' },
-        dataType: 'json',
-        success: function (resp) {
-            if (resp.state !== 'ok') {
-                $content.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (resp.result || resp.state) + '</span>');
-                $panel.show();
-                return;
-            }
-            var byCategory = resp.result;
-            var total = 0;
-            var html = '<div style="display:flex;flex-wrap:wrap;gap:10px">';
-            $.each(byCategory, function (cat, tools) {
-                total += tools.length;
-                var badgeClass = cat === 'OTHER' ? 'label-warning' : 'label-info';
-                html += '<div style="flex:1;min-width:200px;border:1px solid #ddd;border-radius:4px;padding:8px 10px;background:#fafafa">'
-                    + '<div style="margin-bottom:6px"><span class="label ' + badgeClass + '">' + $('<span>').text(cat).html() + '</span>'
-                    + ' <small style="color:#888">(' + tools.length + ')</small></div>'
-                    + '<ul style="margin:0;padding-left:16px;font-size:12px;font-family:monospace">';
-                tools.forEach(function (name) {
-                    html += '<li>' + $('<span>').text(name).html() + '</li>';
-                });
-                html += '</ul></div>';
-            });
-            html += '</div>';
-            html = '<p style="margin-bottom:8px"><strong>{{Tools from MCP servers by category}}</strong> — ' + total + ' {{tools total}}</p>' + html;
-            $content.html(html);
-            $panel.show();
-        },
-        error: function (jqXHR) {
-            $content.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
-            $panel.show();
-        },
-        complete: function () {
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-        }
     });
 });
 
