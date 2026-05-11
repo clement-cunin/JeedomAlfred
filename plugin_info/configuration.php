@@ -1030,7 +1030,7 @@ function alfredRenderCategories(categories, byCategory) {
     _alfredCategories.forEach(function (row, i) {
         var $tr = $('<tr>');
         $tr.append($('<td>').html('<code>' + $('<span>').text(row.category).html() + '</code>'));
-        var $input = $('<input type="text" class="form-control input-sm alfred-cat-keywords">')
+        var $input = $('<textarea class="form-control input-sm alfred-cat-keywords" rows="3" style="font-size:12px;resize:vertical">')
             .val(row.keywords)
             .data('category', row.category)
             .on('input', function () {
