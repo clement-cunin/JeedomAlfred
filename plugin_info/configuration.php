@@ -1136,6 +1136,8 @@ $('#bt_alfred_backtest').on('click', function () {
             var r = resp.result;
             var recallPct = Math.round(r.recall * 10000) / 100;
             var color = r.recall >= 0.95 ? '#3c763d' : (r.recall >= 0.8 ? '#8a6d3b' : '#a94442');
+            var fallbackPct = Math.round(r.fallback_rate * 10000) / 100;
+            var fallbackColor = r.fallback_rate <= 0.1 ? '#3c763d' : (r.fallback_rate <= 0.3 ? '#8a6d3b' : '#a94442');
             var html = '<div class="alert alert-info" style="margin:0 0 10px">'
                 + '<strong>{{Backtest results}}</strong><br>'
                 + _alfredI18n.backtest_sessions.replace('%d', r.sessions_tested) + ' &nbsp;|&nbsp; '
@@ -1143,6 +1145,7 @@ $('#bt_alfred_backtest').on('click', function () {
                 + _alfredI18n.backtest_tools.replace('%d', r.tools_called) + '<br>'
                 + '<strong style="color:' + color + '">'
                 + _alfredI18n.backtest_recall.replace('%s', recallPct) + '</strong>'
+                + ' &nbsp;&nbsp; <strong style="color:' + fallbackColor + '">{{Fallback: }}' + fallbackPct + '% (' + r.fallback_turns + '/' + r.turns_tested + ' {{turns}})</strong>'
                 + '</div>';
             if (r.misses.length === 0) {
                 html += '<p style="color:#3c763d"><i class="fas fa-check-circle"></i> ' + _alfredI18n.backtest_no_misses + '</p>';

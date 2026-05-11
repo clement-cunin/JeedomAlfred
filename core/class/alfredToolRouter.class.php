@@ -16,6 +16,8 @@ class alfredToolRouter
         'AUTOCLAUDE'    => ['ticket', 'issue', 'task', 'tâche', 'tache', 'board', 'project', 'development', 'bug'],
         'ZWAVE'         => ['zwave', 'z-wave', 'node', 'inclusion', 'exclusion', 'pairing', 'appairage'],
         'NOTIFICATIONS' => ['notification', 'push', 'mobile', 'alert', 'geofence', 'localisation', 'location'],
+        'WEATHER'       => ['météo', 'meteo', 'weather', 'temps', 'forecast', 'prévision', 'prevision',
+                            'pluie', 'soleil', 'température extérieure', 'vent', 'humidité'],
         'ADMIN'         => ['plugin', 'update', 'mise à jour', 'log', 'message', 'system', 'install'],
     ];
 
@@ -28,7 +30,8 @@ class alfredToolRouter
         'AUTOCLAUDE'    => '/^ext_jaganin_autoclaude_/',
         'ZWAVE'         => '/^ext_openzwave_/',
         'NOTIFICATIONS' => '/^ext_JeedomConnect_/',
-        'ADMIN'         => '/^(plugin_|update_|message_|log_|ext_jaganin_plugin_|ext_MerosSync_|ext_weather_)/',
+        'WEATHER'       => '/^ext_weather_/',
+        'ADMIN'         => '/^(plugin_|update_|message_|log_|ext_jaganin_plugin_|ext_MerosSync_)/',
     ];
 
     /**
@@ -226,6 +229,7 @@ class alfredToolRouter
         $totalUsed      = 0;
         $hitCount       = 0;
         $totalTurns     = 0;
+        $fallbackTurns  = 0;
         $sessionsTested = 0;
         $misses         = [];
 
@@ -277,6 +281,7 @@ class alfredToolRouter
                 }
                 $nonAlfred = array_values(array_filter($matched, function ($c) { return $c !== 'ALFRED'; }));
                 $fallback  = (count($nonAlfred) === 0 || count($nonAlfred) >= $totalNonAlfredCats);
+                if ($fallback) $fallbackTurns++;
 
                 foreach ($turn['tools'] as $toolName) {
                     $cat = self::deriveCategory($toolName);
@@ -300,6 +305,8 @@ class alfredToolRouter
         return [
             'sessions_tested' => $sessionsTested,
             'turns_tested'    => $totalTurns,
+            'fallback_turns'  => $fallbackTurns,
+            'fallback_rate'   => ($totalTurns > 0) ? round($fallbackTurns / $totalTurns, 4) : 0.0,
             'tools_called'    => $totalUsed,
             'recall'          => ($totalUsed > 0) ? round($hitCount / $totalUsed, 4) : 1.0,
             'misses'          => $misses,

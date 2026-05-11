@@ -209,6 +209,8 @@ try {
     if ($action === 'listToolCategories') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
         require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+        // Seed any new default categories not yet in DB (safe for existing installs)
+        alfredToolRouter::seedDefaultCategories();
         $categories = alfredToolRouter::loadCategories();
         $result = [];
         foreach ($categories as $cat => $keywords) {
