@@ -186,6 +186,33 @@ try {
         ajax::success(['id' => $id, 'scope' => $scope, 'label' => $label, 'content' => $content, 'created_at' => $now, 'updated_at' => $now]);
     }
 
+    if ($action === 'listToolCategories') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+        $categories = alfredToolRouter::loadCategories();
+        $result = [];
+        foreach ($categories as $cat => $keywords) {
+            $result[] = ['category' => $cat, 'keywords' => implode(', ', $keywords)];
+        }
+        ajax::success($result);
+    }
+
+    if ($action === 'saveToolCategories') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        $raw = init('categories', '[]');
+        $data = json_decode($raw, true);
+        if (!is_array($data)) throw new Exception('Invalid categories payload');
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+        alfredToolRouter::saveCategories($data);
+        ajax::success();
+    }
+
+    if ($action === 'backtestRouter') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+        ajax::success(alfredToolRouter::backtest());
+    }
+
     throw new Exception(__('No method found for: ', __FILE__) . $action);
 
 } catch (Exception $e) {

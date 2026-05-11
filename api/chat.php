@@ -61,6 +61,7 @@ require_once __DIR__ . '/../core/class/alfredMCPRegistry.class.php';
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
 require_once __DIR__ . '/../core/class/alfredScheduler.class.php';
 require_once __DIR__ . '/../core/class/alfredMemory.class.php';
+require_once __DIR__ . '/../core/class/alfredToolRouter.class.php';
 require_once __DIR__ . '/../core/class/alfredAgent.class.php';
 
 // ---- Run agent ----
