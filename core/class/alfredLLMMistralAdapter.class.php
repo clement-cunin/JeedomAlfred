@@ -23,9 +23,13 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             $body['tools'] = $this->toMistralTools($tools);
         }
 
-        $data = $this->httpPost(self::API_URL, $this->headers(), $body, 120);
-
-        return $this->normalize($data);
+        $data   = $this->httpPost(self::API_URL, $this->headers(), $body, 120);
+        $result = $this->normalize($data);
+        $quota  = $this->parseQuotaHeaders($this->lastHeaders);
+        if (!empty($quota)) {
+            $result['quota'] = $quota;
+        }
+        return $result;
     }
 
     public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
@@ -47,11 +51,12 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             $body['tools'] = $this->toMistralTools($tools);
         }
 
-        $text        = '';
-        $tool_acc    = []; // index => ['id', 'name', 'arguments']
-        $stop_reason = 'end_turn';
-        $buffer      = '';
-        $error_body  = '';
+        $text            = '';
+        $tool_acc        = []; // index => ['id', 'name', 'arguments']
+        $stop_reason     = 'end_turn';
+        $buffer          = '';
+        $error_body      = '';
+        $responseHeaders = [];
 
         $ch = curl_init(self::API_URL);
         curl_setopt_array($ch, [
@@ -60,6 +65,16 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             CURLOPT_HTTPHEADER     => $this->headers(),
             CURLOPT_TIMEOUT        => 120,
             CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_HEADERFUNCTION => function ($ch, $line) use (&$responseHeaders) {
+                $trimmed = trim($line);
+                $colon   = strpos($trimmed, ':');
+                if ($colon !== false) {
+                    $name  = strtolower(trim(substr($trimmed, 0, $colon)));
+                    $value = trim(substr($trimmed, $colon + 1));
+                    $responseHeaders[$name] = $value;
+                }
+                return strlen($line);
+            },
             CURLOPT_WRITEFUNCTION  => function ($ch, $raw) use (&$buffer, &$text, &$tool_acc, &$stop_reason, &$error_body, $onDelta) {
                 $buffer .= $raw;
                 while (($pos = strpos($buffer, "\n")) !== false) {
@@ -142,11 +157,17 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
             ];
         }
 
-        return [
+        $result = [
             'text'        => trim($text),
             'tool_calls'  => $tool_calls,
             'stop_reason' => $stop_reason,
         ];
+
+        $quota = $this->parseQuotaHeaders($responseHeaders);
+        if (!empty($quota)) {
+            $result['quota'] = $quota;
+        }
+        return $result;
     }
 
     public function testConnection(): array
@@ -201,6 +222,54 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
         usort($active,     function ($a, $b) { return strcmp($b['id'], $a['id']); });
         usort($deprecated, function ($a, $b) { return strcmp($b['id'], $a['id']); });
         return array_merge($active, $deprecated);
+    }
+
+    // -------------------------------------------------------------------------
+
+    public function parseQuotaHeaders(array $headers): array
+    {
+        $limitReq = (float)($headers['x-ratelimit-limit-requests']     ?? 0);
+        $remReq   = (float)($headers['x-ratelimit-remaining-requests'] ?? 0);
+        $limitTok = (float)($headers['x-ratelimit-limit-tokens']       ?? 0);
+        $remTok   = (float)($headers['x-ratelimit-remaining-tokens']   ?? 0);
+        $resetReq = (string)($headers['x-ratelimit-reset-requests']    ?? '');
+        $resetTok = (string)($headers['x-ratelimit-reset-tokens']      ?? '');
+
+        $pctReq = ($limitReq > 0) ? ($limitReq - $remReq) / $limitReq * 100 : null;
+        $pctTok = ($limitTok > 0) ? ($limitTok - $remTok) / $limitTok * 100 : null;
+
+        if ($pctReq === null && $pctTok === null) {
+            return [];
+        }
+
+        // Most unfavorable usage percentage
+        $usedPct = max($pctReq ?? 0.0, $pctTok ?? 0.0);
+
+        // Most unfavorable (largest) reset time
+        $resetReqS = $this->parseResetDuration($resetReq);
+        $resetTokS = $this->parseResetDuration($resetTok);
+        if ($resetReqS !== null && $resetTokS !== null) {
+            $resetInS = max($resetReqS, $resetTokS);
+        } else {
+            $resetInS = $resetReqS ?? $resetTokS;
+        }
+
+        return ['used_pct' => round($usedPct, 1), 'reset_in_s' => $resetInS];
+    }
+
+    /**
+     * Parse a Mistral reset duration string such as "1s", "500ms", "1m30s" into seconds.
+     * Returns null for empty/unparseable strings.
+     */
+    private function parseResetDuration(string $s): ?int
+    {
+        if ($s === '') return null;
+        $total = 0;
+        if (preg_match('/(\d+)h/', $s, $m))      $total += (int)$m[1] * 3600;
+        if (preg_match('/(\d+)m(?!s)/', $s, $m)) $total += (int)$m[1] * 60;
+        if (preg_match('/(\d+)s/', $s, $m))       $total += (int)$m[1];
+        if (preg_match('/(\d+)ms/', $s, $m))      $total += (int)ceil((int)$m[1] / 1000);
+        return $total > 0 ? $total : 1;
     }
 
     // -------------------------------------------------------------------------

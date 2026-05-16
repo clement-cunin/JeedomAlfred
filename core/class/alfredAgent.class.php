@@ -397,6 +397,7 @@ class alfredAgent
         // ReAct loop
         $finalText  = '';
         $iterations = 0;
+        $lastQuota  = [];
 
         while ($iterations < $this->maxIterations) {
             $iterations++;
@@ -406,6 +407,9 @@ class alfredAgent
             };
             $tLlm     = microtime(true);
             $response = $this->llm->chatStream($messages, $tools, $effectiveSystemPrompt, $onDelta);
+            if (!empty($response['quota'])) {
+                $lastQuota = $response['quota'];
+            }
             $timing['llm_calls'][] = [
                 'iteration'   => $iterations,
                 'duration_ms' => (int)round((microtime(true) - $tLlm) * 1000),
@@ -488,14 +492,18 @@ class alfredAgent
             if ($this->userProfil === 'admin') {
                 $this->emit('timing', $timing);
             }
-            $this->emit('done', ['text' => '', 'iterations' => $iterations, 'limit_reached' => true]);
+            $doneData = ['text' => '', 'iterations' => $iterations, 'limit_reached' => true];
+            if (!empty($lastQuota)) $doneData['quota'] = $lastQuota;
+            $this->emit('done', $doneData);
             return '';
         }
 
         if ($this->userProfil === 'admin') {
             $this->emit('timing', $timing);
         }
-        $this->emit('done', ['text' => $finalText, 'iterations' => $iterations]);
+        $doneData = ['text' => $finalText, 'iterations' => $iterations];
+        if (!empty($lastQuota)) $doneData['quota'] = $lastQuota;
+        $this->emit('done', $doneData);
 
         return $finalText;
     }

@@ -16,9 +16,13 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
             $body['tools'] = [['function_declarations' => $this->toGeminiFunctions($tools)]];
         }
 
-        $data = $this->httpPost($url, ['Content-Type: application/json'], $body, 120);
-
-        return $this->normalize($data);
+        $data   = $this->httpPost($url, ['Content-Type: application/json'], $body, 120);
+        $result = $this->normalize($data);
+        $quota  = $this->parseQuotaHeaders($this->lastHeaders);
+        if (!empty($quota)) {
+            $result['quota'] = $quota;
+        }
+        return $result;
     }
 
     public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
