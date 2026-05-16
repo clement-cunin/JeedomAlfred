@@ -113,17 +113,20 @@ class alfredLLM
         if ($apiKey   === '') $apiKey   = alfred::getApiKey($provider);
         if ($model    === '') $model    = alfred::getModel($provider);
 
-        if ($apiKey === '') {
-            throw new Exception("No API key configured for provider '{$provider}'.");
-        }
-
         switch ($provider) {
             case 'mistral':
+                if ($apiKey === '') throw new Exception("No API key configured for Mistral.");
                 require_once __DIR__ . '/alfredLLMMistralAdapter.class.php';
                 return new alfredLLMMistralAdapter($apiKey, $model);
             case 'gemini':
+                if ($apiKey === '') throw new Exception("No API key configured for Gemini.");
                 require_once __DIR__ . '/alfredLLMGeminiAdapter.class.php';
                 return new alfredLLMGeminiAdapter($apiKey, $model);
+            case 'ollama':
+                if ($apiKey === '') $apiKey = (string)config::byKey('ollama_base_url', 'alfred');
+                if ($apiKey === '') $apiKey = 'http://localhost:11434';
+                require_once __DIR__ . '/alfredLLMOllamaAdapter.class.php';
+                return new alfredLLMOllamaAdapter($apiKey, $model);
             default:
                 throw new Exception("Unknown LLM provider: '{$provider}'.");
         }

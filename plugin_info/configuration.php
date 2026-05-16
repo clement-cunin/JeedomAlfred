@@ -35,6 +35,7 @@ $_js_i18n = [
 $_providers = [
     'mistral' => 'Mistral AI',
     'gemini'  => 'Google (Gemini)',
+    'ollama'  => 'Ollama (local)',
 ];
 
 // Auto-detect JeedomMCP settings (used for add button default URL)
@@ -111,6 +112,28 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
                         <option value="<?php echo htmlspecialchars($_saved); ?>"><?php echo htmlspecialchars($_saved ?: '—'); ?></option>
                     </select>
                 </div>
+            </div>
+        </div>
+
+        <!-- Ollama -->
+        <div class="alfred-provider-section" data-provider="ollama">
+            <div class="form-group">
+                <label class="col-sm-4 control-label">{{Ollama URL}}</label>
+                <div class="col-sm-4">
+                    <input type="text" class="configKey form-control alfred-api-key" data-l1key="ollama_base_url"
+                           placeholder="http://192.168.1.X:11434" />
+                </div>
+                <span class="help-block col-sm-4">{{Base URL of your local Ollama instance.}}</span>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-4 control-label">{{Model}}</label>
+                <div class="col-sm-4">
+                    <select class="configKey form-control alfred-model-select" data-l1key="ollama_model">
+                        <?php $_saved = config::byKey('ollama_model', 'alfred'); ?>
+                        <option value="<?php echo htmlspecialchars($_saved); ?>"><?php echo htmlspecialchars($_saved ?: '—'); ?></option>
+                    </select>
+                </div>
+                <span class="help-block col-sm-4">{{Click to load available models from Ollama.}}</span>
             </div>
         </div>
 
@@ -631,7 +654,8 @@ var _alfredPollCount = 0;
 var _alfredProviderPoll = setInterval(function () {
     _alfredPollCount++;
     var hasKey = !!($('[data-l1key="mistral_api_key"]').val()
-                  || $('[data-l1key="gemini_api_key"]').val());
+                  || $('[data-l1key="gemini_api_key"]').val()
+                  || $('[data-l1key="ollama_base_url"]').val());
     if (hasKey || _alfredPollCount >= 20) {
         clearInterval(_alfredProviderPoll);
         alfredShowProvider($('#alfred_provider').val());
@@ -648,13 +672,13 @@ var _alfredModelsLoaded = {};
 function alfredLoadModels($section) {
     var provider = $section.data('provider');
     if (_alfredModelsLoaded[provider]) return;
-    _alfredModelsLoaded[provider] = true;
 
     var $select  = $section.find('.alfred-model-select');
     var apiKey   = $section.find('.alfred-api-key').val().trim();
     var savedVal = $select.val();
 
     if (!apiKey) return;
+    _alfredModelsLoaded[provider] = true;
 
     $select.empty().append($('<option>').val('').text(_alfredI18n.loading).prop('disabled', true).prop('selected', true));
     $select.prop('disabled', true);
@@ -692,6 +716,13 @@ function alfredLoadModels($section) {
 
 $(document).on('mousedown', '.alfred-model-select', function () {
     alfredLoadModels($(this).closest('.alfred-provider-section'));
+});
+
+// For Ollama, also load models when the URL field loses focus
+$(document).on('blur', '.alfred-provider-section[data-provider="ollama"] .alfred-api-key', function () {
+    var $section = $(this).closest('.alfred-provider-section');
+    _alfredModelsLoaded['ollama'] = false; // reset so we reload with the new URL
+    alfredLoadModels($section);
 });
 
 // ---- Memory management ----
@@ -910,7 +941,8 @@ $('#bt_alfred_test_llm').on('click', function () {
     var model     = $section.find('.alfred-model-select').val();
 
     if (!apiKey) {
-        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + _alfredI18n.enter_api_key + '</span>');
+        var _missingMsg = (provider === 'ollama') ? '{{Enter the Ollama URL first.}}' : _alfredI18n.enter_api_key;
+        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + _missingMsg + '</span>');
         return;
     }
 

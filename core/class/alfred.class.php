@@ -16,8 +16,10 @@ class alfred extends eqLogic {
         }
         // Set default models
         $defaults = [
-            'mistral_model'  => 'mistral-large-latest',
-            'gemini_model'   => 'gemini-1.5-pro',
+            'mistral_model'   => 'mistral-large-latest',
+            'gemini_model'    => 'gemini-1.5-pro',
+            'ollama_base_url' => 'http://localhost:11434',
+            'ollama_model'    => 'mistral:latest',
             'max_iterations'  => '10',
             'system_prompt'   => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
         ];
@@ -95,6 +97,13 @@ class alfred extends eqLogic {
             $provider = self::getProvider();
         }
         return (string)config::byKey($provider . '_model', __CLASS__);
+    }
+
+    public static function getBaseUrl(string $provider = ''): string {
+        if ($provider === '') {
+            $provider = self::getProvider();
+        }
+        return (string)config::byKey($provider . '_base_url', __CLASS__);
     }
 
     public static function getMcpServers(): array {
