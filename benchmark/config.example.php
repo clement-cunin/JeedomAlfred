@@ -20,6 +20,9 @@ return [
         'openai' => [
             'api_key' => '',  // https://platform.openai.com/api-keys
         ],
+        'ollama' => [
+            'api_key' => 'http://localhost:11434',  // base URL of your Ollama instance
+        ],
     ],
 
     // ── Default system prompt ─────────────────────────────────────────────────

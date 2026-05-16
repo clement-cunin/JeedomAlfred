@@ -189,8 +189,12 @@ class BenchmarkRunner
                     throw new Exception("OpenAI adapter not found (alfredLLMOpenAIAdapter.class.php).");
                 }
                 return new alfredLLMOpenAIAdapter($apiKey, $model);
+            case 'ollama':
+                // $apiKey is repurposed as base URL for Ollama
+                $baseUrl = $apiKey !== '' ? $apiKey : 'http://localhost:11434';
+                return new alfredLLMOllamaAdapter($baseUrl, $model);
             default:
-                throw new Exception("Unknown provider: '{$provider}'. Supported: mistral, gemini, anthropic, openai.");
+                throw new Exception("Unknown provider: '{$provider}'. Supported: mistral, gemini, anthropic, openai, ollama.");
         }
     }
 
