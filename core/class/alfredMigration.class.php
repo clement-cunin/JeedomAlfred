@@ -8,12 +8,13 @@ class alfredMigration
         3 => 'migration_003_repair_schema',
         4 => 'migration_004_conversation_user_login',
         5 => 'migration_005_llm_call_tracking',
+        6 => 'migration_006_tool_router',
     ];
 
     public static function runPending()
     {
         // Reset version if any required table is missing (all migrations are idempotent)
-        $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_schedule', 'alfred_llm_call'];
+        $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_schedule', 'alfred_llm_call', 'alfred_tool_category'];
         foreach ($required as $table) {
             $row = DB::Prepare(
                 "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :tbl",
@@ -147,6 +148,36 @@ class alfredMigration
                 "ALTER TABLE `alfred_conversation` ADD COLUMN `user_login` VARCHAR(100) DEFAULT NULL",
                 [], DB::FETCH_TYPE_ROW
             );
+        }
+    }
+
+    private static function migration_006_tool_router()
+    {
+        DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_tool_category` (
+            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `category`   VARCHAR(100) NOT NULL,
+            `keywords`   TEXT         NOT NULL DEFAULT \'\',
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uk_category` (`category`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', [], DB::FETCH_TYPE_ROW);
+
+        $cols = [
+            'router_strategy'     => "CHAR(1)            NOT NULL DEFAULT 'A'",
+            'tools_total_count'   => 'SMALLINT UNSIGNED   NOT NULL DEFAULT 0',
+            'tools_offered_count' => 'SMALLINT UNSIGNED   NOT NULL DEFAULT 0',
+            'router_categories'   => "VARCHAR(255)        NOT NULL DEFAULT ''",
+        ];
+        foreach ($cols as $col => $def) {
+            $row = DB::Prepare(
+                "SELECT COUNT(*) as cnt FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 'alfred_llm_call' AND column_name = :col",
+                [':col' => $col], DB::FETCH_TYPE_ROW
+            );
+            if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
+                DB::Prepare("ALTER TABLE `alfred_llm_call` ADD COLUMN `{$col}` {$def}", [], DB::FETCH_TYPE_ROW);
+            }
         }
     }
 

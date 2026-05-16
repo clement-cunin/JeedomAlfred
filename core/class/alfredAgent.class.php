@@ -384,15 +384,21 @@ class alfredAgent
         }
 
         // Fetch aggregated tool list from all enabled MCP servers, then prepend synthetic tools
-        $tools = $this->registry->listTools();
+        $allTools = $this->registry->listTools();
         foreach (array_reverse(self::memoryTools()) as $t) {
-            array_unshift($tools, $t);
+            array_unshift($allTools, $t);
         }
-        array_unshift($tools, self::scheduleTool());
-        array_unshift($tools, self::fileCreateTool());
+        array_unshift($allTools, self::scheduleTool());
+        array_unshift($allTools, self::fileCreateTool());
         if (!empty($uploadedFiles)) {
-            array_unshift($tools, self::fileReadTool());
+            array_unshift($allTools, self::fileReadTool());
         }
+
+        // Apply tool router (strategy A = all tools, B = keyword-based filtering)
+        require_once __DIR__ . '/alfredToolRouter.class.php';
+        $routerStrategy = alfred::getRouterStrategy();
+        $routerResult   = alfredToolRouter::route($allTools, $userMessage, $routerStrategy);
+        $tools          = $routerResult['tools'];
 
         // ReAct loop
         $finalText    = '';
@@ -429,16 +435,20 @@ class alfredAgent
                 $msgId = alfredConversation::saveAssistantResponse($sessionId, $response, $llmInfo);
                 $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
                 alfredConversation::saveLlmCall($sessionId, $msgId, [
-                    'iteration'     => $iterations,
-                    'provider'      => $llmProvider,
-                    'model'         => $llmModel,
-                    'input_tokens'  => $response['usage']['input_tokens']  ?? 0,
-                    'output_tokens' => $response['usage']['output_tokens'] ?? 0,
-                    'duration_ms'   => $durationMs,
-                    'system_chars'  => $systemChars,
-                    'history_chars' => $currentMsgChars,
-                    'tools_chars'   => $toolsChars,
-                    'new_res_chars' => $newResChars,
+                    'iteration'           => $iterations,
+                    'provider'            => $llmProvider,
+                    'model'               => $llmModel,
+                    'input_tokens'        => $response['usage']['input_tokens']  ?? 0,
+                    'output_tokens'       => $response['usage']['output_tokens'] ?? 0,
+                    'duration_ms'         => $durationMs,
+                    'system_chars'        => $systemChars,
+                    'history_chars'       => $currentMsgChars,
+                    'tools_chars'         => $toolsChars,
+                    'new_res_chars'       => $newResChars,
+                    'router_strategy'     => $routerStrategy,
+                    'tools_total_count'   => $routerResult['total'],
+                    'tools_offered_count' => $routerResult['offered'],
+                    'router_categories'   => $routerResult['categories'],
                 ]);
                 break;
             }
@@ -448,16 +458,20 @@ class alfredAgent
             $msgId = alfredConversation::saveAssistantResponse($sessionId, $response, $llmInfo);
             $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
             alfredConversation::saveLlmCall($sessionId, $msgId, [
-                'iteration'     => $iterations,
-                'provider'      => $llmProvider,
-                'model'         => $llmModel,
-                'input_tokens'  => $response['usage']['input_tokens']  ?? 0,
-                'output_tokens' => $response['usage']['output_tokens'] ?? 0,
-                'duration_ms'   => $durationMs,
-                'system_chars'  => $systemChars,
-                'history_chars' => $currentMsgChars,
-                'tools_chars'   => $toolsChars,
-                'new_res_chars' => $newResChars,
+                'iteration'           => $iterations,
+                'provider'            => $llmProvider,
+                'model'               => $llmModel,
+                'input_tokens'        => $response['usage']['input_tokens']  ?? 0,
+                'output_tokens'       => $response['usage']['output_tokens'] ?? 0,
+                'duration_ms'         => $durationMs,
+                'system_chars'        => $systemChars,
+                'history_chars'       => $currentMsgChars,
+                'tools_chars'         => $toolsChars,
+                'new_res_chars'       => $newResChars,
+                'router_strategy'     => $routerStrategy,
+                'tools_total_count'   => $routerResult['total'],
+                'tools_offered_count' => $routerResult['offered'],
+                'router_categories'   => $routerResult['categories'],
             ]);
             $prevMsgChars = $currentMsgChars;
 
