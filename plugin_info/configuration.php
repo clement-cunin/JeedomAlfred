@@ -246,6 +246,14 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
             <span class="help-block col-sm-6">{{Maximum number of tool-call iterations before the agent stops.}}</span>
         </div>
 
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Show quota usage bar}}</label>
+            <div class="col-sm-2" style="padding-top:7px">
+                <input type="checkbox" class="configKey" data-l1key="show_quota_bar" />
+            </div>
+            <span class="help-block col-sm-6">{{Display a bar showing remaining LLM quota after each response (Mistral only for now).}}</span>
+        </div>
+
         <!-- ================================================================ -->
         <!-- Memory -->
         <!-- ================================================================ -->
