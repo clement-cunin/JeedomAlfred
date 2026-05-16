@@ -7,12 +7,13 @@ class alfredMigration
         2 => 'migration_002_memory_label',
         3 => 'migration_003_repair_schema',
         4 => 'migration_004_conversation_user_login',
+        5 => 'migration_005_llm_call_tracking',
     ];
 
     public static function runPending()
     {
         // Reset version if any required table is missing (all migrations are idempotent)
-        $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_schedule'];
+        $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_schedule', 'alfred_llm_call'];
         foreach ($required as $table) {
             $row = DB::Prepare(
                 "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :tbl",
@@ -109,6 +110,29 @@ class alfredMigration
                 [], DB::FETCH_TYPE_ROW
             );
         }
+    }
+
+    private static function migration_005_llm_call_tracking()
+    {
+        DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_llm_call` (
+            `id`            INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+            `session_id`    VARCHAR(36)      NOT NULL,
+            `message_id`    INT UNSIGNED     DEFAULT NULL,
+            `iteration`     TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            `provider`      VARCHAR(50)      NOT NULL DEFAULT \'\',
+            `model`         VARCHAR(100)     NOT NULL DEFAULT \'\',
+            `input_tokens`  INT UNSIGNED     NOT NULL DEFAULT 0,
+            `output_tokens` INT UNSIGNED     NOT NULL DEFAULT 0,
+            `duration_ms`   INT UNSIGNED     NOT NULL DEFAULT 0,
+            `system_chars`  INT UNSIGNED     NOT NULL DEFAULT 0,
+            `history_chars` INT UNSIGNED     NOT NULL DEFAULT 0,
+            `tools_chars`   INT UNSIGNED     NOT NULL DEFAULT 0,
+            `new_res_chars` INT UNSIGNED     NOT NULL DEFAULT 0,
+            `created_at`    DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_session` (`session_id`),
+            KEY `idx_message` (`message_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', [], DB::FETCH_TYPE_ROW);
     }
 
     private static function migration_004_conversation_user_login()

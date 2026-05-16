@@ -5,6 +5,8 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
     private const API_BASE   = 'https://generativelanguage.googleapis.com/v1beta/models';
     private const MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+    public function getProvider(): string { return 'gemini'; }
+
     public function chat(array $messages, array $tools, string $systemPrompt): array
     {
         $url  = self::API_BASE . '/' . urlencode($this->model) . ':generateContent?key=' . urlencode($this->apiKey);

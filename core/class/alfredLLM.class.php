@@ -32,6 +32,13 @@ abstract class alfredLLMAdapter
         $this->model  = $model;
     }
 
+    abstract public function getProvider(): string;
+
+    public function getModel(): string
+    {
+        return $this->model;
+    }
+
     /**
      * Send a conversation turn to the LLM.
      *

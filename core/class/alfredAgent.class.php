@@ -395,35 +395,71 @@ class alfredAgent
         }
 
         // ReAct loop
-        $finalText  = '';
-        $iterations = 0;
+        $finalText    = '';
+        $iterations   = 0;
+        $systemChars  = strlen($effectiveSystemPrompt);
+        $toolsChars   = strlen(json_encode($tools));
+        $prevMsgChars = strlen(json_encode($messages));
+        $llmProvider  = $this->llm->getProvider();
+        $llmModel     = $this->llm->getModel();
 
         while ($iterations < $this->maxIterations) {
             $iterations++;
 
+            $currentMsgChars = strlen(json_encode($messages));
+            $newResChars     = max(0, $currentMsgChars - $prevMsgChars);
+
             $onDelta  = function (string $chunk): void {
                 $this->emit('delta', ['text' => $chunk]);
             };
-            $tLlm     = microtime(true);
-            $response = $this->llm->chatStream($messages, $tools, $effectiveSystemPrompt, $onDelta);
+            $tLlm       = microtime(true);
+            $response   = $this->llm->chatStream($messages, $tools, $effectiveSystemPrompt, $onDelta);
+            $durationMs = (int)round((microtime(true) - $tLlm) * 1000);
             $timing['llm_calls'][] = [
                 'iteration'   => $iterations,
-                'duration_ms' => (int)round((microtime(true) - $tLlm) * 1000),
+                'duration_ms' => $durationMs,
             ];
+
+            $llmInfo = ['provider' => $llmProvider, 'model' => $llmModel];
 
             if ($response['stop_reason'] === 'end_turn' || empty($response['tool_calls'])) {
                 // Final text response — delta events were already emitted chunk by chunk
                 $finalText = $response['text'];
                 $tDb = microtime(true);
-                alfredConversation::saveAssistantResponse($sessionId, $response);
+                $msgId = alfredConversation::saveAssistantResponse($sessionId, $response, $llmInfo);
                 $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
+                alfredConversation::saveLlmCall($sessionId, $msgId, [
+                    'iteration'     => $iterations,
+                    'provider'      => $llmProvider,
+                    'model'         => $llmModel,
+                    'input_tokens'  => $response['usage']['input_tokens']  ?? 0,
+                    'output_tokens' => $response['usage']['output_tokens'] ?? 0,
+                    'duration_ms'   => $durationMs,
+                    'system_chars'  => $systemChars,
+                    'history_chars' => $currentMsgChars,
+                    'tools_chars'   => $toolsChars,
+                    'new_res_chars' => $newResChars,
+                ]);
                 break;
             }
 
             // Assistant wants to call tools — persist the assistant turn first
             $tDb = microtime(true);
-            alfredConversation::saveAssistantResponse($sessionId, $response);
+            $msgId = alfredConversation::saveAssistantResponse($sessionId, $response, $llmInfo);
             $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
+            alfredConversation::saveLlmCall($sessionId, $msgId, [
+                'iteration'     => $iterations,
+                'provider'      => $llmProvider,
+                'model'         => $llmModel,
+                'input_tokens'  => $response['usage']['input_tokens']  ?? 0,
+                'output_tokens' => $response['usage']['output_tokens'] ?? 0,
+                'duration_ms'   => $durationMs,
+                'system_chars'  => $systemChars,
+                'history_chars' => $currentMsgChars,
+                'tools_chars'   => $toolsChars,
+                'new_res_chars' => $newResChars,
+            ]);
+            $prevMsgChars = $currentMsgChars;
 
             // Add to in-memory messages for next iteration
             $assistantMsg = [

@@ -106,7 +106,7 @@ class alfredConversation
      * @param mixed  $content  String or array (will be JSON-encoded)
      * @param array  $metadata Optional extra data (tool_call_id, tool_calls, name…)
      */
-    public static function addMessage(string $sessionId, string $role, $content, array $metadata = []): void
+    public static function addMessage(string $sessionId, string $role, $content, array $metadata = []): int
     {
         $contentStr  = is_array($content) ? json_encode($content, JSON_UNESCAPED_UNICODE) : (string)$content;
         $metadataStr = empty($metadata)   ? null : json_encode($metadata, JSON_UNESCAPED_UNICODE);
@@ -123,7 +123,11 @@ class alfredConversation
             DB::FETCH_TYPE_ROW
         );
 
+        $row = DB::Prepare('SELECT LAST_INSERT_ID() AS id', [], DB::FETCH_TYPE_ROW);
+        $id  = isset($row['id']) ? (int)$row['id'] : 0;
+
         self::touchSession($sessionId);
+        return $id;
     }
 
     /**
@@ -209,9 +213,11 @@ class alfredConversation
     /**
      * Persist a full normalized LLM response into the session.
      *
-     * $response = ['text' => '...', 'tool_calls' => [...], 'stop_reason' => '...']
+     * $response  = ['text' => '...', 'tool_calls' => [...], 'stop_reason' => '...', 'usage' => [...]]
+     * $llmInfo   = ['provider' => '...', 'model' => '...']  (optional, stored in metadata)
+     * Returns the new message id.
      */
-    public static function saveAssistantResponse(string $sessionId, array $response): void
+    public static function saveAssistantResponse(string $sessionId, array $response, array $llmInfo = []): int
     {
         $meta = [];
         if (!empty($response['tool_calls'])) {
@@ -220,7 +226,48 @@ class alfredConversation
         if (!empty($response['gemini_thought_parts'])) {
             $meta['gemini_thought_parts'] = $response['gemini_thought_parts'];
         }
-        self::addMessage($sessionId, 'assistant', $response['text'], $meta);
+        if (!empty($llmInfo['provider'])) {
+            $meta['provider'] = $llmInfo['provider'];
+        }
+        if (!empty($llmInfo['model'])) {
+            $meta['model'] = $llmInfo['model'];
+        }
+        return self::addMessage($sessionId, 'assistant', $response['text'], $meta);
+    }
+
+    /**
+     * Persist one LLM API call's metrics into alfred_llm_call.
+     *
+     * $data keys: iteration, provider, model, input_tokens, output_tokens,
+     *             duration_ms, system_chars, history_chars, tools_chars, new_res_chars
+     */
+    public static function saveLlmCall(string $sessionId, ?int $messageId, array $data): void
+    {
+        DB::Prepare(
+            'INSERT INTO alfred_llm_call
+             (session_id, message_id, iteration, provider, model,
+              input_tokens, output_tokens, duration_ms,
+              system_chars, history_chars, tools_chars, new_res_chars)
+             VALUES
+             (:session_id, :message_id, :iteration, :provider, :model,
+              :input_tokens, :output_tokens, :duration_ms,
+              :system_chars, :history_chars, :tools_chars, :new_res_chars)',
+            [
+                ':session_id'    => $sessionId,
+                ':message_id'    => $messageId ?: null,
+                ':iteration'     => (int)($data['iteration']     ?? 1),
+                ':provider'      => (string)($data['provider']   ?? ''),
+                ':model'         => (string)($data['model']      ?? ''),
+                ':input_tokens'  => (int)($data['input_tokens']  ?? 0),
+                ':output_tokens' => (int)($data['output_tokens'] ?? 0),
+                ':duration_ms'   => (int)($data['duration_ms']   ?? 0),
+                ':system_chars'  => (int)($data['system_chars']  ?? 0),
+                ':history_chars' => (int)($data['history_chars'] ?? 0),
+                ':tools_chars'   => (int)($data['tools_chars']   ?? 0),
+                ':new_res_chars' => (int)($data['new_res_chars'] ?? 0),
+            ],
+            DB::FETCH_TYPE_ROW
+        );
     }
 
     /**
