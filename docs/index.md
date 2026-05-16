@@ -13,7 +13,9 @@ Alfred est un plugin Jeedom qui intègre un assistant IA directement dans votre 
 | [Mémoire persistante](memoire.md) | Sauvegarder et gérer les informations entre sessions |
 | [Planification](planification.md) | Demander à Alfred d'agir plus tard |
 | [Saisie et synthèse vocale](voix.md) | Microphone, dictée, TTS, sélection de voix |
+| [Fichiers locaux](local-files.md) | Pièces jointes de session, outils LLM, API pour plugins externes |
 | [Architecture technique](architecture.md) | Pour les développeurs : classes PHP, API SSE, base de données |
+| [Base de données](database.md) | Schéma des tables MySQL, diagramme ER, migrations |
 
 ## Fonctionnalités principales
 
@@ -22,5 +24,6 @@ Alfred est un plugin Jeedom qui intègre un assistant IA directement dans votre 
 - **Outils MCP** : Alfred peut contrôler vos équipements Jeedom via JeedomMCP
 - **Mémoire persistante** : Alfred se souvient des informations entre les conversations
 - **Planification** : Alfred peut exécuter des actions différées ("éteins les lumières dans 30 minutes")
+- **Fichiers locaux** : joindre des PDF ou images à une conversation, Alfred les lit à la demande et peut créer des fichiers téléchargeables
 - **Multi-sessions** : historique de conversations accessible dans la barre latérale
 - **PWA** : installable sur mobile comme une application native (Phase 6)
