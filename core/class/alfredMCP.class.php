@@ -100,7 +100,7 @@ class alfredMCP
 
         $headers = [
             'Content-Type: application/json',
-            'Accept: application/json',
+            'Accept: application/json, text/event-stream',
         ];
         if ($this->authHeader !== '' && $this->authValue !== '') {
             $headers[] = $this->authHeader . ': ' . $this->authValue;
