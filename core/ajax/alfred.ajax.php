@@ -186,6 +186,55 @@ try {
         ajax::success(['id' => $id, 'scope' => $scope, 'label' => $label, 'content' => $content, 'created_at' => $now, 'updated_at' => $now]);
     }
 
+    if ($action === 'previewCategories') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfred.class.php';
+        require_once __DIR__ . '/../class/alfredMCP.class.php';
+        require_once __DIR__ . '/../class/alfredMCPRegistry.class.php';
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+
+        $registry = alfredMCPRegistry::fromConfig();
+        $tools    = $registry->listTools();
+
+        // Categorize each tool
+        $byCategory = [];
+        foreach ($tools as $tool) {
+            $cat = alfredToolRouter::deriveCategory($tool['name']);
+            $byCategory[$cat][] = $tool['name'];
+        }
+        ksort($byCategory);
+        ajax::success($byCategory);
+    }
+
+    if ($action === 'listToolCategories') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+        // Seed any new default categories not yet in DB (safe for existing installs)
+        alfredToolRouter::seedDefaultCategories();
+        $categories = alfredToolRouter::loadCategories();
+        $result = [];
+        foreach ($categories as $cat => $keywords) {
+            $result[] = ['category' => $cat, 'keywords' => implode(', ', $keywords)];
+        }
+        ajax::success($result);
+    }
+
+    if ($action === 'saveToolCategories') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        $raw = init('categories', '[]');
+        $data = json_decode($raw, true);
+        if (!is_array($data)) throw new Exception('Invalid categories payload');
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+        alfredToolRouter::saveCategories($data);
+        ajax::success();
+    }
+
+    if ($action === 'backtestRouter') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfredToolRouter.class.php';
+        ajax::success(alfredToolRouter::backtest());
+    }
+
     throw new Exception(__('No method found for: ', __FILE__) . $action);
 
 } catch (Exception $e) {

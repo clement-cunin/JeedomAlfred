@@ -21,6 +21,7 @@ class alfred extends eqLogic {
             'ollama_base_url' => 'http://localhost:11434',
             'ollama_model'    => 'mistral:latest',
             'max_iterations'  => '10',
+            'router_strategy' => 'A',
             'system_prompt'   => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
         ];
         foreach ($defaults as $key => $value) {
@@ -69,6 +70,7 @@ class alfred extends eqLogic {
         require_once __DIR__ . '/alfredMCPRegistry.class.php';
         require_once __DIR__ . '/alfredConversation.class.php';
         require_once __DIR__ . '/alfredMemory.class.php';
+        require_once __DIR__ . '/alfredToolRouter.class.php';
         require_once __DIR__ . '/alfredAgent.class.php';
         try {
             alfredScheduler::processPending();
@@ -134,6 +136,11 @@ class alfred extends eqLogic {
     public static function getMaxIterations(): int {
         $v = (int)config::byKey('max_iterations', __CLASS__);
         return $v > 0 ? $v : 10;
+    }
+
+    public static function getRouterStrategy(): string {
+        $v = (string)config::byKey('router_strategy', __CLASS__);
+        return in_array($v, ['A', 'B', 'C'], true) ? $v : 'A';
     }
 
     // -------------------------------------------------------------------------
