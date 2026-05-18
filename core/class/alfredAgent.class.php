@@ -35,6 +35,8 @@ class alfredAgent
     private ?string           $userProfil;
     /** @var callable|null */
     private $onEvent;
+    /** @var string[] MCP errors collected during registry init, persisted at start of chat() */
+    private array $pendingMcpErrors = [];
 
     public function __construct(
         ?alfredLLMAdapter  $llm             = null,
@@ -55,6 +57,7 @@ class alfredAgent
             $this->registry = $registry;
         } else {
             $this->registry = alfredMCPRegistry::fromConfig(function (string $msg): void {
+                $this->pendingMcpErrors[] = $msg;
                 $this->emit('error', ['message' => $msg]);
             });
         }
@@ -354,6 +357,12 @@ class alfredAgent
             }
             alfredConversation::addMessage($sessionId, 'user', $userMessage);
         }
+
+        // Persist any MCP init errors so they survive page reloads (excluded from LLM context)
+        foreach ($this->pendingMcpErrors as $errMsg) {
+            alfredConversation::addMessage($sessionId, 'system', $errMsg, ['error' => true]);
+        }
+        $this->pendingMcpErrors = [];
 
         // Load full history
         $messages = alfredConversation::getMessages($sessionId);
