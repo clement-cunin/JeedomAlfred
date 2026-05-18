@@ -160,10 +160,12 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
 
     /**
      * Recursively sanitize a JSON Schema for Gemini:
-     * - type as array ["string","null"] → pick first non-null type (Gemini proto is not repeating)
-     * - Empty properties array → stdClass
-     * - Array type with missing/empty items → items: {type: string}
-     * - Remove unsupported keywords (default, examples, $schema, additionalProperties, anyOf, oneOf, allOf)
+     * - type as array ["string","null"] → first non-null type (proto field is not repeating)
+     * - anyOf: supported by Gemini — recurse into variants; collapse nullable pattern to nullable:true
+     * - oneOf/allOf: not supported by Gemini — removed
+     * - Empty properties → stdClass
+     * - Array type with no items → items: {type: string}
+     * - Remove unsupported keywords: additionalProperties, default, examples, $schema, $defs, title
      */
     private function sanitizeSchema($schema): array
     {
@@ -178,8 +180,34 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
         }
 
         // Remove keywords Gemini does not support
-        foreach (['default', 'examples', '$schema', 'additionalProperties', '$defs', 'definitions', 'anyOf', 'oneOf', 'allOf'] as $key) {
+        foreach (['default', 'examples', '$schema', 'additionalProperties', '$defs', 'definitions', 'oneOf', 'allOf', 'title'] as $key) {
             unset($schema[$key]);
+        }
+
+        // anyOf: Gemini supports it (proto: any_of) — but sanitize each variant.
+        // Simplify nullable pattern [{type:X,...}, {type:"null"}] → {type:X, nullable:true}
+        if (isset($schema['anyOf']) && is_array($schema['anyOf'])) {
+            $variants = array_values(array_filter($schema['anyOf'], fn($v) => is_array($v)));
+            $nonNull  = array_values(array_filter($variants, fn($v) => ($v['type'] ?? '') !== 'null'));
+            $hasNull  = count($variants) > count($nonNull);
+
+            if (empty($nonNull)) {
+                unset($schema['anyOf']);
+                $schema['type'] = $schema['type'] ?? 'string';
+            } elseif (count($nonNull) === 1) {
+                // Nullable pattern: collapse into the single non-null schema
+                $description = $schema['description'] ?? null;
+                $schema = $this->sanitizeSchema($nonNull[0]);
+                if ($description !== null && !isset($schema['description'])) {
+                    $schema['description'] = $description;
+                }
+                if ($hasNull) {
+                    $schema['nullable'] = true;
+                }
+            } else {
+                // Multiple real variants: keep anyOf, sanitize each, drop null entries
+                $schema['anyOf'] = array_values(array_map([$this, 'sanitizeSchema'], $nonNull));
+            }
         }
 
         // Fix empty properties
