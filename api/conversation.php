@@ -62,7 +62,16 @@ if (!$userLogin) {
 }
 
 // ---- Load classes ----
+require_once __DIR__ . '/../core/class/alfred.class.php';
+require_once __DIR__ . '/../core/class/alfredLLM.class.php';
+require_once __DIR__ . '/../core/class/alfredMCP.class.php';
+require_once __DIR__ . '/../core/class/alfredMCPRegistry.class.php';
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
+require_once __DIR__ . '/../core/class/alfredScheduler.class.php';
+require_once __DIR__ . '/../core/class/alfredMemory.class.php';
+require_once __DIR__ . '/../core/class/alfredAgent.class.php';
+
+set_time_limit(120);
 
 // ---- Route request ----
 $method    = $_SERVER['REQUEST_METHOD'];
@@ -175,52 +184,40 @@ function handleGetConversation(string $sessionId, string $userLogin): void
 }
 
 /**
- * POST /api/conversation/<session_id>/message
- * Add a message to a conversation.
+ * POST ?session_id=<uuid>&action=message
+ * Send a user message and get Alfred's response.
  *
- * Body: { "content": "...", "role": "user" }
- * Note: only "user" role is accepted via API; assistant messages are created by the agent.
+ * Body: { "content": "..." }
  */
 function handleAddMessage(string $sessionId, string $userLogin): void
 {
-    $session = alfredConversation::getSession($sessionId);
-
-    if (!$session) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Conversation not found']);
-        return;
-    }
-
-    if (!alfredConversation::sessionBelongsTo($sessionId, $userLogin)) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Access denied']);
-        return;
-    }
-
     $input   = json_decode(file_get_contents('php://input'), true) ?? [];
-    $content = $input['content'] ?? '';
-    $role    = trim($input['role'] ?? 'user');
+    $content = trim($input['content'] ?? '');
 
-    if (!$content) {
+    if ($content === '') {
         http_response_code(400);
         echo json_encode(['error' => 'Missing content']);
         return;
     }
 
-    if ($role !== 'user') {
-        http_response_code(400);
-        echo json_encode(['error' => 'Only user role is accepted via API']);
-        return;
-    }
+    // 'api' login (core API key, no real user) acts as admin to bypass ownership check
+    $userProfil = ($userLogin === 'api') ? 'admin' : 'user';
 
-    $messageId = alfredConversation::addMessage($sessionId, $role, $content);
+    $agent = new alfredAgent(
+        null,
+        null,
+        null,    // no SSE — response captured via return value
+        $userLogin,
+        $userProfil
+    );
 
-    http_response_code(201);
+    $reply = $agent->run($sessionId, $content);
+
+    http_response_code(200);
     echo json_encode([
-        'success'    => true,
-        'message_id' => $messageId,
-        'content'    => $content,
-        'role'       => $role,
+        'success'  => true,
+        'message'  => $content,
+        'reply'    => $reply,
     ]);
 }
 
