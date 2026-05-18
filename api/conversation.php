@@ -5,14 +5,14 @@
  * RESTful API for managing Alfred conversations.
  *
  * Endpoints:
- *   GET  /api/conversation?session_id=<uuid>         → retrieve conversation + messages
+ *   GET  /api/conversations                           → list conversations
  *   POST /api/conversation                             → create a new conversation
+ *   GET  /api/conversation/<session_id>               → retrieve conversation + messages
  *   POST /api/conversation/<session_id>/message       → add a message
  *   GET  /api/conversation/<session_id>/messages      → list all messages
  *   DELETE /api/conversation/<session_id>             → delete conversation
- *   GET  /api/conversations                           → list conversations
  *
- * Auth: Jeedom session or user_hash parameter
+ * Auth: Jeedom session, user_hash param, or X-API-Key header (Jeedom API key)
  */
 
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
@@ -20,7 +20,7 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, X-API-Key');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -28,24 +28,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // ---- Auth ----
+// Three accepted auth methods (in priority order):
+// 1. Active Jeedom browser session
+// 2. user_hash query parameter
+// 3. X-API-Key header (Jeedom core API key or user hash)
 $connectedUser = null;
+$userLogin     = null;
+
 if (isConnect()) {
     $connectedUser = $_SESSION['user'] ?? null;
+    $userLogin     = $connectedUser ? $connectedUser->getLogin() : null;
 } else {
-    $hash          = trim(init('user_hash'));
-    $connectedUser = $hash !== '' ? user::byHash($hash) : null;
-    if (!$connectedUser) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Unauthorized']);
-        exit;
+    // Try user_hash param first, then X-API-Key header
+    $apiKey = trim($_SERVER['HTTP_X_API_KEY'] ?? init('user_hash'));
+    if ($apiKey !== '') {
+        // jeedom::apiAccess sets $_USER_GLOBAL if the key is a valid user hash
+        if (jeedom::apiAccess($apiKey, 'alfred')) {
+            global $_USER_GLOBAL;
+            if (is_object($_USER_GLOBAL)) {
+                $userLogin = $_USER_GLOBAL->getLogin();
+            } else {
+                // Core API key — use a synthetic admin identity
+                $userLogin = 'api';
+            }
+        }
     }
 }
 
-$userLogin  = ($connectedUser !== null) ? $connectedUser->getLogin() : null;
-
 if (!$userLogin) {
     http_response_code(401);
-    echo json_encode(['error' => 'Unable to identify user']);
+    echo json_encode(['error' => 'Unauthorized']);
     exit;
 }
 
