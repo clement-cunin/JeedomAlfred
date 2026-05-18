@@ -4,15 +4,15 @@
  *
  * RESTful API for managing Alfred conversations.
  *
- * Endpoints:
- *   GET  /api/conversations                           → list conversations
- *   POST /api/conversation                             → create a new conversation
- *   GET  /api/conversation/<session_id>               → retrieve conversation + messages
- *   POST /api/conversation/<session_id>/message       → add a message
- *   GET  /api/conversation/<session_id>/messages      → list all messages
- *   DELETE /api/conversation/<session_id>             → delete conversation
+ * Endpoints (all via conversation.php):
+ *   GET    ?                                     → list conversations
+ *   POST   ?                                     → create a new conversation   body: {title}
+ *   GET    ?session_id=<uuid>                    → get conversation + messages
+ *   POST   ?session_id=<uuid>&action=message     → add a message               body: {content}
+ *   GET    ?session_id=<uuid>&action=messages    → list messages
+ *   DELETE ?session_id=<uuid>                    → delete conversation
  *
- * Auth: Jeedom session, user_hash param, or X-API-Key header (Jeedom API key)
+ * Auth: Jeedom session, user_hash param, or X-API-Key header (Jeedom core API key)
  */
 
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
@@ -64,25 +64,14 @@ if (!$userLogin) {
 // ---- Load classes ----
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
 
-// ---- Parse request ----
-$method = $_SERVER['REQUEST_METHOD'];
-$path   = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
-$parts  = explode('/', $path);
-
-// Remove base path (api/conversation)
-$apiIdx = array_search('conversation', $parts);
-if ($apiIdx === false) {
-    http_response_code(404);
-    echo json_encode(['error' => 'Not found']);
-    exit;
-}
-
-$pathSegments = array_slice($parts, $apiIdx + 1);
+// ---- Route request ----
+$method    = $_SERVER['REQUEST_METHOD'];
+$sessionId = trim(init('session_id'));
+$action    = trim(init('action'));
 
 try {
-    // Route requests
-    if (count($pathSegments) === 0) {
-        // /api/conversation or /api/conversations
+    if ($sessionId === '') {
+        // No session_id — list or create
         if ($method === 'GET') {
             handleListConversations($userLogin);
         } elseif ($method === 'POST') {
@@ -91,21 +80,17 @@ try {
             http_response_code(405);
             echo json_encode(['error' => 'Method not allowed']);
         }
-    } elseif (count($pathSegments) === 1 && $method === 'GET') {
-        // /api/conversation/<session_id>
-        handleGetConversation($pathSegments[0], $userLogin);
-    } elseif (count($pathSegments) === 2 && $pathSegments[1] === 'message' && $method === 'POST') {
-        // /api/conversation/<session_id>/message
-        handleAddMessage($pathSegments[0], $userLogin);
-    } elseif (count($pathSegments) === 2 && $pathSegments[1] === 'messages' && $method === 'GET') {
-        // /api/conversation/<session_id>/messages
-        handleListMessages($pathSegments[0], $userLogin);
-    } elseif (count($pathSegments) === 1 && $method === 'DELETE') {
-        // /api/conversation/<session_id>
-        handleDeleteConversation($pathSegments[0], $userLogin);
+    } elseif ($action === 'message' && $method === 'POST') {
+        handleAddMessage($sessionId, $userLogin);
+    } elseif ($action === 'messages' && $method === 'GET') {
+        handleListMessages($sessionId, $userLogin);
+    } elseif ($method === 'GET') {
+        handleGetConversation($sessionId, $userLogin);
+    } elseif ($method === 'DELETE') {
+        handleDeleteConversation($sessionId, $userLogin);
     } else {
-        http_response_code(404);
-        echo json_encode(['error' => 'Not found']);
+        http_response_code(405);
+        echo json_encode(['error' => 'Method not allowed']);
     }
 } catch (Exception $e) {
     http_response_code(500);
