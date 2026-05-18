@@ -8,6 +8,7 @@ class alfredMigration
         3 => 'migration_003_repair_schema',
         4 => 'migration_004_conversation_user_login',
         5 => 'migration_005_llm_call_tracking',
+        6 => 'migration_006_message_role_error',
     ];
 
     public static function runPending()
@@ -148,6 +149,14 @@ class alfredMigration
                 [], DB::FETCH_TYPE_ROW
             );
         }
+    }
+
+    private static function migration_006_message_role_error()
+    {
+        DB::Prepare(
+            "ALTER TABLE `alfred_message` MODIFY COLUMN `role` ENUM('user','assistant','tool','error') NOT NULL",
+            [], DB::FETCH_TYPE_ROW
+        );
     }
 
     private static function migration_003_repair_schema()

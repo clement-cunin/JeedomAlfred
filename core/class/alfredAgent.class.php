@@ -360,7 +360,7 @@ class alfredAgent
 
         // Persist any MCP init errors so they survive page reloads (excluded from LLM context)
         foreach ($this->pendingMcpErrors as $errMsg) {
-            alfredConversation::addMessage($sessionId, 'system', $errMsg, ['error' => true]);
+            alfredConversation::addMessage($sessionId, 'error', $errMsg, ['error' => true]);
         }
         $this->pendingMcpErrors = [];
 
