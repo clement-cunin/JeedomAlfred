@@ -9,6 +9,7 @@ class alfredMigration
         4 => 'migration_004_conversation_user_login',
         5 => 'migration_005_llm_call_tracking',
         6 => 'migration_006_message_role_error',
+        7 => 'migration_007_message_role_error_ensure',
     ];
 
     public static function runPending()
@@ -153,6 +154,16 @@ class alfredMigration
 
     private static function migration_006_message_role_error()
     {
+        DB::Prepare(
+            "ALTER TABLE `alfred_message` MODIFY COLUMN `role` ENUM('user','assistant','tool','error') NOT NULL",
+            [], DB::FETCH_TYPE_ROW
+        );
+    }
+
+    private static function migration_007_message_role_error_ensure()
+    {
+        // Ensures 'error' is in the role ENUM even if migration_006 ran from a dev branch
+        // that had a different content. The MODIFY COLUMN is idempotent.
         DB::Prepare(
             "ALTER TABLE `alfred_message` MODIFY COLUMN `role` ENUM('user','assistant','tool','error') NOT NULL",
             [], DB::FETCH_TYPE_ROW
