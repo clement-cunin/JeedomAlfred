@@ -160,9 +160,10 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
 
     /**
      * Recursively sanitize a JSON Schema for Gemini:
+     * - type as array ["string","null"] → pick first non-null type (Gemini proto is not repeating)
      * - Empty properties array → stdClass
      * - Array type with missing/empty items → items: {type: string}
-     * - Remove unsupported keywords (default, examples, $schema, additionalProperties)
+     * - Remove unsupported keywords (default, examples, $schema, additionalProperties, anyOf, oneOf, allOf)
      */
     private function sanitizeSchema($schema): array
     {
@@ -170,8 +171,14 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
             return ['type' => 'string'];
         }
 
+        // Flatten type arrays: ["string","null"] → "string"
+        if (isset($schema['type']) && is_array($schema['type'])) {
+            $nonNull = array_values(array_filter($schema['type'], fn($t) => $t !== 'null'));
+            $schema['type'] = $nonNull[0] ?? 'string';
+        }
+
         // Remove keywords Gemini does not support
-        foreach (['default', 'examples', '$schema', 'additionalProperties', '$defs', 'definitions'] as $key) {
+        foreach (['default', 'examples', '$schema', 'additionalProperties', '$defs', 'definitions', 'anyOf', 'oneOf', 'allOf'] as $key) {
             unset($schema[$key]);
         }
 
