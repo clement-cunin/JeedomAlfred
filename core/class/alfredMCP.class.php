@@ -130,9 +130,24 @@ class alfredMCP
 
         // Strip UTF-8 BOM if present (some PHP setups emit it)
         $raw  = ltrim($raw, "\xEF\xBB\xBF");
-        $data = json_decode($raw, true);
+
+        // Some MCP servers respond with SSE (text/event-stream) instead of plain JSON.
+        // Extract the JSON payload from the last non-empty "data:" line.
+        $body = $raw;
+        if (str_contains($raw, 'data:')) {
+            foreach (array_reverse(explode("\n", $raw)) as $line) {
+                $line = trim($line);
+                if (str_starts_with($line, 'data:')) {
+                    $body = trim(substr($line, 5));
+                    break;
+                }
+            }
+        }
+
+        $data = json_decode($body, true);
         if (!is_array($data)) {
-            throw new Exception("MCP invalid JSON response (HTTP {$code}): " . substr($raw, 0, 200));
+            $preview = substr($raw, 0, 1000) . (strlen($raw) > 1000 ? '...' : '');
+            throw new Exception("MCP invalid JSON response (HTTP {$code}): " . $preview);
         }
         if (isset($data['error'])) {
             $msg = $data['error']['message'] ?? json_encode($data['error']);

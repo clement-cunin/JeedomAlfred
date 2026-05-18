@@ -345,6 +345,20 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
     line-height: 30px;
     margin-left: 6px;
 }
+.alfred-mcp-error-detail {
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin-top: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 11px;
+    font-family: monospace;
+    word-break: break-word;
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
 </style>
 
 <script>
@@ -570,11 +584,17 @@ function alfredMcpTest(i, $result) {
                 $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> ' + _alfredI18n.test_ok.replace('%d', n) + '</span>');
                 alfredMcpCheckConflicts();
             } else {
-                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (data.result || data.state) + '</span>');
+                var errMsg = data.result || data.state;
+                var $err = $('<div style="color:#a94442"><i class="fas fa-times"></i> ' + errMsg + '</div>');
+                $result.html($err);
             }
         },
         error: function(jqXHR) {
-            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
+            var errText = jqXHR.responseText || 'Unknown error';
+            var $container = $('<div>');
+            $container.append($('<div style="color:#a94442"><i class="fas fa-times"></i> Error</div>'));
+            $container.append($('<div class="alfred-mcp-error-detail">' + errText + '</div>'));
+            $result.html($container);
         }
     });
 }
