@@ -43,7 +43,7 @@ if (isConnect()) {
     $apiKey = trim($_SERVER['HTTP_X_API_KEY'] ?? init('user_hash'));
     if ($apiKey !== '') {
         // jeedom::apiAccess sets $_USER_GLOBAL if the key is a valid user hash
-        if (jeedom::apiAccess($apiKey, 'alfred')) {
+        if (jeedom::apiAccess($apiKey, 'core')) {
             global $_USER_GLOBAL;
             if (is_object($_USER_GLOBAL)) {
                 $userLogin = $_USER_GLOBAL->getLogin();
