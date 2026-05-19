@@ -4,6 +4,8 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
 {
     // $apiKey is repurposed to store the Ollama base URL (e.g. http://localhost:11434)
 
+    public function getProvider(): string { return 'ollama'; }
+
     private function chatUrl(): string { return rtrim($this->apiKey, '/') . '/v1/chat/completions'; }
     private function tagsUrl(): string { return rtrim($this->apiKey, '/') . '/api/tags'; }
 
