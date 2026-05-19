@@ -3,17 +3,45 @@
 class alfredMigration
 {
     const MIGRATIONS = [
-        1 => 'migration_001_initial_schema',
-        2 => 'migration_002_memory_label',
-        3 => 'migration_003_repair_schema',
-        4 => 'migration_004_conversation_user_login',
-        5 => 'migration_005_llm_call_tracking',
-        6 => 'migration_006_message_role_error',
+        1 => 'migration_001_baseline',
     ];
 
-    public static function runPending()
+    private static function downDir(): string
     {
-        // Reset version if any required table is missing (all migrations are idempotent)
+        return __DIR__ . '/../../var/migrations/';
+    }
+
+    private static function ensureLogTable(): void
+    {
+        DB::Prepare(
+            'CREATE TABLE IF NOT EXISTS `alfred_migration_log` (
+                `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `version`    INT UNSIGNED NOT NULL,
+                `hash`       VARCHAR(32)  NOT NULL,
+                `filename`   VARCHAR(100) NOT NULL,
+                `applied_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uq_version` (`version`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+    }
+
+    public static function runPending(): void
+    {
+        self::ensureLogTable();
+
+        $current = (int) config::byKey('schemaVersion', 'alfred', 0);
+
+        // Transition: old system used individual versions 1–6; new system squashes them into new v1
+        if ($current >= 1 && $current <= 6) {
+            log::add('alfred', 'info', "Legacy schema v{$current} — transitioning to new migration system at v1");
+            config::save('schemaVersion', 1, 'alfred');
+            $current = 1;
+        }
+
+        // Reset if any required table is missing (fresh install or schema corruption)
         $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_schedule', 'alfred_llm_call'];
         foreach ($required as $table) {
             $row = DB::Prepare(
@@ -22,40 +50,126 @@ class alfredMigration
                 DB::FETCH_TYPE_ROW
             );
             if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
-                log::add('alfred', 'info', "Missing table '{$table}', resetting schema version to force migrations");
+                log::add('alfred', 'info', "Missing table '{$table}' — resetting schema version to force migrations");
                 config::save('schemaVersion', 0, 'alfred');
+                $current = 0;
                 break;
             }
         }
 
-        $current = (int) config::byKey('schemaVersion', 'alfred', 0);
         $target = max(array_keys(self::MIGRATIONS));
 
         for ($v = $current + 1; $v <= $target; $v++) {
-            $method = self::MIGRATIONS[$v];
-            log::add('alfred', 'info', "Running migration {$v}: {$method}");
-            self::$method();
-            config::save('schemaVersion', $v, 'alfred');
-            log::add('alfred', 'info', "Migration {$v} complete");
+            if (!isset(self::MIGRATIONS[$v])) {
+                continue;
+            }
+            self::applyUp($v);
         }
     }
 
-    public static function getVersion()
+    /**
+     * Roll back migrations from current version down to $targetVersion (exclusive).
+     * Requires down files to be present on disk (saved by applyUp at deploy time).
+     */
+    public static function rollbackTo(int $targetVersion): void
+    {
+        $current = self::getVersion();
+        if ($targetVersion >= $current) {
+            log::add('alfred', 'warning', "rollbackTo({$targetVersion}) called but current version is {$current} — nothing to do");
+            return;
+        }
+
+        for ($v = $current; $v > $targetVersion; $v--) {
+            self::applyDown($v);
+        }
+    }
+
+    public static function getVersion(): int
     {
         return (int) config::byKey('schemaVersion', 'alfred', 0);
     }
 
-    public static function getTargetVersion()
+    public static function getTargetVersion(): int
     {
         return max(array_keys(self::MIGRATIONS));
     }
 
-    private static function migration_001_initial_schema()
+    private static function applyUp(int $v): void
+    {
+        $method = self::MIGRATIONS[$v];
+        log::add('alfred', 'info', "Running migration {$v}: {$method}");
+        self::$method();
+
+        $downMethod = $method . '_down';
+        if (method_exists(__CLASS__, $downMethod)) {
+            $downSql = self::$downMethod();
+            $hash     = md5($downSql);
+            $filename = "V{$v}_{$hash}.sql";
+            $dir      = self::downDir();
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            file_put_contents($dir . $filename, $downSql);
+            DB::Prepare(
+                'INSERT INTO `alfred_migration_log` (version, hash, filename) VALUES (:v, :h, :f)',
+                [':v' => $v, ':h' => $hash, ':f' => $filename],
+                DB::FETCH_TYPE_ROW
+            );
+            log::add('alfred', 'info', "Down file saved: {$filename}");
+        }
+
+        config::save('schemaVersion', $v, 'alfred');
+        log::add('alfred', 'info', "Migration {$v} complete");
+    }
+
+    private static function applyDown(int $v): void
+    {
+        self::ensureLogTable();
+
+        $row = DB::Prepare(
+            'SELECT filename, hash FROM `alfred_migration_log` WHERE version = :v',
+            [':v' => $v],
+            DB::FETCH_TYPE_ROW
+        );
+        if (!$row) {
+            throw new \RuntimeException("No rollback record for migration {$v} — manual intervention required");
+        }
+
+        $file = self::downDir() . $row['filename'];
+        if (!file_exists($file)) {
+            throw new \RuntimeException("Rollback file missing: {$file} — manual intervention required");
+        }
+
+        $sql = file_get_contents($file);
+        if (md5($sql) !== $row['hash']) {
+            throw new \RuntimeException("Hash mismatch for migration {$v} rollback file — file may be corrupted");
+        }
+
+        log::add('alfred', 'info', "Rolling back migration {$v}: {$row['filename']}");
+        foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
+            DB::Prepare($stmt, [], DB::FETCH_TYPE_ROW);
+        }
+
+        DB::Prepare(
+            'DELETE FROM `alfred_migration_log` WHERE version = :v',
+            [':v' => $v],
+            DB::FETCH_TYPE_ROW
+        );
+        config::save('schemaVersion', $v - 1, 'alfred');
+        log::add('alfred', 'info', "Migration {$v} rolled back");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Migration 1 — Full baseline schema (squashes former migrations 1–6)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static function migration_001_baseline(): void
     {
         DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_conversation` (
             `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
             `session_id` VARCHAR(36)   NOT NULL,
             `title`      VARCHAR(255)  DEFAULT NULL,
+            `user_login` VARCHAR(100)  DEFAULT NULL,
             `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
@@ -65,7 +179,7 @@ class alfredMigration
         DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_message` (
             `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
             `session_id` VARCHAR(36)   NOT NULL,
-            `role`       ENUM(\'user\',\'assistant\',\'tool\') NOT NULL,
+            `role`       ENUM(\'user\',\'assistant\',\'tool\',\'error\') NOT NULL,
             `content`    LONGTEXT      NOT NULL,
             `metadata`   JSON          DEFAULT NULL,
             `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -76,6 +190,7 @@ class alfredMigration
         DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_memory` (
             `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
             `scope`      VARCHAR(100)  NOT NULL,
+            `label`      VARCHAR(100)  NOT NULL DEFAULT \'\',
             `content`    TEXT          NOT NULL,
             `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -95,26 +210,7 @@ class alfredMigration
             PRIMARY KEY (`id`),
             KEY (`status`, `run_at`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', [], DB::FETCH_TYPE_ROW);
-    }
 
-    private static function migration_002_memory_label()
-    {
-        // Use information_schema check to avoid ADD COLUMN IF NOT EXISTS (MySQL compat)
-        $row = DB::Prepare(
-            "SELECT COUNT(*) as cnt FROM information_schema.columns
-             WHERE table_schema = DATABASE() AND table_name = 'alfred_memory' AND column_name = 'label'",
-            [], DB::FETCH_TYPE_ROW
-        );
-        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
-            DB::Prepare(
-                "ALTER TABLE `alfred_memory` ADD COLUMN `label` VARCHAR(100) NOT NULL DEFAULT ''",
-                [], DB::FETCH_TYPE_ROW
-            );
-        }
-    }
-
-    private static function migration_005_llm_call_tracking()
-    {
         DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_llm_call` (
             `id`            INT UNSIGNED     NOT NULL AUTO_INCREMENT,
             `session_id`    VARCHAR(36)      NOT NULL,
@@ -136,57 +232,14 @@ class alfredMigration
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', [], DB::FETCH_TYPE_ROW);
     }
 
-    private static function migration_004_conversation_user_login()
+    private static function migration_001_baseline_down(): string
     {
-        $row = DB::Prepare(
-            "SELECT COUNT(*) as cnt FROM information_schema.columns
-             WHERE table_schema = DATABASE() AND table_name = 'alfred_conversation' AND column_name = 'user_login'",
-            [], DB::FETCH_TYPE_ROW
-        );
-        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
-            DB::Prepare(
-                "ALTER TABLE `alfred_conversation` ADD COLUMN `user_login` VARCHAR(100) DEFAULT NULL",
-                [], DB::FETCH_TYPE_ROW
-            );
-        }
-    }
-
-    private static function migration_006_message_role_error()
-    {
-        DB::Prepare(
-            "ALTER TABLE `alfred_message` MODIFY COLUMN `role` ENUM('user','assistant','tool','error') NOT NULL",
-            [], DB::FETCH_TYPE_ROW
-        );
-    }
-
-    private static function migration_003_repair_schema()
-    {
-        // Create alfred_schedule if it was missing from early installations
-        DB::Prepare('CREATE TABLE IF NOT EXISTS `alfred_schedule` (
-            `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-            `session_id`  VARCHAR(36)   NOT NULL,
-            `instruction` TEXT          NOT NULL,
-            `run_at`      DATETIME      NOT NULL,
-            `strategy`    ENUM(\'background\',\'cron\') NOT NULL,
-            `status`      ENUM(\'pending\',\'running\',\'done\',\'error\') NOT NULL DEFAULT \'pending\',
-            `error_msg`   TEXT          DEFAULT NULL,
-            `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            KEY (`status`, `run_at`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', [], DB::FETCH_TYPE_ROW);
-
-        // Add updated_at to alfred_conversation if missing (use information_schema check for MySQL compat)
-        $row = DB::Prepare(
-            "SELECT COUNT(*) as cnt FROM information_schema.columns
-             WHERE table_schema = DATABASE() AND table_name = 'alfred_conversation' AND column_name = 'updated_at'",
-            [], DB::FETCH_TYPE_ROW
-        );
-        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
-            DB::Prepare(
-                'ALTER TABLE `alfred_conversation` ADD COLUMN `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
-                [], DB::FETCH_TYPE_ROW
-            );
-            log::add('alfred', 'info', 'Added missing updated_at column to alfred_conversation');
-        }
+        return implode(";\n", [
+            'DROP TABLE IF EXISTS `alfred_llm_call`',
+            'DROP TABLE IF EXISTS `alfred_schedule`',
+            'DROP TABLE IF EXISTS `alfred_memory`',
+            'DROP TABLE IF EXISTS `alfred_message`',
+            'DROP TABLE IF EXISTS `alfred_conversation`',
+        ]);
     }
 }
