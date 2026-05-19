@@ -9,8 +9,20 @@
  *   cron        delay >= 15 min — stored in DB, picked up by alfred::cron() at
  *                                  run_at time (minute-level precision, acceptable)
  *
- * Usage:
+ * Usage (internal):
  *   alfredScheduler::schedule($sessionId, 300, 'Turn off the living room light');
+ *
+ * === Public API for third-party plugins ===
+ *
+ * schedule() is a stable public contract callable from outside JeedomAlfred.
+ * Minimal bootstrap — only Jeedom core and this file are required:
+ *
+ *   require_once '/var/www/html/core/php/core.inc.php';
+ *   require_once '/var/www/html/plugins/alfred/core/class/alfredScheduler.class.php';
+ *   alfredScheduler::schedule($sessionId, $delaySeconds, $instruction);
+ *
+ * Availability guard:
+ *   if (!class_exists('alfredScheduler')) { /* Alfred not installed or not loadable *\/ }
  */
 class alfredScheduler
 {
@@ -24,10 +36,12 @@ class alfredScheduler
     /**
      * Schedule a deferred re-invocation of the agent.
      *
+     * @api Stable public contract — callable from third-party plugins (see class docblock).
+     *
      * @param string $sessionId     Session to re-invoke on
      * @param int    $delaySeconds  Delay before execution
      * @param string $instruction   What to ask the agent when it wakes up
-     * @return array Confirmation with status and human-readable message
+     * @return array{status: string, strategy: string, run_at: string, message: string}
      */
     public static function schedule(string $sessionId, int $delaySeconds, string $instruction): array
     {
