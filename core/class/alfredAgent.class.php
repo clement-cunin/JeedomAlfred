@@ -174,6 +174,66 @@ class alfredAgent
         return self::registerFile($sessionId, $content, $originalName, $mimeType);
     }
 
+    /**
+     * Inject an async tool result into a session and run a continuation LLM turn.
+     *
+     * Intended for background processes that complete async tool work started during
+     * a previous Alfred turn (e.g. a scanner, a long-running export, a remote job).
+     *
+     * The method:
+     *   1. Injects a synthetic assistant message with a tool_calls entry
+     *   2. Injects the tool result message
+     *   3. Runs alfredAgent in continuation mode (empty user message) so the LLM
+     *      sees the tool result and generates a natural response or chains further actions
+     *
+     * Minimal bootstrap:
+     *   require_once '/var/www/html/core/php/core.inc.php';
+     *   require_once '/var/www/html/plugins/alfred/core/class/alfredAgent.class.php';
+     *   alfredAgent::resumeWithAsyncToolResult($sessionId, 'ext_myplugin_mytool', $result);
+     *
+     * @api Stable public contract — callable from third-party plugins.
+     *
+     * @param string  $sessionId   The Alfred session to resume
+     * @param string  $toolName    Full tool name as registered in Alfred (e.g. "ext_jaganin_scanner_scan")
+     * @param array   $toolResult  The tool result payload to inject
+     * @param ?string $userLogin   Resolved from session if null (via alfredConversation::getUserLogin)
+     * @param ?string $userProfil  Resolved from user table if null
+     * @return string              The assistant's final text response
+     */
+    public static function resumeWithAsyncToolResult(
+        string  $sessionId,
+        string  $toolName,
+        array   $toolResult,
+        ?string $userLogin  = null,
+        ?string $userProfil = null
+    ): string {
+        if ($userLogin === null) {
+            $userLogin = alfredConversation::getUserLogin($sessionId);
+        }
+        if ($userProfil === null && $userLogin !== null) {
+            $userProfil = 'user';
+            try {
+                $u = user::byLogin($userLogin);
+                if ($u && $u->getProfils() === 'admin') {
+                    $userProfil = 'admin';
+                }
+            } catch (Exception $ignored) {}
+        }
+
+        $toolCallId = bin2hex(random_bytes(8));
+
+        alfredConversation::saveAssistantResponse($sessionId, [
+            'text'        => '',
+            'tool_calls'  => [['id' => $toolCallId, 'name' => $toolName, 'input' => []]],
+            'stop_reason' => 'tool_use',
+            'usage'       => [],
+        ]);
+
+        alfredConversation::saveToolResult($sessionId, $toolCallId, $toolName, $toolResult);
+
+        return (new alfredAgent(null, null, null, $userLogin, $userProfil))->run($sessionId, '');
+    }
+
     private static function extensionForMime(string $mimeType): string
     {
         $map = [
