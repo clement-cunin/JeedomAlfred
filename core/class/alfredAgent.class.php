@@ -428,6 +428,9 @@ class alfredAgent
         $messages = alfredConversation::getMessages($sessionId);
         $timing['session_load'] = (int)round((microtime(true) - $tPhase) * 1000);
 
+        // Flush files registered by background processes (e.g. async scanner) before building the prompt
+        $this->flushPendingFileEvents($sessionId);
+
         // Build effective system prompt (base + persistent memory block + attached files)
         $tPhase = microtime(true);
         $effectiveSystemPrompt = $this->buildSystemPrompt();
