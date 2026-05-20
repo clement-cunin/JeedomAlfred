@@ -131,8 +131,44 @@ class alfredConversation
     }
 
     /**
+     * Create a pending UI message linked to an async task. Returns the new message ID.
+     */
+    public static function createPendingMessage(string $sessionId, string $displayText, int $taskId): int
+    {
+        return self::addMessage($sessionId, 'pending', $displayText, [
+            'task_id'      => $taskId,
+            'async_status' => 'pending',
+        ]);
+    }
+
+    /**
+     * Update the async_status (and optional result/error_msg) of a pending message.
+     */
+    public static function updatePendingMessage(int $messageId, string $status, array $data = []): void
+    {
+        $row = DB::Prepare(
+            'SELECT metadata FROM alfred_message WHERE id = :id LIMIT 1',
+            [':id' => $messageId],
+            DB::FETCH_TYPE_ROW
+        );
+        if (!$row) {
+            return;
+        }
+        $meta                 = $row['metadata'] ? json_decode($row['metadata'], true) : [];
+        $meta['async_status'] = $status;
+        if (array_key_exists('result', $data))    $meta['result']    = $data['result'];
+        if (array_key_exists('error_msg', $data)) $meta['error_msg'] = $data['error_msg'];
+
+        DB::Prepare(
+            'UPDATE alfred_message SET metadata = :metadata WHERE id = :id',
+            [':metadata' => json_encode($meta, JSON_UNESCAPED_UNICODE), ':id' => $messageId],
+            DB::FETCH_TYPE_ROW
+        );
+    }
+
+    /**
      * Load messages for a session as internal Alfred format (for LLM context).
-     * Error messages are excluded — they are display-only and must not pollute the LLM context.
+     * Error and pending messages are excluded — they are display-only.
      */
     public static function getMessages(string $sessionId): array
     {
@@ -148,8 +184,9 @@ class alfredConversation
             $meta    = $row['metadata'] ? json_decode($row['metadata'], true) : [];
             $content = $row['content'];
 
-            // Skip error messages — they are display-only
+            // Skip display-only messages
             if (!empty($meta['error'])) continue;
+            if ($row['role'] === 'pending') continue;
 
             $msg = ['role' => $row['role'], 'content' => $content];
 
@@ -203,6 +240,13 @@ class alfredConversation
             if ($row['role'] === 'tool') {
                 $msg['tool_call_id'] = $meta['tool_call_id'] ?? '';
                 $msg['name']         = $meta['name'] ?? '';
+            }
+            if ($row['role'] === 'pending') {
+                $msg['display_text'] = $content;
+                $msg['async_status'] = $meta['async_status'] ?? 'pending';
+                $msg['task_id']      = $meta['task_id'] ?? null;
+                if (isset($meta['result']))    $msg['result']    = $meta['result'];
+                if (isset($meta['error_msg'])) $msg['error_msg'] = $meta['error_msg'];
             }
 
             $out[] = $msg;

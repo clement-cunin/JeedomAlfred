@@ -63,7 +63,7 @@ class alfred extends eqLogic {
     public static function cron() {
         // Process any scheduled wakeups whose run_at has been reached (cron strategy only;
         // background-strategy schedules run in their own spawned process).
-        require_once __DIR__ . '/alfredScheduler.class.php';
+        require_once __DIR__ . '/alfredAsyncTask.class.php';
         require_once __DIR__ . '/alfredLLM.class.php';
         require_once __DIR__ . '/alfredMCP.class.php';
         require_once __DIR__ . '/alfredMCPRegistry.class.php';
@@ -71,9 +71,9 @@ class alfred extends eqLogic {
         require_once __DIR__ . '/alfredMemory.class.php';
         require_once __DIR__ . '/alfredAgent.class.php';
         try {
-            alfredScheduler::processPending();
+            alfredAsyncTask::processPending();
         } catch (Exception $e) {
-            log::add('alfred_cron', 'error', 'cron: alfredScheduler failed — ' . $e->getMessage());
+            log::add('alfred_cron', 'error', 'cron: alfredAsyncTask failed — ' . $e->getMessage());
         }
     }
 

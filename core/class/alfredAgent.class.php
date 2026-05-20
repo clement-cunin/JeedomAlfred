@@ -234,6 +234,58 @@ class alfredAgent
         return (new alfredAgent(null, null, null, $userLogin, $userProfil))->run($sessionId, '');
     }
 
+    /**
+     * Inject an async tool error into a session and run a continuation LLM turn.
+     *
+     * Symmetric to resumeWithAsyncToolResult() — use when a background tool failed
+     * so the LLM can inform the user naturally.
+     *
+     * @api Stable public contract — callable from third-party plugins.
+     *
+     * @param string  $sessionId    The Alfred session to resume
+     * @param string  $toolName     Full tool name as registered in Alfred
+     * @param string  $errorMessage Human-readable error description
+     * @param ?string $userLogin    Resolved from session if null
+     * @param ?string $userProfil   Resolved from user table if null
+     * @return string               The assistant's final text response
+     */
+    public static function resumeWithAsyncToolError(
+        string  $sessionId,
+        string  $toolName,
+        string  $errorMessage,
+        ?string $userLogin  = null,
+        ?string $userProfil = null
+    ): string {
+        if ($userLogin === null) {
+            $userLogin = alfredConversation::getUserLogin($sessionId);
+        }
+        if ($userProfil === null && $userLogin !== null) {
+            $userProfil = 'user';
+            try {
+                $u = user::byLogin($userLogin);
+                if ($u && $u->getProfils() === 'admin') {
+                    $userProfil = 'admin';
+                }
+            } catch (Exception $ignored) {}
+        }
+
+        $toolCallId = bin2hex(random_bytes(8));
+
+        alfredConversation::saveAssistantResponse($sessionId, [
+            'text'        => '',
+            'tool_calls'  => [['id' => $toolCallId, 'name' => $toolName, 'input' => []]],
+            'stop_reason' => 'tool_use',
+            'usage'       => [],
+        ]);
+
+        alfredConversation::saveToolResult($sessionId, $toolCallId, $toolName, [
+            'error'   => true,
+            'message' => $errorMessage,
+        ]);
+
+        return (new alfredAgent(null, null, null, $userLogin, $userProfil))->run($sessionId, '');
+    }
+
     private static function extensionForMime(string $mimeType): string
     {
         $map = [
@@ -614,7 +666,6 @@ class alfredAgent
 
     /**
      * Handle a call to the synthetic alfred_schedule tool.
-     * Delegates to alfredScheduler and returns a confirmation string.
      */
     private function handleScheduleTool(string $sessionId, array $input): array
     {
@@ -625,7 +676,7 @@ class alfredAgent
             return ['error' => 'delay_seconds must be positive and instruction must not be empty.'];
         }
 
-        return alfredScheduler::schedule($sessionId, $delaySeconds, $instruction);
+        return alfredAsyncTask::schedule($sessionId, $delaySeconds, $instruction);
     }
 
     // -------------------------------------------------------------------------

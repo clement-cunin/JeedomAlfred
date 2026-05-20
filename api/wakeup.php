@@ -1,16 +1,12 @@
 <?php
 /**
- * Alfred wakeup script — called by the background scheduler after a delay.
+ * Alfred async task wakeup script — called by the background scheduler after a delay.
  *
  * CLI only. Usage:
- *   php wakeup.php --schedule_id=N --delay=N
+ *   php wakeup.php --task_id=N --delay=N
  *
- * The script sleeps for --delay seconds (0 means no sleep), then loads the
- * schedule row from the DB and runs the agent with a synthetic user message:
- *   "[SCHEDULED] {instruction}"
- *
- * The schedule row is updated to 'running' before the agent starts and to
- * 'done' or 'error' afterward, preventing duplicate executions.
+ * Sleeps for --delay seconds, then loads the task from alfred_async_task and
+ * executes it. Marks the task running before execution, then done or error after.
  */
 
 if (php_sapi_name() !== 'cli') {
@@ -19,12 +15,12 @@ if (php_sapi_name() !== 'cli') {
 }
 
 // ---- Parse arguments ----
-$opts       = getopt('', ['schedule_id:', 'delay:']);
-$scheduleId = (int)($opts['schedule_id'] ?? 0);
-$delay      = (int)($opts['delay']       ?? 0);
+$opts   = getopt('', ['task_id:', 'delay:']);
+$taskId = (int)($opts['task_id'] ?? 0);
+$delay  = (int)($opts['delay']   ?? 0);
 
-if ($scheduleId <= 0) {
-    fwrite(STDERR, "wakeup.php: --schedule_id is required and must be a positive integer\n");
+if ($taskId <= 0) {
+    fwrite(STDERR, "wakeup.php: --task_id is required and must be a positive integer\n");
     exit(1);
 }
 
@@ -42,31 +38,30 @@ require_once __DIR__ . '/../core/class/alfredLLM.class.php';
 require_once __DIR__ . '/../core/class/alfredMCP.class.php';
 require_once __DIR__ . '/../core/class/alfredMCPRegistry.class.php';
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
-require_once __DIR__ . '/../core/class/alfredScheduler.class.php';
+require_once __DIR__ . '/../core/class/alfredAsyncTask.class.php';
 require_once __DIR__ . '/../core/class/alfredMemory.class.php';
 require_once __DIR__ . '/../core/class/alfredAgent.class.php';
 
-// ---- Load schedule row ----
-$row = DB::Prepare(
-    'SELECT * FROM alfred_schedule WHERE id = :id LIMIT 1',
-    [':id' => $scheduleId],
-    DB::FETCH_TYPE_ROW
-) ?: null;
+// ---- Load task ----
+$task = alfredAsyncTask::getTask($taskId);
 
-if ($row === null) {
-    log::add('alfred_cron', 'error', "schedule #{$scheduleId}: row not found");
+if ($task === null) {
+    log::add('alfred_cron', 'error', "wakeup: task #{$taskId} not found");
     exit(1);
 }
 
-if ($row['status'] !== 'pending') {
+if ($task['status'] !== 'pending') {
     // Already executed or cancelled — exit silently to prevent duplicates
     exit(0);
 }
 
-log::add('alfred_cron', 'info', "=== schedule #{$scheduleId} starting: {$row['instruction']} ===");
+$payload     = json_decode($task['payload'] ?? '{}', true);
+$instruction = $payload['instruction'] ?? '';
+
+log::add('alfred_cron', 'info', "=== wakeup task #{$taskId} starting: {$instruction} ===");
 
 // ---- Resolve user from session ----
-$userLogin  = alfredConversation::getUserLogin($row['session_id']);
+$userLogin  = alfredConversation::getUserLogin($task['session_id']);
 $userProfil = null;
 if ($userLogin !== null) {
     try {
@@ -74,18 +69,18 @@ if ($userLogin !== null) {
         $userProfil = ($u && $u->getProfils() === 'admin') ? 'admin' : 'user';
     } catch (Exception $ignored) {}
 }
-log::add('alfred_cron', 'info', "schedule #{$scheduleId}: user={$userLogin}, session={$row['session_id']}");
+log::add('alfred_cron', 'info', "wakeup task #{$taskId}: user={$userLogin}, session={$task['session_id']}");
 
-// ---- Run agent ----
-alfredScheduler::markRunning($scheduleId);
+// ---- Run ----
+alfredAsyncTask::markRunning($taskId);
 
 try {
     $agent = new alfredAgent(null, null, null, $userLogin, $userProfil);
-    $agent->run($row['session_id'], '[SCHEDULED] ' . $row['instruction']);
-    alfredScheduler::markDone($scheduleId);
-    log::add('alfred_cron', 'info', "=== schedule #{$scheduleId} done ===");
+    $agent->run($task['session_id'], '[SCHEDULED] ' . $instruction);
+    alfredAsyncTask::resolve($taskId);
+    log::add('alfred_cron', 'info', "=== wakeup task #{$taskId} done ===");
 } catch (Exception $e) {
-    alfredScheduler::markError($scheduleId, $e->getMessage());
-    log::add('alfred_cron', 'error', "schedule #{$scheduleId} failed: " . $e->getMessage());
+    alfredAsyncTask::fail($taskId, $e->getMessage());
+    log::add('alfred_cron', 'error', "wakeup task #{$taskId} failed: " . $e->getMessage());
     exit(1);
 }
