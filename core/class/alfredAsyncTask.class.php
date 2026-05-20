@@ -56,10 +56,11 @@ class alfredAsyncTask
         }
 
         return [
-            'status'   => 'scheduled',
-            'strategy' => $strategy,
-            'run_at'   => $runAt->format('Y-m-d H:i:s'),
-            'message'  => "Scheduled in " . self::humanDelay($delaySeconds) . ": '{$instruction}'",
+            'status'        => 'scheduled',
+            'strategy'      => $strategy,
+            'run_at'        => $runAt->format('Y-m-d H:i:s'),
+            'message'       => "Scheduled in " . self::humanDelay($delaySeconds) . ": '{$instruction}'",
+            '_async_task_id' => $taskId, // consumed and stripped by alfredAgent before LLM sees it
         ];
     }
 
@@ -70,6 +71,13 @@ class alfredAsyncTask
     /**
      * Create an async task and its linked pending UI message.
      * Returns the new task ID.
+     */
+    /**
+     * Create an async task record.
+     *
+     * The linked pending UI message is NOT created here — the caller is responsible
+     * for calling linkMessage() after the tool result is saved to alfred_message,
+     * so that the pending message appears after the tool result in the conversation.
      */
     public static function create(string $sessionId, string $type, string $displayText, array $payload = []): int
     {
@@ -84,17 +92,26 @@ class alfredAsyncTask
             ],
             DB::FETCH_TYPE_ROW
         );
-        $taskId = (int) DB::getLastInsertId();
+        return (int) DB::getLastInsertId();
+    }
 
-        $messageId = alfredConversation::createPendingMessage($sessionId, $displayText, $taskId);
-
+    /**
+     * Create the pending UI message for a task and store the link.
+     * Must be called AFTER the tool result message is saved in alfred_message.
+     */
+    public static function linkMessage(int $taskId, string $sessionId): void
+    {
+        $task      = self::getTask($taskId);
+        $messageId = alfredConversation::createPendingMessage(
+            $sessionId,
+            $task['display_text'] ?? '',
+            $taskId
+        );
         DB::Prepare(
             'UPDATE alfred_async_task SET message_id = :message_id WHERE id = :id',
             [':message_id' => $messageId, ':id' => $taskId],
             DB::FETCH_TYPE_ROW
         );
-
-        return $taskId;
     }
 
     // -------------------------------------------------------------------------

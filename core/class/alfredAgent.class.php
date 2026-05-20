@@ -622,6 +622,13 @@ class alfredAgent
                     'duration_ms' => (int)round((microtime(true) - $tTool) * 1000),
                 ];
 
+                // Strip internal async task marker before it reaches the LLM or the DB
+                $asyncTaskId = null;
+                if (is_array($result) && isset($result['_async_task_id'])) {
+                    $asyncTaskId = (int) $result['_async_task_id'];
+                    unset($result['_async_task_id']);
+                }
+
                 $resultStr = is_array($result)
                     ? json_encode($result, JSON_UNESCAPED_UNICODE)
                     : (string)$result;
@@ -632,6 +639,11 @@ class alfredAgent
                 $tDb = microtime(true);
                 alfredConversation::saveToolResult($sessionId, $tc['id'], $tc['name'], $result);
                 $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
+
+                // Create the pending UI message AFTER the tool result so it appears last in the conversation
+                if ($asyncTaskId !== null) {
+                    alfredAsyncTask::linkMessage($asyncTaskId, $sessionId);
+                }
 
                 $messages[] = [
                     'role'        => 'tool',
