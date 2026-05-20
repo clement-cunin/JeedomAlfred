@@ -34,8 +34,8 @@ class alfredMigration
 
         $current = (int) config::byKey('schemaVersion', 'alfred', 0);
 
-        // Transition: old system used individual versions 1–6; new system squashes them into new v1
-        if ($current >= 1 && $current <= 6) {
+        // Transition: old system had individual versions; new system squashes them into new v1
+        if ($current >= 1 && $current > $target) {
             log::add('alfred', 'info', "Legacy schema v{$current} — transitioning to new migration system at v1");
             config::save('schemaVersion', 1, 'alfred');
             $current = 1;

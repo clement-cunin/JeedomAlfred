@@ -4,6 +4,7 @@ if (!isConnect('admin')) {
 }
 
 include_file('core', 'alfredMigration', 'class', 'alfred');
+alfredMigration::runPending();
 $_schemaVersion       = alfredMigration::getVersion();
 $_schemaTargetVersion = alfredMigration::getTargetVersion();
 
