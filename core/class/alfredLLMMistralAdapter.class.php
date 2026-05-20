@@ -226,9 +226,18 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
 
     private function toMistralMessages(array $messages): array
     {
-        $out = [];
+        $out      = [];
+        $lastRole = null;
         foreach ($messages as $msg) {
             $role = $msg['role'];
+
+            // Mistral requires strict user/assistant alternation. Two consecutive assistant
+            // messages occur when resumeWithAsyncToolResult() injects a synthetic tool-call
+            // turn after a session that ended with a normal text response. Insert a virtual
+            // user separator so the conversation stays valid.
+            if ($role === 'assistant' && $lastRole === 'assistant') {
+                $out[] = ['role' => 'user', 'content' => ''];
+            }
 
             if ($role === 'user') {
                 $out[] = ['role' => 'user', 'content' => $msg['content']];
@@ -257,6 +266,8 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
                     'name'         => $msg['name'] ?? '',
                 ];
             }
+
+            $lastRole = $role;
         }
         return $out;
     }
