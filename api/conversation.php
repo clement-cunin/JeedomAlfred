@@ -67,7 +67,7 @@ require_once __DIR__ . '/../core/class/alfredLLM.class.php';
 require_once __DIR__ . '/../core/class/alfredMCP.class.php';
 require_once __DIR__ . '/../core/class/alfredMCPRegistry.class.php';
 require_once __DIR__ . '/../core/class/alfredConversation.class.php';
-require_once __DIR__ . '/../core/class/alfredScheduler.class.php';
+require_once __DIR__ . '/../core/class/alfredAsyncTask.class.php';
 require_once __DIR__ . '/../core/class/alfredMemory.class.php';
 require_once __DIR__ . '/../core/class/alfredAgent.class.php';
 

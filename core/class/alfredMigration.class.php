@@ -4,6 +4,7 @@ class alfredMigration
 {
     const MIGRATIONS = [
         1 => 'migration_001_baseline',
+        2 => 'migration_002_async_tasks',
     ];
 
     private static function downDir(): string
@@ -33,6 +34,7 @@ class alfredMigration
         self::ensureLogTable();
 
         $current = (int) config::byKey('schemaVersion', 'alfred', 0);
+        $target  = max(array_keys(self::MIGRATIONS));
 
         // Transition: old system had individual versions; new system squashes them into new v1
         if ($current >= 1 && $current > $target) {
@@ -42,7 +44,7 @@ class alfredMigration
         }
 
         // Reset if any required table is missing (fresh install or schema corruption)
-        $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_schedule', 'alfred_llm_call'];
+        $required = ['alfred_message', 'alfred_conversation', 'alfred_memory', 'alfred_async_task', 'alfred_llm_call'];
         foreach ($required as $table) {
             $row = DB::Prepare(
                 "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :tbl",
@@ -240,6 +242,99 @@ class alfredMigration
             'DROP TABLE IF EXISTS `alfred_memory`',
             'DROP TABLE IF EXISTS `alfred_message`',
             'DROP TABLE IF EXISTS `alfred_conversation`',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Migration 2 — Unified async task table (replaces alfred_schedule)
+    //               + 'pending' role on alfred_message
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static function migration_002_async_tasks(): void
+    {
+        DB::Prepare(
+            'ALTER TABLE `alfred_message`
+             MODIFY COLUMN `role` ENUM(\'user\',\'assistant\',\'tool\',\'error\',\'pending\') NOT NULL',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+
+        DB::Prepare(
+            'CREATE TABLE IF NOT EXISTS `alfred_async_task` (
+                `id`           INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+                `session_id`   VARCHAR(36)   NOT NULL,
+                `type`         VARCHAR(64)   NOT NULL DEFAULT \'schedule\',
+                `status`       ENUM(\'pending\',\'running\',\'done\',\'error\') NOT NULL DEFAULT \'pending\',
+                `display_text` VARCHAR(255)  DEFAULT NULL,
+                `message_id`   INT UNSIGNED  DEFAULT NULL,
+                `payload`      JSON          DEFAULT NULL,
+                `result`       LONGTEXT      DEFAULT NULL,
+                `error_msg`    TEXT          DEFAULT NULL,
+                `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at`   DATETIME      DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY (`session_id`),
+                KEY (`status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+
+        // Migrate pending/running schedules — done/error are historical noise, skip them
+        DB::Prepare(
+            'INSERT INTO `alfred_async_task`
+                (session_id, type, status, payload, error_msg, created_at)
+             SELECT
+                session_id,
+                \'schedule\',
+                status,
+                JSON_OBJECT(
+                    \'instruction\', instruction,
+                    \'run_at\',      DATE_FORMAT(run_at, \'%Y-%m-%d %H:%i:%s\'),
+                    \'strategy\',    strategy
+                ),
+                error_msg,
+                created_at
+             FROM `alfred_schedule`
+             WHERE status IN (\'pending\', \'running\')',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+
+        DB::Prepare('DROP TABLE IF EXISTS `alfred_schedule`', [], DB::FETCH_TYPE_ROW);
+    }
+
+    private static function migration_002_async_tasks_down(): string
+    {
+        return implode(";\n", [
+            'DELETE FROM `alfred_message` WHERE `role` = \'pending\'',
+            'ALTER TABLE `alfred_message`
+             MODIFY COLUMN `role` ENUM(\'user\',\'assistant\',\'tool\',\'error\') NOT NULL',
+            'CREATE TABLE IF NOT EXISTS `alfred_schedule` (
+                `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+                `session_id`  VARCHAR(36)   NOT NULL,
+                `instruction` TEXT          NOT NULL,
+                `run_at`      DATETIME      NOT NULL,
+                `strategy`    ENUM(\'background\',\'cron\') NOT NULL,
+                `status`      ENUM(\'pending\',\'running\',\'done\',\'error\') NOT NULL DEFAULT \'pending\',
+                `error_msg`   TEXT          DEFAULT NULL,
+                `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY (`status`, `run_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+            'INSERT INTO `alfred_schedule`
+                (session_id, instruction, run_at, strategy, status, error_msg, created_at)
+             SELECT
+                session_id,
+                JSON_UNQUOTE(JSON_EXTRACT(payload, \'$.instruction\')),
+                JSON_UNQUOTE(JSON_EXTRACT(payload, \'$.run_at\')),
+                JSON_UNQUOTE(JSON_EXTRACT(payload, \'$.strategy\')),
+                status,
+                error_msg,
+                created_at
+             FROM `alfred_async_task`
+             WHERE type = \'schedule\'',
+            'DROP TABLE IF EXISTS `alfred_async_task`',
         ]);
     }
 }

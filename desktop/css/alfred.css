@@ -280,6 +280,19 @@
     border-bottom-left-radius: 2px;
 }
 
+.alfred-msg.error {
+    align-self: stretch;
+}
+
+.alfred-msg.error .alfred-msg-bubble {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    font-size: 0.9em;
+    width: 100%;
+}
+
 /* Per-message TTS action bar */
 .alfred-msg.assistant {
     align-items: flex-start;

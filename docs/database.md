@@ -18,7 +18,7 @@ erDiagram
     alfred_message {
         int id PK
         varchar session_id
-        varchar role "user, assistant, tool, error"
+        varchar role "user, assistant, tool, error, pending"
         longtext content
         json metadata
         datetime created_at
@@ -50,20 +50,24 @@ erDiagram
         datetime updated_at
     }
 
-    alfred_schedule {
+    alfred_async_task {
         int id PK
         varchar session_id
-        text instruction
-        datetime run_at
-        varchar strategy "background, cron"
+        varchar type "schedule, ext_*"
         varchar status "pending, running, done, error"
+        varchar display_text
+        int message_id FK
+        json payload
+        longtext result
         text error_msg
         datetime created_at
+        datetime updated_at
     }
 
     alfred_conversation ||--o{ alfred_message : "session_id"
-    alfred_conversation ||--o{ alfred_schedule : "session_id"
+    alfred_conversation ||--o{ alfred_async_task : "session_id"
     alfred_message |o--o| alfred_llm_call : "message_id"
+    alfred_async_task |o--o| alfred_message : "message_id"
 ```
 
 > Les relations sont portées par `session_id` (VARCHAR) et non par des clés étrangères déclarées, conformément aux autres tables du schéma Jeedom.
@@ -85,16 +89,18 @@ Une ligne par session de chat. `session_id` est un UUID v4 généré côté PHP.
 
 ### `alfred_message`
 
-Un message par ligne (utilisateur, assistant, résultat d'outil, ou erreur).
+Un message par ligne (utilisateur, assistant, résultat d'outil, erreur, ou tâche async en attente).
 
 | Colonne | Type | Description |
 |---|---|---|
 | `id` | INT UNSIGNED | PK auto-incrément |
 | `session_id` | VARCHAR(36) | Référence vers `alfred_conversation.session_id` |
-| `role` | ENUM | `user`, `assistant`, `tool`, ou `error` |
+| `role` | ENUM | `user`, `assistant`, `tool`, `error`, ou `pending` |
 | `content` | LONGTEXT | Contenu Markdown ou JSON (tool results) |
-| `metadata` | JSON | Provider, model, tool calls… (structure libre) |
+| `metadata` | JSON | Provider, model, tool calls… — pour `pending` : `{task_id, async_status, result?, error_msg?}` |
 | `created_at` | DATETIME | |
+
+Les messages `pending` sont display-only (exclus du contexte LLM). Leur `metadata.async_status` suit les transitions `pending → running → done/error`.
 
 ### `alfred_llm_call`
 
@@ -130,20 +136,23 @@ Mémoire persistante entre sessions, organisée par portée.
 | `created_at` | DATETIME | |
 | `updated_at` | DATETIME | |
 
-### `alfred_schedule`
+### `alfred_async_task`
 
-Tâches différées demandées par l'utilisateur à Alfred.
+Toutes les tâches asynchrones d'Alfred — actuellement les schedules, extensible aux plugins externes (Phase 2).
 
 | Colonne | Type | Description |
 |---|---|---|
 | `id` | INT UNSIGNED | PK auto-incrément |
 | `session_id` | VARCHAR(36) | Session d'origine |
-| `instruction` | TEXT | Instruction à exécuter |
-| `run_at` | DATETIME | Date/heure d'exécution prévue |
-| `strategy` | ENUM | `background` (one-shot) ou `cron` (récurrent) |
+| `type` | VARCHAR(64) | `schedule`, `ext_<plugin>_<action>`… |
 | `status` | ENUM | `pending`, `running`, `done`, `error` |
+| `display_text` | VARCHAR(255) | Texte affiché dans le message pending UI |
+| `message_id` | INT UNSIGNED | Référence vers `alfred_message.id` (le message pending) |
+| `payload` | JSON | Données spécifiques au type — pour `schedule` : `{instruction, run_at, strategy}` |
+| `result` | LONGTEXT | JSON résultat en cas de succès |
 | `error_msg` | TEXT | Message d'erreur éventuel |
 | `created_at` | DATETIME | |
+| `updated_at` | DATETIME | Mis à jour à chaque transition de statut |
 
 ---
 
@@ -181,18 +190,19 @@ Ce répertoire est exclu de git (`var/` dans `.gitignore`) et persiste sur le Pi
    ```php
    const MIGRATIONS = [
        1 => 'migration_001_baseline',
-       2 => 'migration_002_mon_changement',  // ← nouvelle entrée
+       2 => 'migration_002_async_tasks',
+       3 => 'migration_003_mon_changement',  // ← nouvelle entrée
    ];
    ```
 
 2. Écrire les méthodes `up` et `down` **ensemble** :
    ```php
-   private static function migration_002_mon_changement(): void
+   private static function migration_003_mon_changement(): void
    {
        DB::Prepare("ALTER TABLE `alfred_message` ADD COLUMN `foo` VARCHAR(50) DEFAULT NULL", [], DB::FETCH_TYPE_ROW);
    }
 
-   private static function migration_002_mon_changement_down(): string
+   private static function migration_003_mon_changement_down(): string
    {
        return "ALTER TABLE `alfred_message` DROP COLUMN `foo`";
    }
