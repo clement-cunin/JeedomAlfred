@@ -11,11 +11,13 @@
  */
 class alfredMCP
 {
-    private string $url;
-    private string $authHeader;
-    private string $authValue;
-    private int    $timeout;
-    private ?array $cachedTools = null;
+    private string  $url;
+    private string  $authHeader;
+    private string  $authValue;
+    private int     $timeout;
+    private ?array  $cachedTools   = null;
+    private bool    $initialized   = false;
+    private ?string $mcpSessionId  = null;
 
     public function __construct(
         string $url        = '',
@@ -43,6 +45,7 @@ class alfredMCP
             return $this->cachedTools;
         }
 
+        $this->ensureInitialized();
         $response = $this->send('tools/list', new stdClass());
         $tools = $response['tools'] ?? [];
 
@@ -63,6 +66,7 @@ class alfredMCP
      */
     public function callTool(string $name, array $arguments, ?string $sessionId = null)
     {
+        $this->ensureInitialized();
         $response = $this->send('tools/call', [
             'name'      => $name,
             'arguments' => $arguments,
@@ -85,10 +89,110 @@ class alfredMCP
     // JSON-RPC transport
     // -------------------------------------------------------------------------
 
+    /**
+     * MCP Streamable HTTP handshake: initialize → capture Mcp-Session-Id → notifications/initialized.
+     * Servers that don't use sessions ignore the initialize or return no session header — no impact.
+     */
+    private function ensureInitialized(): void
+    {
+        if ($this->initialized) {
+            return;
+        }
+        $this->initialized = true;
+
+        try {
+            $responseHeaders = [];
+            $this->sendRaw(
+                json_encode([
+                    'jsonrpc' => '2.0',
+                    'id'      => 0,
+                    'method'  => 'initialize',
+                    'params'  => [
+                        'protocolVersion' => '2024-11-05',
+                        'capabilities'    => new stdClass(),
+                        'clientInfo'      => ['name' => 'alfred', 'version' => '1.0'],
+                    ],
+                ]),
+                $this->buildHeaders(),
+                $responseHeaders
+            );
+
+            foreach ($responseHeaders as $header) {
+                if (stripos($header, 'Mcp-Session-Id:') === 0) {
+                    $this->mcpSessionId = trim(substr($header, strlen('Mcp-Session-Id:')));
+                    break;
+                }
+            }
+
+            $notifHeaders = $this->buildHeaders();
+            if ($this->mcpSessionId !== null) {
+                $notifHeaders[] = 'Mcp-Session-Id: ' . $this->mcpSessionId;
+            }
+            $this->sendRaw(
+                json_encode([
+                    'jsonrpc' => '2.0',
+                    'method'  => 'notifications/initialized',
+                    'params'  => new stdClass(),
+                ]),
+                $notifHeaders,
+                $ignored
+            );
+        } catch (Exception $e) {
+            // Server doesn't require initialization — proceed without session
+        }
+    }
+
+    private function buildHeaders(): array
+    {
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json, text/event-stream',
+        ];
+        if ($this->authHeader !== '' && $this->authValue !== '') {
+            $headers[] = $this->authHeader . ': ' . $this->authValue;
+        }
+        return $headers;
+    }
+
+    /** Low-level curl POST; populates $responseHeaders by reference. */
+    private function sendRaw(string $payload, array $requestHeaders, ?array &$responseHeaders): string
+    {
+        $responseHeaders = [];
+        $ch = curl_init($this->url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_HTTPHEADER     => $requestHeaders,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $this->timeout,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$responseHeaders) {
+                $responseHeaders[] = $header;
+                return strlen($header);
+            },
+        ]);
+        $raw = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false) {
+            throw new Exception("MCP HTTP request failed [{$this->url}]: {$err}");
+        }
+        return $raw;
+    }
+
     private function send(string $method, $params, ?string $sessionId = null): array
     {
         if ($this->url === '') {
             throw new Exception('MCP server URL is not configured.');
+        }
+
+        $headers = $this->buildHeaders();
+        if ($this->mcpSessionId !== null) {
+            $headers[] = 'Mcp-Session-Id: ' . $this->mcpSessionId;
+        }
+        if ($sessionId !== null && $sessionId !== '') {
+            $headers[] = 'X-Alfred-Session-Id: ' . $sessionId;
         }
 
         $payload = json_encode([
@@ -98,35 +202,9 @@ class alfredMCP
             'params'  => $params,
         ]);
 
-        $headers = [
-            'Content-Type: application/json',
-            'Accept: application/json, text/event-stream',
-        ];
-        if ($this->authHeader !== '' && $this->authValue !== '') {
-            $headers[] = $this->authHeader . ': ' . $this->authValue;
-        }
-        if ($sessionId !== null && $sessionId !== '') {
-            $headers[] = 'X-Alfred-Session-Id: ' . $sessionId;
-        }
-
-        $ch = curl_init($this->url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ]);
-
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
-        curl_close($ch);
-
-        if ($raw === false) {
-            throw new Exception("MCP HTTP request failed [{$this->url}]: {$err}");
-        }
+        $ignored = null;
+        $raw  = $this->sendRaw($payload, $headers, $ignored);
+        $code = 0;
 
         // Strip UTF-8 BOM if present (some PHP setups emit it)
         $raw  = ltrim($raw, "\xEF\xBB\xBF");
@@ -147,7 +225,7 @@ class alfredMCP
         $data = json_decode($body, true);
         if (!is_array($data)) {
             $preview = substr($raw, 0, 1000) . (strlen($raw) > 1000 ? '...' : '');
-            throw new Exception("MCP invalid JSON response (HTTP {$code}): " . $preview);
+            throw new Exception("MCP invalid JSON response: " . $preview);
         }
         if (isset($data['error'])) {
             $msg = $data['error']['message'] ?? json_encode($data['error']);

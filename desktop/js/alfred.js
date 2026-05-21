@@ -223,6 +223,8 @@ $(function () {
                 appendToolCall(msg.name, 'done', input, result);
             } else if (msg.role === 'pending') {
                 appendAsyncTask(msg);
+            } else if (msg.role === 'error') {
+                appendBubble('error', '⚠️ ' + msg.content);
             }
         });
         scrollToBottom();
