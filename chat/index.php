@@ -1126,6 +1126,7 @@ $(function () {
 
     function renderHistory(messages) {
         knownMsgCount = messages.length;
+        _toolCallMap  = {};
         $('#alfred-messages').empty();
         var toolInputMap = {};
         messages.forEach(function (msg, idx) {
@@ -1571,6 +1572,11 @@ $(function () {
             var d = JSON.parse(e.data); updateToolCall(d.name, 'done', d.result);
         });
 
+        source.addEventListener('async_task', function (e) {
+            var d = JSON.parse(e.data);
+            appendAsyncTask({ display_text: d.display_text, async_status: d.async_status, task_id: d.task_id });
+        });
+
         source.addEventListener('file_added', function (e) {
             var f = JSON.parse(e.data);
             if (!pendingFiles.some(function (pf) { return pf.file_id === f.file_id; })) {
@@ -1714,7 +1720,7 @@ $(function () {
         }
         if (hasResult) {
             var rstr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-            $details.append($('<div class="alfred-tool-section">')
+            $details.append($('<div class="alfred-tool-section alfred-tool-result-section">')
                 .append($('<span class="alfred-tool-label">').text('Result'))
                 .append($('<pre class="alfred-tool-pre">').text(rstr)));
         }
@@ -1729,9 +1735,12 @@ $(function () {
         if (!$el) return;
         $el.find('i').attr('class', 'fas ' + (status === 'done' ? 'fa-check text-success' : 'fa-times text-danger'));
         if (result !== undefined && result !== null) {
-            var rstr     = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-            var $details = $el.find('.alfred-tool-details').removeClass('alfred-tool-no-content');
-            $details.append($('<div class="alfred-tool-section">')
+            var $details = $el.find('.alfred-tool-details');
+            // Guard: only append result section if none exists yet
+            if ($details.find('.alfred-tool-result-section').length > 0) return;
+            var rstr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+            $details.removeClass('alfred-tool-no-content');
+            $details.append($('<div class="alfred-tool-section alfred-tool-result-section">')
                 .append($('<span class="alfred-tool-label">').text('Result'))
                 .append($('<pre class="alfred-tool-pre">').text(rstr)));
         }

@@ -643,6 +643,12 @@ class alfredAgent
                 // Create the pending UI message AFTER the tool result so it appears last in the conversation
                 if ($asyncTaskId !== null) {
                     alfredAsyncTask::linkMessage($asyncTaskId, $sessionId);
+                    $task = alfredAsyncTask::getTask($asyncTaskId);
+                    $this->emit('async_task', [
+                        'task_id'      => $asyncTaskId,
+                        'display_text' => $task['display_text'] ?? '',
+                        'async_status' => 'pending',
+                    ]);
                 }
 
                 $messages[] = [

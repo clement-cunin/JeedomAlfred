@@ -197,6 +197,7 @@ $(function () {
 
     function renderHistory(messages) {
         knownMsgCount = messages.length;
+        _toolCallMap  = {};
         $('#alfred-messages').empty();
         var toolInputMap = {};
         messages.forEach(function (msg) {
@@ -211,7 +212,7 @@ $(function () {
                 }
             } else if (msg.role === 'user') {
                 if (msg.content.indexOf('[SCHEDULED]') === 0) {
-                    appendScheduledBubble(msg.content.replace('[SCHEDULED]', '').trim());
+                    // skip — shown via pending task bubble
                 } else {
                     appendBubble('user', msg.content);
                 }
@@ -220,6 +221,8 @@ $(function () {
                 var result;
                 try { result = JSON.parse(msg.content); } catch (e) { result = msg.content; }
                 appendToolCall(msg.name, 'done', input, result);
+            } else if (msg.role === 'pending') {
+                appendAsyncTask(msg);
             }
         });
         scrollToBottom();
@@ -596,6 +599,11 @@ $(function () {
             updateToolCall(d.name, 'done', d.result);
         });
 
+        source.addEventListener('async_task', function (e) {
+            var d = JSON.parse(e.data);
+            appendAsyncTask({ display_text: d.display_text, async_status: d.async_status, task_id: d.task_id });
+        });
+
         source.addEventListener('debug', function (e) {
             if (!alfred_config.isAdmin) return;
             var d = JSON.parse(e.data);
@@ -753,7 +761,7 @@ $(function () {
         if (hasResult) {
             var resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
             $details.append(
-                $('<div class="alfred-tool-section">')
+                $('<div class="alfred-tool-section alfred-tool-result-section">')
                     .append($('<span class="alfred-tool-label">').text('Résultat'))
                     .append($('<pre class="alfred-tool-pre">').text(resultStr))
             );
@@ -772,15 +780,42 @@ $(function () {
         $el.find('i').attr('class', 'fas ' + icon);
 
         if (result !== undefined && result !== null) {
-            var resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
             var $details = $el.find('.alfred-tool-details');
+            // Guard: only append result section if none exists yet
+            if ($details.find('.alfred-tool-result-section').length > 0) return;
+            var resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
             $details.removeClass('alfred-tool-no-content');
             $details.append(
-                $('<div class="alfred-tool-section">')
+                $('<div class="alfred-tool-section alfred-tool-result-section">')
                     .append($('<span class="alfred-tool-label">').text('Résultat'))
                     .append($('<pre class="alfred-tool-pre">').text(resultStr))
             );
         }
+    }
+
+    function appendAsyncTask(msg) {
+        var status  = msg.async_status || 'pending';
+        var iconMap = { pending: 'fa-spinner fa-spin', running: 'fa-spinner fa-spin', done: 'fa-check text-success', error: 'fa-times text-danger' };
+        var $summary = $('<summary class="alfred-tool-call-header">')
+            .append($('<i>').addClass('fas ' + (iconMap[status] || 'fa-spinner fa-spin')))
+            .append($('<code>').text(msg.display_text || 'Tâche async'));
+        var $details = $('<details class="alfred-tool-details">').append($summary);
+        var hasResult = msg.result !== undefined && msg.result !== null;
+        var hasError  = msg.error_msg !== undefined && msg.error_msg !== null;
+        if (!hasResult && !hasError) $details.addClass('alfred-tool-no-content');
+        if (hasResult) {
+            var rstr = typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result, null, 2);
+            $details.append($('<div class="alfred-tool-section">')
+                .append($('<span class="alfred-tool-label">').text('Résultat'))
+                .append($('<pre class="alfred-tool-pre">').text(rstr)));
+        }
+        if (hasError) {
+            $details.append($('<div class="alfred-tool-section">')
+                .append($('<span class="alfred-tool-label">').text('Erreur'))
+                .append($('<pre class="alfred-tool-pre">').text(msg.error_msg)));
+        }
+        $('#alfred-messages').append($('<div class="alfred-tool-call">').append($details));
+        scrollToBottom();
     }
 
     function showTyping() {
@@ -864,6 +899,30 @@ $(function () {
             return v.toString(16);
         });
     }
+
+    // =========================================================================
+    // Background poll — picks up async task updates
+    // =========================================================================
+
+    setInterval(function () {
+        if (isStreaming || !currentSessionId) return;
+        $.ajax({
+            type: 'POST',
+            url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+            data: { action: 'getMessages', session_id: currentSessionId },
+            dataType: 'json',
+            success: function (resp) {
+                if (resp.state !== 'ok' || !resp.result) return;
+                var hasActivePending = resp.result.some(function (m) {
+                    return m.role === 'pending' && m.async_status !== 'done' && m.async_status !== 'error';
+                });
+                if (resp.result.length > knownMsgCount || hasActivePending) {
+                    renderHistory(resp.result);
+                    loadSessions();
+                }
+            }
+        });
+    }, 5000);
 
     // =========================================================================
     // Boot
