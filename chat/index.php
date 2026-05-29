@@ -1903,6 +1903,24 @@ $(function () {
     var _shareFileId  = _urlParams.get('share_file_id');
     var _shareName    = _urlParams.get('share_name');
     var _shareType    = _urlParams.get('share_type') || 'application/octet-stream';
+    var _shareError   = _urlParams.get('share_error');
+
+    if (_shareError) {
+        var _errMsgs = {
+            auth:     'Share failed: session expired. Open Alfred once to refresh auth.',
+            nofile:   'Share failed: no file received (code ' + (_urlParams.get('code') || '?') + ').',
+            badfile:  'Share failed: unsupported file type (' + (_urlParams.get('mime') || '?') + ').',
+            savefail: 'Share failed: could not save the file on the server.'
+        };
+        var $toast = $('<div>').css({
+            position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+            background: '#c0392b', color: '#fff', padding: '10px 18px', borderRadius: '8px',
+            zIndex: 9999, fontSize: '14px', maxWidth: '90vw', textAlign: 'center'
+        }).text(_errMsgs[_shareError] || 'Share failed: ' + _shareError);
+        $('body').append($toast);
+        setTimeout(function () { $toast.fadeOut(400, function () { $toast.remove(); }); }, 6000);
+        history.replaceState(null, '', window.location.pathname);
+    }
 
     loadSessions(function () {
         if (_shareSession && _shareFileId && _shareName) {

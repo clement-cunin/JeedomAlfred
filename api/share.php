@@ -22,7 +22,7 @@ if (isConnect()) {
     $connectedUser = $hash !== '' ? user::byHash($hash) : null;
 }
 if (!$connectedUser) {
-    header('Location: ' . $chatUrl);
+    header('Location: ' . $chatUrl . '?share_error=auth');
     exit;
 }
 
@@ -31,7 +31,8 @@ $allowedExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
 $maxSize    = 20 * 1024 * 1024;
 
 if (empty($_FILES['files']) || $_FILES['files']['error'] !== UPLOAD_ERR_OK) {
-    header('Location: ' . $chatUrl);
+    $uploadErr = $_FILES['files']['error'] ?? -1;
+    header('Location: ' . $chatUrl . '?share_error=nofile&code=' . $uploadErr);
     exit;
 }
 
@@ -39,7 +40,7 @@ $file     = $_FILES['files'];
 $mimeType = mime_content_type($file['tmp_name']);
 
 if ($file['size'] > $maxSize || !in_array($mimeType, $allowed, true)) {
-    header('Location: ' . $chatUrl);
+    header('Location: ' . $chatUrl . '?share_error=badfile&mime=' . urlencode($mimeType));
     exit;
 }
 
@@ -62,7 +63,7 @@ $safeExt = in_array($origExt, $allowedExt, true) ? $origExt : '';
 $filename = $fileId . ($safeExt !== '' ? '.' . $safeExt : '');
 
 if (!move_uploaded_file($file['tmp_name'], $dir . DIRECTORY_SEPARATOR . $filename)) {
-    header('Location: ' . $chatUrl);
+    header('Location: ' . $chatUrl . '?share_error=savefail');
     exit;
 }
 
