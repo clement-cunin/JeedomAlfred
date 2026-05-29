@@ -15,6 +15,16 @@ if (isConnect()) {
     $_userHash     = $_SESSION['user']->getHash();
     $_isConfigured = alfred::getApiKey() !== '';
     $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
+    // Persist user_hash as a cookie so share.php can auth without a live PHP session.
+    if (($_COOKIE['alfred_user_hash'] ?? '') !== $_userHash) {
+        setcookie('alfred_user_hash', $_userHash, [
+            'expires'  => time() + 30 * 24 * 3600,
+            'path'     => '/plugins/alfred/',
+            'secure'   => true,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
 }
 ?><!DOCTYPE html>
 <html lang="en">

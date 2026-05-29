@@ -14,7 +14,14 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 $chatUrl = '/plugins/alfred/chat/index.php';
 
-if (!isConnect()) {
+$connectedUser = null;
+if (isConnect()) {
+    $connectedUser = $_SESSION['user'] ?? null;
+} else {
+    $hash          = trim($_COOKIE['alfred_user_hash'] ?? '');
+    $connectedUser = $hash !== '' ? user::byHash($hash) : null;
+}
+if (!$connectedUser) {
     header('Location: ' . $chatUrl);
     exit;
 }
