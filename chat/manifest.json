@@ -4,7 +4,7 @@
     "short_name": "Alfred",
     "description": "AI assistant for your Jeedom home automation system.",
     "start_url": "/plugins/alfred/chat/index.php",
-    "scope": "/plugins/alfred/chat/",
+    "scope": "/plugins/alfred/",
     "display": "fullscreen",
     "display_override": ["fullscreen", "standalone", "minimal-ui"],
     "orientation": "portrait",
