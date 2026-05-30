@@ -854,6 +854,63 @@ if (isConnect()) {
         }
 
         #alfred-login .login-btn:hover { background: #286090; }
+
+        /* ---- Share destination bottom sheet ---- */
+        #alfred-share-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 2000;
+        }
+        #alfred-share-sheet {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #fff;
+            border-radius: 16px 16px 0 0;
+            padding: 24px 20px calc(16px + env(safe-area-inset-bottom));
+            z-index: 2001;
+            box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+        }
+        #alfred-share-sheet h3 {
+            margin: 0 0 14px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        #alfred-share-file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f4f7fb;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #555;
+            overflow: hidden;
+        }
+        #alfred-share-file-info i { color: #337ab7; font-size: 18px; flex-shrink: 0; }
+        #alfred-share-file-info span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .alfred-share-btn {
+            display: block;
+            width: 100%;
+            padding: 13px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+            margin-bottom: 10px;
+            transition: opacity 0.15s;
+        }
+        .alfred-share-btn:last-child { margin-bottom: 0; }
+        .alfred-share-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        #alfred-share-btn-current { background: #fff; color: #337ab7; border: 1.5px solid #337ab7; }
+        #alfred-share-btn-new     { background: #337ab7; color: #fff; }
+        #alfred-share-btn-cancel  { background: transparent; color: #999; font-size: 14px; font-weight: 400; padding: 10px; }
     </style>
 </head>
 <body>
@@ -909,6 +966,19 @@ if (isConnect()) {
         </div>
 
     </div>
+</div>
+
+<!-- Share destination bottom sheet -->
+<div id="alfred-share-overlay"></div>
+<div id="alfred-share-sheet">
+    <h3>Ajouter le fichier à...</h3>
+    <div id="alfred-share-file-info">
+        <i id="alfred-share-file-icon" class="fas fa-file"></i>
+        <span id="alfred-share-file-name"></span>
+    </div>
+    <button class="alfred-share-btn" id="alfred-share-btn-current">Conversation actuelle</button>
+    <button class="alfred-share-btn" id="alfred-share-btn-new">Nouvelle conversation</button>
+    <button class="alfred-share-btn" id="alfred-share-btn-cancel">Annuler</button>
 </div>
 
 <script>
@@ -1921,21 +1991,85 @@ $(function () {
 
     loadSessions(function () {
         if (_shareSession && _shareFileId && _shareName) {
-            // Clean URL so a refresh doesn't re-trigger the share
-            if (window.history && window.history.replaceState) {
-                history.replaceState(null, '', window.location.pathname);
+            history.replaceState(null, '', window.location.pathname);
+
+            var _lastId           = localStorage.getItem('alfred_last_session');
+            var _hasCurrentSession = !!(_lastId && $('[data-session-id="' + _lastId + '"]').length);
+
+            document.getElementById('alfred-share-file-icon').className = 'fas ' + mimeToIcon(_shareType);
+            document.getElementById('alfred-share-file-name').textContent = _shareName;
+            var _btnCurrent = document.getElementById('alfred-share-btn-current');
+            _btnCurrent.disabled = !_hasCurrentSession;
+            _btnCurrent.title    = _hasCurrentSession ? '' : 'Aucune conversation active';
+
+            document.getElementById('alfred-share-overlay').style.display = 'block';
+            document.getElementById('alfred-share-sheet').style.display   = 'block';
+
+            function _closeSheet() {
+                document.getElementById('alfred-share-overlay').style.display = 'none';
+                document.getElementById('alfred-share-sheet').style.display   = 'none';
             }
-            currentSessionId = _shareSession;
-            localStorage.setItem('alfred_last_session', _shareSession);
-            renderWelcome();
-            setInputEnabled(!!alfred_config.isConfigured);
-            pendingFiles.push({ file_id: _shareFileId, filename: _shareName, mime_type: _shareType });
-            renderAttachmentBar();
-            if (alfred_config.isConfigured) {
-                setTimeout(function () {
-                    sendMessage(_shareSession, 'I shared a file with you: ' + _shareName);
-                }, 400);
+
+            function _activateSession(sessId) {
+                currentSessionId = sessId;
+                localStorage.setItem('alfred_last_session', sessId);
+                if ($('[data-session-id="' + sessId + '"]').length) {
+                    loadSession(sessId);
+                } else {
+                    renderWelcome();
+                    setInputEnabled(!!alfred_config.isConfigured);
+                }
+                pendingFiles.push({ file_id: _shareFileId, filename: _shareName, mime_type: _shareType });
+                renderAttachmentBar();
             }
+
+            document.getElementById('alfred-share-btn-new').onclick = function () {
+                _closeSheet();
+                _activateSession(_shareSession);
+            };
+
+            document.getElementById('alfred-share-btn-current').onclick = function () {
+                if (!_hasCurrentSession) return;
+                var btn = this;
+                btn.disabled    = true;
+                btn.textContent = 'Transfert…';
+                $.ajax({
+                    url:         alfred_config.basePath + '/api/share_accept.php',
+                    method:      'POST',
+                    contentType: 'application/json',
+                    data:        JSON.stringify({
+                        share_session:  _shareSession,
+                        file_id:        _shareFileId,
+                        target_session: _lastId,
+                        user_hash:      alfred_config.userHash
+                    }),
+                    success: function () {
+                        _closeSheet();
+                        _activateSession(_lastId);
+                    },
+                    error: function () {
+                        btn.disabled    = false;
+                        btn.textContent = 'Conversation actuelle';
+                        alert('Erreur lors du transfert du fichier.');
+                    }
+                });
+            };
+
+            document.getElementById('alfred-share-btn-cancel').onclick = function () {
+                _closeSheet();
+                var lastId = localStorage.getItem('alfred_last_session');
+                if (lastId && $('[data-session-id="' + lastId + '"]').length) {
+                    loadSession(lastId);
+                } else {
+                    startNewSession();
+                    setInputEnabled(!!alfred_config.isConfigured);
+                }
+            };
+
+            document.getElementById('alfred-share-overlay').onclick = function () {
+                document.getElementById('alfred-share-btn-cancel').onclick();
+            };
+
         } else {
             var lastId = localStorage.getItem('alfred_last_session');
             if (lastId && $('[data-session-id="' + lastId + '"]').length) {
