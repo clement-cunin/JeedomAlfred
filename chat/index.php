@@ -1993,22 +1993,8 @@ $(function () {
         if (_shareSession && _shareFileId && _shareName) {
             history.replaceState(null, '', window.location.pathname);
 
-            var _lastId           = localStorage.getItem('alfred_last_session');
+            var _lastId            = localStorage.getItem('alfred_last_session');
             var _hasCurrentSession = !!(_lastId && $('[data-session-id="' + _lastId + '"]').length);
-
-            document.getElementById('alfred-share-file-icon').className = 'fas ' + mimeToIcon(_shareType);
-            document.getElementById('alfred-share-file-name').textContent = _shareName;
-            var _btnCurrent = document.getElementById('alfred-share-btn-current');
-            _btnCurrent.disabled = !_hasCurrentSession;
-            _btnCurrent.title    = _hasCurrentSession ? '' : 'Aucune conversation active';
-
-            document.getElementById('alfred-share-overlay').style.display = 'block';
-            document.getElementById('alfred-share-sheet').style.display   = 'block';
-
-            function _closeSheet() {
-                document.getElementById('alfred-share-overlay').style.display = 'none';
-                document.getElementById('alfred-share-sheet').style.display   = 'none';
-            }
 
             function _activateSession(sessId) {
                 currentSessionId = sessId;
@@ -2023,16 +2009,7 @@ $(function () {
                 renderAttachmentBar();
             }
 
-            document.getElementById('alfred-share-btn-new').onclick = function () {
-                _closeSheet();
-                _activateSession(_shareSession);
-            };
-
-            document.getElementById('alfred-share-btn-current').onclick = function () {
-                if (!_hasCurrentSession) return;
-                var btn = this;
-                btn.disabled    = true;
-                btn.textContent = 'Transfert…';
+            function _transferAndActivate(targetId) {
                 $.ajax({
                     url:         alfred_config.basePath + '/api/share_accept.php',
                     method:      'POST',
@@ -2040,35 +2017,76 @@ $(function () {
                     data:        JSON.stringify({
                         share_session:  _shareSession,
                         file_id:        _shareFileId,
-                        target_session: _lastId,
+                        target_session: targetId,
                         user_hash:      alfred_config.userHash
                     }),
-                    success: function () {
-                        _closeSheet();
-                        _activateSession(_lastId);
-                    },
-                    error: function () {
-                        btn.disabled    = false;
-                        btn.textContent = 'Conversation actuelle';
-                        alert('Erreur lors du transfert du fichier.');
-                    }
+                    success: function () { _activateSession(targetId); },
+                    error:   function () { _activateSession(_shareSession); }
                 });
-            };
+            }
 
-            document.getElementById('alfred-share-btn-cancel').onclick = function () {
-                _closeSheet();
-                var lastId = localStorage.getItem('alfred_last_session');
-                if (lastId && $('[data-session-id="' + lastId + '"]').length) {
-                    loadSession(lastId);
+            if (!_hasCurrentSession) {
+                // No conversation with messages: no need to ask.
+                // If there's an existing empty session (e.g. from a previous share with files
+                // but no message sent), transfer the file there. Otherwise use the share session.
+                if (_lastId && _lastId !== _shareSession) {
+                    _transferAndActivate(_lastId);
                 } else {
-                    startNewSession();
-                    setInputEnabled(!!alfred_config.isConfigured);
+                    _activateSession(_shareSession);
                 }
-            };
+            } else {
+                // A real conversation exists: ask where to put the file.
+                document.getElementById('alfred-share-file-icon').className   = 'fas ' + mimeToIcon(_shareType);
+                document.getElementById('alfred-share-file-name').textContent = _shareName;
 
-            document.getElementById('alfred-share-overlay').onclick = function () {
-                document.getElementById('alfred-share-btn-cancel').onclick();
-            };
+                document.getElementById('alfred-share-overlay').style.display = 'block';
+                document.getElementById('alfred-share-sheet').style.display   = 'block';
+
+                function _closeSheet() {
+                    document.getElementById('alfred-share-overlay').style.display = 'none';
+                    document.getElementById('alfred-share-sheet').style.display   = 'none';
+                }
+
+                document.getElementById('alfred-share-btn-new').onclick = function () {
+                    _closeSheet();
+                    _activateSession(_shareSession);
+                };
+
+                document.getElementById('alfred-share-btn-current').onclick = function () {
+                    var btn = this;
+                    btn.disabled    = true;
+                    btn.textContent = 'Transfert…';
+                    $.ajax({
+                        url:         alfred_config.basePath + '/api/share_accept.php',
+                        method:      'POST',
+                        contentType: 'application/json',
+                        data:        JSON.stringify({
+                            share_session:  _shareSession,
+                            file_id:        _shareFileId,
+                            target_session: _lastId,
+                            user_hash:      alfred_config.userHash
+                        }),
+                        success: function () {
+                            _closeSheet();
+                            _activateSession(_lastId);
+                        },
+                        error: function () {
+                            btn.disabled    = false;
+                            btn.textContent = 'Conversation actuelle';
+                            alert('Erreur lors du transfert du fichier.');
+                        }
+                    });
+                };
+
+                document.getElementById('alfred-share-btn-cancel').onclick = function () {
+                    _closeSheet();
+                    loadSession(_lastId);
+                };
+
+                document.getElementById('alfred-share-overlay').onclick = function () {
+                    document.getElementById('alfred-share-btn-cancel').onclick();
+                };
+            }
 
         } else {
             var lastId = localStorage.getItem('alfred_last_session');
