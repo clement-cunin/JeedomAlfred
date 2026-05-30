@@ -15,16 +15,6 @@ if (isConnect()) {
     $_userHash     = $_SESSION['user']->getHash();
     $_isConfigured = alfred::getApiKey() !== '';
     $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
-    // Persist user_hash as a cookie so share.php can auth without a live PHP session.
-    if (($_COOKIE['alfred_user_hash'] ?? '') !== $_userHash) {
-        setcookie('alfred_user_hash', $_userHash, [
-            'expires'  => time() + 30 * 24 * 3600,
-            'path'     => '/plugins/alfred/',
-            'secure'   => true,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-    }
 }
 ?><!DOCTYPE html>
 <html lang="en">
@@ -939,6 +929,13 @@ if ("<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>") {
     localStorage.setItem('alfred_user_hash',     alfred_config.userHash);
     localStorage.setItem('alfred_is_configured', alfred_config.isConfigured ? '1' : '0');
     localStorage.setItem('alfred_is_admin',      alfred_config.isAdmin ? '1' : '0');
+}
+// Set a cookie so share.php can authenticate even without a live PHP session.
+// SameSite=None is required: the Web Share Target POST is a cross-origin navigation.
+if (alfred_config.userHash) {
+    var _cookieExp = new Date(Date.now() + 30 * 24 * 3600 * 1000).toUTCString();
+    document.cookie = 'alfred_user_hash=' + encodeURIComponent(alfred_config.userHash)
+        + '; expires=' + _cookieExp + '; path=/plugins/alfred/; Secure; SameSite=None';
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
