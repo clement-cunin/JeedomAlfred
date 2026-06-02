@@ -40,15 +40,38 @@ $_providers = [
     'ollama'  => 'Ollama (local)',
 ];
 
-// Provider chain
-$_chainRaw  = config::byKey('provider_chain', 'alfred');
-$_chainJson = is_array($_chainRaw) ? (json_encode($_chainRaw) ?: '[]') : ($_chainRaw ?: '[]');
-// Bootstrap default chain if empty (e.g. fresh install before activate() is called)
-if ($_chainJson === '[]' || $_chainJson === '') {
-    $_fallback  = config::byKey('provider', 'alfred');
-    if ($_fallback === '') $_fallback = 'mistral';
-    $_chainJson = json_encode([$_fallback]);
+// Provider chain (object format: [{id, type, api_key/base_url, model, enabled}, ...])
+$_chainRaw     = config::byKey('provider_chain', 'alfred');
+$_chainDecoded = is_array($_chainRaw) ? $_chainRaw : (json_decode((string)$_chainRaw, true) ?: []);
+// Migrate old slug-array format in-place
+if (!empty($_chainDecoded) && is_string($_chainDecoded[0])) {
+    $tmp = [];
+    foreach ($_chainDecoded as $slug) {
+        $entry = ['id' => alfred::generateSessionId(), 'type' => $slug, 'enabled' => true];
+        if ($slug === 'ollama') {
+            $entry['base_url'] = (string)config::byKey('ollama_base_url', 'alfred') ?: 'http://localhost:11434';
+        } else {
+            $entry['api_key'] = (string)config::byKey($slug . '_api_key', 'alfred');
+        }
+        $entry['model'] = (string)config::byKey($slug . '_model', 'alfred');
+        $tmp[] = $entry;
+    }
+    $_chainDecoded = $tmp;
+    config::save('provider_chain', json_encode($_chainDecoded), 'alfred');
 }
+// Bootstrap default chain if still empty
+if (empty($_chainDecoded)) {
+    $slug = (string)config::byKey('provider', 'alfred') ?: 'mistral';
+    $_chainDecoded = [[
+        'id'      => alfred::generateSessionId(),
+        'type'    => $slug,
+        'api_key' => (string)config::byKey($slug . '_api_key', 'alfred'),
+        'model'   => (string)config::byKey($slug . '_model', 'alfred'),
+        'enabled' => true,
+    ]];
+    config::save('provider_chain', json_encode($_chainDecoded), 'alfred');
+}
+$_chainJson = json_encode($_chainDecoded) ?: '[]';
 
 // Auto-detect JeedomMCP settings (used for add button default URL)
 $_mcpAutoUrl    = network::getNetworkAccess('internal', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
@@ -66,89 +89,23 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
         <!-- ================================================================ -->
         <legend><i class="fas fa-robot"></i> {{AI provider}}</legend>
 
+        <input type="hidden" id="alfred_provider_chain_json" class="configKey" data-l1key="provider_chain" />
+
         <div class="form-group">
-            <div class="col-sm-offset-4 col-sm-8" style="margin-bottom:8px">
-                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_test_llm">
-                    <i class="fas fa-plug"></i> {{Test LLM connection}}
+            <div class="col-sm-offset-4 col-sm-8">
+                <div id="alfred-chain-list"></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-sm-offset-4 col-sm-8">
+                <select id="alfred_chain_add_select" class="form-control input-sm" style="display:inline-block;width:auto;min-width:160px">
+                    <?php foreach ($_providers as $_pid => $_plabel): ?>
+                    <option value="<?php echo $_pid; ?>"><?php echo $_plabel; ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_chain_add" style="margin-left:6px">
+                    <i class="fas fa-plus"></i> {{Add provider}}
                 </button>
-                <span id="alfred_test_llm_result" style="margin-left:10px;font-size:13px"></span>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="col-sm-4 control-label">{{Fallback chain}}</label>
-            <div class="col-sm-8">
-                <input type="hidden" id="alfred_provider_chain_json" class="configKey" data-l1key="provider_chain" />
-                <div id="alfred-chain-list" style="margin-bottom:6px"></div>
-                <div style="display:flex;align-items:center;gap:6px">
-                    <select id="alfred_chain_add_select" class="form-control input-sm" style="width:auto;min-width:150px"></select>
-                    <button type="button" class="btn btn-default btn-sm" id="bt_alfred_chain_add">
-                        <i class="fas fa-plus"></i> {{Add}}
-                    </button>
-                </div>
-                <span class="help-block" style="padding-left:0;margin-top:4px">{{Providers are tried in order. If one fails due to quota or unavailability, the next is used automatically.}}</span>
-            </div>
-        </div>
-
-        <!-- Mistral -->
-        <div class="alfred-provider-section" data-provider="mistral">
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{Mistral API key}}</label>
-                <div class="col-sm-4">
-                    <input type="password" class="configKey form-control alfred-api-key" data-l1key="mistral_api_key"
-                           placeholder="..." autocomplete="new-password" />
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{Model}}</label>
-                <div class="col-sm-4">
-                    <select class="configKey form-control alfred-model-select" data-l1key="mistral_model">
-                        <?php $_saved = config::byKey('mistral_model', 'alfred'); ?>
-                        <option value="<?php echo htmlspecialchars($_saved); ?>"><?php echo htmlspecialchars($_saved ?: '—'); ?></option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- Gemini -->
-        <div class="alfred-provider-section" data-provider="gemini">
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{Gemini API key}}</label>
-                <div class="col-sm-4">
-                    <input type="password" class="configKey form-control alfred-api-key" data-l1key="gemini_api_key"
-                           placeholder="AIza..." autocomplete="new-password" />
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{Model}}</label>
-                <div class="col-sm-4">
-                    <select class="configKey form-control alfred-model-select" data-l1key="gemini_model">
-                        <?php $_saved = config::byKey('gemini_model', 'alfred'); ?>
-                        <option value="<?php echo htmlspecialchars($_saved); ?>"><?php echo htmlspecialchars($_saved ?: '—'); ?></option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- Ollama -->
-        <div class="alfred-provider-section" data-provider="ollama">
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{Ollama URL}}</label>
-                <div class="col-sm-4">
-                    <input type="text" class="configKey form-control alfred-api-key" data-l1key="ollama_base_url"
-                           placeholder="http://192.168.1.X:11434" />
-                </div>
-                <span class="help-block col-sm-4">{{Base URL of your local Ollama instance.}}</span>
-            </div>
-            <div class="form-group">
-                <label class="col-sm-4 control-label">{{Model}}</label>
-                <div class="col-sm-4">
-                    <select class="configKey form-control alfred-model-select" data-l1key="ollama_model">
-                        <?php $_saved = config::byKey('ollama_model', 'alfred'); ?>
-                        <option value="<?php echo htmlspecialchars($_saved); ?>"><?php echo htmlspecialchars($_saved ?: '—'); ?></option>
-                    </select>
-                </div>
-                <span class="help-block col-sm-4">{{Click to load available models from Ollama.}}</span>
             </div>
         </div>
 
@@ -374,41 +331,13 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
     white-space: pre-wrap;
     line-height: 1.4;
 }
-.alfred-chain-entry {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-bottom: 4px;
-    padding: 5px 10px;
-    background: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-}
-.alfred-chain-badge {
-    flex: 1;
-    font-size: 13px;
-}
-.alfred-chain-num {
-    display: inline-block;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #5bc0de;
-    color: #fff;
-    font-size: 10px;
-    font-weight: bold;
-    text-align: center;
-    line-height: 18px;
-    margin-right: 6px;
-    flex-shrink: 0;
-}
-.alfred-chain-entry:first-child .alfred-chain-num {
-    background: #5cb85c;
+.alfred-mcp-server-card.disabled-provider {
+    opacity: 0.6;
 }
 .alfred-chain-test-result {
     font-size: 12px;
-    margin-left: 4px;
-    white-space: nowrap;
+    margin-left: 6px;
+    line-height: 30px;
 }
 </style>
 
@@ -708,7 +637,7 @@ $('#bt_alfred_autodetect_mcp').on('click', function() {
 });
 
 // ============================================================
-// Provider chain manager
+// Provider chain manager — card-based, one card per provider entry
 // ============================================================
 
 var _alfredChain          = [];
@@ -735,56 +664,128 @@ function alfredChainRender() {
     $list.empty();
 
     if (_alfredChain.length === 0) {
-        $list.append('<p class="text-muted" style="margin:4px 0">' + _alfredI18n.chain_empty + '</p>');
+        $list.append('<p class="text-muted" style="margin:8px 0 4px">' + _alfredI18n.chain_empty + '</p>');
     }
 
-    $.each(_alfredChain, function (i, slug) {
-        var label = _alfredProviderLabels[slug] || slug;
-        var $entry = $('<div class="alfred-chain-entry">');
-        $entry.append(
-            $('<span class="alfred-chain-badge">')
-                .append($('<span class="alfred-chain-num">').text(i + 1))
-                .append(label)
-        );
-
-        // Up / Down
-        var $up = $('<button type="button" class="btn btn-default btn-xs" title="Up"><i class="fas fa-arrow-up"></i></button>');
-        $up.prop('disabled', i === 0).on('click', (function (idx) {
-            return function () { alfredChainMove(idx, -1); };
-        })(i));
-
-        var $down = $('<button type="button" class="btn btn-default btn-xs" title="Down"><i class="fas fa-arrow-down"></i></button>');
-        $down.prop('disabled', i === _alfredChain.length - 1).on('click', (function (idx) {
-            return function () { alfredChainMove(idx, 1); };
-        })(i));
-
-        // Remove
-        var $remove = $('<button type="button" class="btn btn-danger btn-xs" title="Remove"><i class="fas fa-trash"></i></button>');
-        $remove.on('click', (function (idx) {
-            return function () { alfredChainRemove(idx); };
-        })(i));
-
-        // Test
-        var $testResult = $('<span class="alfred-chain-test-result">');
-        var $test = $('<button type="button" class="btn btn-default btn-xs"><i class="fas fa-plug"></i></button>');
-        $test.on('click', (function (s, $r) {
-            return function () { alfredChainTest(s, $r); };
-        })(slug, $testResult));
-
-        $entry.append($up).append($down).append($remove).append($test).append($testResult);
-        $list.append($entry);
+    $.each(_alfredChain, function (i, entry) {
+        $list.append(alfredChainBuildCard(i, entry));
     });
+}
 
-    alfredChainUpdateAddSelect();
-    alfredUpdateProviderSections();
+function alfredChainBuildCard(i, entry) {
+    var type     = entry.type    || 'mistral';
+    var isOllama = (type === 'ollama');
+    var credVal  = isOllama ? (entry.base_url || '') : (entry.api_key || '');
+    var model    = entry.model   || '';
+    var enabled  = (entry.enabled !== false);
+
+    var $card = $('<div class="alfred-mcp-server-card">');
+    if (!enabled) $card.addClass('disabled-provider');
+
+    // Row 1: provider type + credential
+    var $typeWrap = $('<div class="alfred-field" style="flex:0 0 auto;width:155px">');
+    $typeWrap.append($('<label>').text('{{Provider}}'));
+    var $typeSelect = $('<select class="form-control input-sm alfred-chain-type">');
+    $.each(_alfredProviderLabels, function (slug, label) {
+        $typeSelect.append($('<option>').val(slug).text(label));
+    });
+    $typeSelect.val(type);
+    $typeSelect.on('change', (function (idx) {
+        return function () {
+            var t = $(this).val();
+            _alfredChain[idx].type = t;
+            delete _alfredChain[idx].api_key;
+            delete _alfredChain[idx].base_url;
+            delete _alfredChain[idx].model;
+            alfredChainUpdateCredField($(this).closest('.alfred-mcp-server-card'), t);
+            alfredChainSerialize();
+        };
+    })(i));
+    $typeWrap.append($typeSelect);
+
+    var $credWrap = $('<div class="alfred-field" style="flex:2">');
+    $credWrap.append($('<label class="alfred-chain-cred-label">'));
+    var $credInput = $('<input class="form-control input-sm alfred-chain-cred" autocomplete="new-password">');
+    $credInput.val(credVal);
+    $credInput.on('input', (function (idx) {
+        return function () {
+            var t = _alfredChain[idx].type;
+            if (t === 'ollama') { _alfredChain[idx].base_url = $(this).val(); delete _alfredChain[idx].api_key; }
+            else                { _alfredChain[idx].api_key  = $(this).val(); delete _alfredChain[idx].base_url; }
+            alfredChainSerialize();
+        };
+    })(i));
+    $credWrap.append($credInput);
+    $card.append($('<div class="alfred-mcp-line">').append($typeWrap).append($credWrap));
+    alfredChainUpdateCredField($card, type);
+
+    // Row 2: model
+    var $modelWrap = $('<div class="alfred-field" style="flex:1">');
+    $modelWrap.append($('<label>').text('{{Model}}'));
+    var $modelSelect = $('<select class="form-control input-sm alfred-chain-model">');
+    $modelSelect.append($('<option>').val(model).text(model || '—'));
+    $modelSelect.val(model);
+    $modelSelect.on('change', (function (idx) {
+        return function () { _alfredChain[idx].model = $(this).val(); alfredChainSerialize(); };
+    })(i));
+    $modelWrap.append($modelSelect);
+    $card.append($('<div class="alfred-mcp-line">').append($modelWrap));
+
+    // Row 3: enabled + test
+    var $enabledCb = $('<input type="checkbox">').prop('checked', enabled);
+    $enabledCb.on('change', (function (idx) {
+        return function () {
+            _alfredChain[idx].enabled = $(this).is(':checked');
+            $(this).closest('.alfred-mcp-server-card').toggleClass('disabled-provider', !_alfredChain[idx].enabled);
+            alfredChainSerialize();
+        };
+    })(i));
+    var $enabledLabel = $('<label class="alfred-mcp-check-label">').append($enabledCb).append(' {{Enabled}}');
+
+    var $testResult = $('<span class="alfred-chain-test-result">');
+    var $testBtn    = $('<button type="button" class="btn btn-default btn-sm">').html('<i class="fas fa-plug"></i> {{Test}}');
+    $testBtn.on('click', (function (idx, $r) {
+        return function () {
+            var t    = _alfredChain[idx].type;
+            var cred = (t === 'ollama') ? (_alfredChain[idx].base_url || '') : (_alfredChain[idx].api_key || '');
+            alfredChainTest(t, cred, _alfredChain[idx].model || '', $r);
+        };
+    })(i, $testResult));
+
+    $card.append($('<div class="alfred-mcp-line alfred-mcp-check-line">').append($enabledLabel).append($testBtn).append($testResult));
+
+    // Side actions
+    var $side = $('<div class="alfred-mcp-side-actions">');
+    if (_alfredChain.length > 1) {
+        var $btnUp = $('<button type="button" class="btn btn-default btn-xs" title="Move up"><i class="fas fa-arrow-up"></i></button>');
+        $btnUp.prop('disabled', i === 0).on('click', (function (idx) { return function () { alfredChainMove(idx, -1); }; })(i));
+        var $btnDown = $('<button type="button" class="btn btn-default btn-xs" title="Move down"><i class="fas fa-arrow-down"></i></button>');
+        $btnDown.prop('disabled', i === _alfredChain.length - 1).on('click', (function (idx) { return function () { alfredChainMove(idx, 1); }; })(i));
+        $side.append($btnUp).append($btnDown);
+    }
+    var $btnRemove = $('<button type="button" class="btn btn-danger btn-xs" title="Remove"><i class="fas fa-trash"></i></button>');
+    $btnRemove.on('click', (function (idx) { return function () { alfredChainRemove(idx); }; })(i));
+    $side.append($btnRemove);
+
+    return $('<div class="alfred-mcp-entry">').append($card).append($side);
+}
+
+function alfredChainUpdateCredField($card, type) {
+    var $label = $card.find('.alfred-chain-cred-label');
+    var $input = $card.find('.alfred-chain-cred');
+    if (type === 'ollama') {
+        $label.text('{{Ollama URL}}');
+        $input.attr('type', 'text').attr('placeholder', 'http://192.168.1.X:11434');
+    } else {
+        $label.text('{{API key}}');
+        $input.attr('type', 'password').attr('placeholder', '...');
+    }
 }
 
 function alfredChainMove(i, dir) {
     var j = i + dir;
     if (j < 0 || j >= _alfredChain.length) return;
-    var tmp = _alfredChain[i];
-    _alfredChain[i] = _alfredChain[j];
-    _alfredChain[j] = tmp;
+    var tmp = _alfredChain[i]; _alfredChain[i] = _alfredChain[j]; _alfredChain[j] = tmp;
     alfredChainSerialize();
     alfredChainRender();
 }
@@ -795,64 +796,50 @@ function alfredChainRemove(i) {
     alfredChainRender();
 }
 
-function alfredChainUpdateAddSelect() {
-    var $select = $('#alfred_chain_add_select');
-    $select.empty();
-    $.each(_alfredProviderLabels, function (slug, label) {
-        if (_alfredChain.indexOf(slug) === -1) {
-            $select.append($('<option>').val(slug).text(label));
-        }
-    });
-    $('#bt_alfred_chain_add').prop('disabled', $select.find('option').length === 0);
-}
-
-function alfredUpdateProviderSections() {
-    $.each(_alfredProviderLabels, function (slug) {
-        var inChain = _alfredChain.indexOf(slug) !== -1;
-        $('.alfred-provider-section[data-provider="' + slug + '"]').toggle(inChain);
-    });
-}
-
-function alfredChainTest(slug, $result) {
-    var $section = $('.alfred-provider-section[data-provider="' + slug + '"]');
-    var apiKey   = $section.find('.alfred-api-key').val().trim();
-    var model    = $section.find('.alfred-model-select').val();
-
-    if (!apiKey) {
-        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i></span>');
+function alfredChainTest(type, cred, model, $result) {
+    if (!cred) {
+        var msg = (type === 'ollama') ? '{{Enter the Ollama URL first.}}' : _alfredI18n.enter_api_key;
+        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + msg + '</span>');
         return;
     }
-
     $result.html('<i class="fas fa-spinner fa-spin"></i>');
     $.ajax({
         type: 'POST',
         url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-        data: { action: 'testLLM', provider: slug, api_key: apiKey, model: model },
+        data: { action: 'testLLM', provider: type, api_key: cred, model: model },
         dataType: 'json',
         success: function (data) {
             if (data.state === 'ok') {
-                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i></span>');
+                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> ' + data.result.model + ' — OK</span>');
             } else {
-                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i></span>');
+                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (data.result || data.state) + '</span>');
             }
         },
-        error: function () {
-            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i></span>');
+        error: function (jqXHR) {
+            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
         }
     });
 }
 
 $('#bt_alfred_chain_add').on('click', function () {
-    var slug = $('#alfred_chain_add_select').val();
-    if (!slug || _alfredChain.indexOf(slug) !== -1) return;
-    _alfredChain.push(slug);
+    var type  = $('#alfred_chain_add_select').val();
+    if (!type) return;
+    var entry = { id: (Math.random().toString(36).slice(2) + Date.now().toString(36)), type: type, model: '', enabled: true };
+    if (type === 'ollama') { entry.base_url = ''; } else { entry.api_key = ''; }
+    _alfredChain.push(entry);
     alfredChainSerialize();
     alfredChainRender();
 });
 
-// Initialize chain from PHP-injected value (no race condition, same pattern as MCP servers)
+// Initialize chain from PHP-injected value
 (function () {
     try { _alfredChain = JSON.parse(_alfredChainJson); } catch (e) { _alfredChain = []; }
+    // Handle old slug-array format in JS
+    if (_alfredChain.length > 0 && typeof _alfredChain[0] === 'string') {
+        _alfredChain = _alfredChain.map(function (slug) {
+            return { id: '', type: slug, api_key: '', model: '', enabled: true };
+        });
+    }
     alfredChainSerialize(true);
     alfredChainRender();
 })();
@@ -860,23 +847,30 @@ $('#bt_alfred_chain_add').on('click', function () {
 // Initialize MCP server list
 (function () {
     try { _alfredMcpServers = JSON.parse(_alfredMcpServersJson); } catch (e) { _alfredMcpServers = []; }
-    alfredMcpSerialize(true);  // sync hidden field only, no save on init
+    alfredMcpSerialize(true);
     alfredMcpRender();
 })();
 
-// ---- Lazy model loading ----
-var _alfredModelsLoaded = {};
+// ---- Model lazy-loading for chain cards ----
 
-function alfredLoadModels($section) {
-    var provider = $section.data('provider');
-    if (_alfredModelsLoaded[provider]) return;
+$(document).on('mousedown', '.alfred-chain-model', function () {
+    alfredChainLoadModels($(this).closest('.alfred-mcp-server-card'));
+});
 
-    var $select  = $section.find('.alfred-model-select');
-    var apiKey   = $section.find('.alfred-api-key').val().trim();
-    var savedVal = $select.val();
+$(document).on('blur', '.alfred-chain-cred', function () {
+    var $card = $(this).closest('.alfred-mcp-server-card');
+    if ($card.find('.alfred-chain-type').val() === 'ollama') {
+        alfredChainLoadModels($card);
+    }
+});
 
-    if (!apiKey) return;
-    _alfredModelsLoaded[provider] = true;
+function alfredChainLoadModels($card) {
+    var type    = $card.find('.alfred-chain-type').val();
+    var cred    = $card.find('.alfred-chain-cred').val().trim();
+    var $select = $card.find('.alfred-chain-model');
+    var saved   = $select.val();
+
+    if (!cred) return;
 
     $select.empty().append($('<option>').val('').text(_alfredI18n.loading).prop('disabled', true).prop('selected', true));
     $select.prop('disabled', true);
@@ -884,44 +878,31 @@ function alfredLoadModels($section) {
     $.ajax({
         type: 'POST',
         url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-        data: { action: 'listModels', provider: provider, api_key: apiKey },
+        data: { action: 'listModels', provider: type, api_key: cred },
         dataType: 'json',
         success: function (resp) {
             $select.empty();
             if (resp.state !== 'ok') {
-                $select.append($('<option>').val(savedVal).text(savedVal));
-                $select.val(savedVal);
+                $select.append($('<option>').val(saved).text(saved));
+                $select.val(saved);
                 return;
             }
             resp.result.forEach(function (m) {
                 $select.append($('<option>').val(m.id).text(m.name));
             });
-            if (savedVal && $select.find('option[value="' + savedVal + '"]').length) {
-                $select.val(savedVal);
+            if (saved && $select.find('option[value="' + saved + '"]').length) {
+                $select.val(saved);
             } else {
                 $select.prop('selectedIndex', 0);
             }
         },
         error: function () {
-            $select.empty().append($('<option>').val(savedVal).text(savedVal));
-            $select.val(savedVal);
+            $select.empty().append($('<option>').val(saved).text(saved));
+            $select.val(saved);
         },
-        complete: function () {
-            $select.prop('disabled', false);
-        }
+        complete: function () { $select.prop('disabled', false); }
     });
 }
-
-$(document).on('mousedown', '.alfred-model-select', function () {
-    alfredLoadModels($(this).closest('.alfred-provider-section'));
-});
-
-// For Ollama, also load models when the URL field loses focus
-$(document).on('blur', '.alfred-provider-section[data-provider="ollama"] .alfred-api-key', function () {
-    var $section = $(this).closest('.alfred-provider-section');
-    _alfredModelsLoaded['ollama'] = false; // reset so we reload with the new URL
-    alfredLoadModels($section);
-});
 
 // ---- Memory management ----
 
@@ -1130,47 +1111,4 @@ $(document).on('click', '.alfred-memory-create-cancel', function () {
     }
 });
 
-$('#bt_alfred_test_llm').on('click', function () {
-    var $btn     = $(this);
-    var $result  = $('#alfred_test_llm_result');
-    var provider = _alfredChain.length > 0 ? _alfredChain[0] : null;
-
-    if (!provider) {
-        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> {{Add a provider to the chain first.}}</span>');
-        return;
-    }
-
-    var $section = $('.alfred-provider-section[data-provider="' + provider + '"]');
-    var apiKey   = $section.find('.alfred-api-key').val().trim();
-    var model    = $section.find('.alfred-model-select').val();
-
-    if (!apiKey) {
-        var _missingMsg = (provider === 'ollama') ? '{{Enter the Ollama URL first.}}' : _alfredI18n.enter_api_key;
-        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + _missingMsg + '</span>');
-        return;
-    }
-
-    $btn.prop('disabled', true);
-    $result.html('<i class="fas fa-spinner fa-spin"></i>');
-
-    $.ajax({
-        type: 'POST',
-        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-        data: { action: 'testLLM', provider: provider, api_key: apiKey, model: model },
-        dataType: 'json',
-        success: function (data) {
-            if (data.state === 'ok') {
-                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> ' + data.result.model + ' — OK</span>');
-            } else {
-                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (data.result || data.state) + '</span>');
-            }
-        },
-        error: function (jqXHR) {
-            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
-        },
-        complete: function () {
-            $btn.prop('disabled', false);
-        }
-    });
-});
 </script>

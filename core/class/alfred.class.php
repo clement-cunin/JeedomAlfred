@@ -14,11 +14,28 @@ class alfred extends eqLogic {
         if (config::byKey('provider', __CLASS__) === '') {
             config::save('provider', 'mistral', __CLASS__);
         }
-        // Migrate single provider to provider_chain
-        if (config::byKey('provider_chain', __CLASS__) === '') {
-            $existing = config::byKey('provider', __CLASS__);
-            if ($existing === '') $existing = 'mistral';
-            config::save('provider_chain', json_encode([$existing]), __CLASS__);
+        // Migrate provider_chain to self-contained entry objects
+        $rawChain = config::byKey('provider_chain', __CLASS__);
+        $decoded  = is_array($rawChain) ? $rawChain : (json_decode((string)$rawChain, true) ?: []);
+        $needsObjectMigration = !empty($decoded) && is_string($decoded[0]);
+        $needsDefault         = empty($decoded);
+        if ($needsObjectMigration || $needsDefault) {
+            if ($needsDefault) {
+                $decoded = [(string)config::byKey('provider', __CLASS__) ?: 'mistral'];
+            }
+            $newChain = [];
+            foreach ($decoded as $slug) {
+                if (!is_string($slug)) { $newChain[] = $slug; continue; }
+                $entry = ['id' => self::generateSessionId(), 'type' => $slug, 'enabled' => true];
+                if ($slug === 'ollama') {
+                    $entry['base_url'] = (string)config::byKey('ollama_base_url', __CLASS__) ?: 'http://localhost:11434';
+                } else {
+                    $entry['api_key'] = (string)config::byKey($slug . '_api_key', __CLASS__);
+                }
+                $entry['model'] = (string)config::byKey($slug . '_model', __CLASS__);
+                $newChain[] = $entry;
+            }
+            config::save('provider_chain', json_encode($newChain), __CLASS__);
         }
         // Set default models
         $defaults = [
@@ -88,8 +105,12 @@ class alfred extends eqLogic {
     // -------------------------------------------------------------------------
 
     public static function getProvider(): string {
-        $chain = self::getProviderChain();
-        if (!empty($chain)) return $chain[0];
+        foreach (self::getProviderChain() as $entry) {
+            if (is_string($entry)) return $entry;
+            if (is_array($entry) && !empty($entry['type'])) {
+                if (!isset($entry['enabled']) || $entry['enabled']) return $entry['type'];
+            }
+        }
         return (string)config::byKey('provider', __CLASS__);
     }
 
@@ -151,6 +172,26 @@ class alfred extends eqLogic {
     public static function getMaxIterations(): int {
         $v = (int)config::byKey('max_iterations', __CLASS__);
         return $v > 0 ? $v : 10;
+    }
+
+    public static function tempDisableProvider(string $id, int $seconds): void {
+        if ($id === '') return;
+        $raw = (string)config::byKey('provider_temp_disabled', __CLASS__);
+        $map = ($raw !== '') ? (json_decode($raw, true) ?: []) : [];
+        $map[$id] = time() + $seconds;
+        config::save('provider_temp_disabled', json_encode($map), __CLASS__);
+    }
+
+    public static function isTempDisabled(string $id): bool {
+        if ($id === '') return false;
+        $raw = (string)config::byKey('provider_temp_disabled', __CLASS__);
+        if ($raw === '') return false;
+        $map = json_decode($raw, true);
+        if (!is_array($map) || !isset($map[$id])) return false;
+        if (time() < (int)$map[$id]) return true;
+        unset($map[$id]);
+        config::save('provider_temp_disabled', json_encode($map), __CLASS__);
+        return false;
     }
 
     // -------------------------------------------------------------------------
