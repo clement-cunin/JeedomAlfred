@@ -668,7 +668,13 @@ function alfredChainRender() {
     }
 
     $.each(_alfredChain, function (i, entry) {
-        $list.append(alfredChainBuildCard(i, entry));
+        var $entry = alfredChainBuildCard(i, entry);
+        $list.append($entry);
+        // Auto-load models in background if credential is already set
+        var cred = (entry.type === 'ollama') ? (entry.base_url || '') : (entry.api_key || '');
+        if (cred) {
+            alfredChainLoadModels($entry.find('.alfred-mcp-server-card'));
+        }
     });
 }
 
@@ -851,56 +857,47 @@ $('#bt_alfred_chain_add').on('click', function () {
     alfredMcpRender();
 })();
 
-// ---- Model lazy-loading for chain cards ----
-
-$(document).on('mousedown', '.alfred-chain-model', function () {
-    alfredChainLoadModels($(this).closest('.alfred-mcp-server-card'));
-});
+// ---- Model background-loading for chain cards ----
+// Models are loaded silently (no DOM change before response) so the select stays
+// open when the user clicks it. Load triggers: page render + credential blur.
 
 $(document).on('blur', '.alfred-chain-cred', function () {
-    var $card = $(this).closest('.alfred-mcp-server-card');
-    if ($card.find('.alfred-chain-type').val() === 'ollama') {
-        alfredChainLoadModels($card);
-    }
+    alfredChainLoadModels($(this).closest('.alfred-mcp-server-card'));
 });
 
 function alfredChainLoadModels($card) {
     var type    = $card.find('.alfred-chain-type').val();
     var cred    = $card.find('.alfred-chain-cred').val().trim();
     var $select = $card.find('.alfred-chain-model');
-    var saved   = $select.val();
 
     if (!cred) return;
 
-    $select.empty().append($('<option>').val('').text(_alfredI18n.loading).prop('disabled', true).prop('selected', true));
-    $select.prop('disabled', true);
-
+    // Silent load — keep existing options visible until the response arrives
+    var currentVal = $select.val();
     $.ajax({
         type: 'POST',
         url: 'plugins/alfred/core/ajax/alfred.ajax.php',
         data: { action: 'listModels', provider: type, api_key: cred },
         dataType: 'json',
         success: function (resp) {
+            if (resp.state !== 'ok') return;
+            var chosen = $select.val() || currentVal;
             $select.empty();
-            if (resp.state !== 'ok') {
-                $select.append($('<option>').val(saved).text(saved));
-                $select.val(saved);
-                return;
-            }
             resp.result.forEach(function (m) {
                 $select.append($('<option>').val(m.id).text(m.name));
             });
-            if (saved && $select.find('option[value="' + saved + '"]').length) {
-                $select.val(saved);
+            if (chosen && $select.find('option[value="' + chosen + '"]').length) {
+                $select.val(chosen);
             } else {
                 $select.prop('selectedIndex', 0);
+                // Persist updated selection back to chain
+                var idx = $select.closest('.alfred-mcp-entry').index();
+                if (idx >= 0 && _alfredChain[idx]) {
+                    _alfredChain[idx].model = $select.val();
+                    alfredChainSerialize();
+                }
             }
-        },
-        error: function () {
-            $select.empty().append($('<option>').val(saved).text(saved));
-            $select.val(saved);
-        },
-        complete: function () { $select.prop('disabled', false); }
+        }
     });
 }
 
