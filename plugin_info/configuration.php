@@ -98,12 +98,7 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
         </div>
         <div class="form-group">
             <div class="col-sm-offset-4 col-sm-8">
-                <select id="alfred_chain_add_select" class="form-control input-sm" style="display:inline-block;width:auto;min-width:160px">
-                    <?php foreach ($_providers as $_pid => $_plabel): ?>
-                    <option value="<?php echo $_pid; ?>"><?php echo $_plabel; ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_chain_add" style="margin-left:6px">
+                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_chain_add">
                     <i class="fas fa-plus"></i> {{Add provider}}
                 </button>
             </div>
@@ -815,8 +810,7 @@ function alfredChainTest(type, cred, model, $result) {
 }
 
 $('#bt_alfred_chain_add').on('click', function () {
-    var type  = $('#alfred_chain_add_select').val();
-    if (!type) return;
+    var type  = <?php echo json_encode(array_key_first($_providers)); ?>;
     var entry = { id: (Math.random().toString(36).slice(2) + Date.now().toString(36)), type: type, model: '', enabled: true };
     if (type === 'ollama') { entry.base_url = ''; } else { entry.api_key = ''; }
     _alfredChain.push(entry);
