@@ -148,6 +148,8 @@ class alfredLLMChain extends alfredLLMAdapter
                 if ($i > 0) {
                     log::add('alfred', 'info', 'LLM chain: fallback to ' . $entry['adapter']->getProvider() . ' succeeded after ' . $i . ' failure(s)');
                 }
+                $result['_provider'] = $entry['adapter']->getProvider();
+                $result['_model']    = $entry['adapter']->getModel();
                 return $result;
             } catch (Exception $e) {
                 $lastException = $e;
@@ -175,6 +177,8 @@ class alfredLLMChain extends alfredLLMAdapter
                 if ($i > 0) {
                     log::add('alfred', 'info', 'LLM chain: stream fallback to ' . $entry['adapter']->getProvider() . ' succeeded after ' . $i . ' failure(s)');
                 }
+                $result['_provider'] = $entry['adapter']->getProvider();
+                $result['_model']    = $entry['adapter']->getModel();
                 return $result;
             } catch (Exception $e) {
                 $lastException = $e;

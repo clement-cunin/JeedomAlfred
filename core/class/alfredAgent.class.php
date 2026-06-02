@@ -524,9 +524,6 @@ class alfredAgent
         $systemChars  = strlen($effectiveSystemPrompt);
         $toolsChars   = strlen(json_encode($tools));
         $prevMsgChars = strlen(json_encode($messages));
-        $llmProvider  = $this->llm->getProvider();
-        $llmModel     = $this->llm->getModel();
-
         while ($iterations < $this->maxIterations) {
             $iterations++;
 
@@ -544,7 +541,9 @@ class alfredAgent
                 'duration_ms' => $durationMs,
             ];
 
-            $llmInfo = ['provider' => $llmProvider, 'model' => $llmModel];
+            $llmProvider = $response['_provider'] ?? $this->llm->getProvider();
+            $llmModel    = $response['_model']    ?? $this->llm->getModel();
+            $llmInfo     = ['provider' => $llmProvider, 'model' => $llmModel];
 
             if ($response['stop_reason'] === 'end_turn' || empty($response['tool_calls'])) {
                 // Final text response — delta events were already emitted chunk by chunk
