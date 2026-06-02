@@ -28,6 +28,7 @@ $_js_i18n = [
     'test_ok'            => __('OK — %d tool(s) found', __FILE__),
     'conflict_warning'   => __('Tool name conflicts detected — first declared server wins. Conflicting names: %s. Enable tool prefix on one of the servers to resolve.', __FILE__),
     'no_servers'         => __('No MCP servers configured. Alfred will work as a plain LLM without tools.', __FILE__),
+    'chain_empty'        => __('No provider configured. Add at least one.', __FILE__),
     'add_memory'         => __('Add memory', __FILE__),
     'memory_label_ph'    => __('e.g. vacation-july', __FILE__),
     'memory_content_ph'  => __('Memory content…', __FILE__),
@@ -38,6 +39,16 @@ $_providers = [
     'gemini'  => 'Google (Gemini)',
     'ollama'  => 'Ollama (local)',
 ];
+
+// Provider chain
+$_chainRaw  = config::byKey('provider_chain', 'alfred');
+$_chainJson = is_array($_chainRaw) ? (json_encode($_chainRaw) ?: '[]') : ($_chainRaw ?: '[]');
+// Bootstrap default chain if empty (e.g. fresh install before activate() is called)
+if ($_chainJson === '[]' || $_chainJson === '') {
+    $_fallback  = config::byKey('provider', 'alfred');
+    if ($_fallback === '') $_fallback = 'mistral';
+    $_chainJson = json_encode([$_fallback]);
+}
 
 // Auto-detect JeedomMCP settings (used for add button default URL)
 $_mcpAutoUrl    = network::getNetworkAccess('internal', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
@@ -65,15 +76,18 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
         </div>
 
         <div class="form-group">
-            <label class="col-sm-4 control-label">{{Provider}}</label>
-            <div class="col-sm-4">
-                <select id="alfred_provider" class="configKey form-control" data-l1key="provider">
-                    <?php foreach ($_providers as $_pid => $_plabel): ?>
-                    <option value="<?php echo $_pid; ?>"><?php echo $_plabel; ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <label class="col-sm-4 control-label">{{Fallback chain}}</label>
+            <div class="col-sm-8">
+                <input type="hidden" id="alfred_provider_chain_json" class="configKey" data-l1key="provider_chain" />
+                <div id="alfred-chain-list" style="margin-bottom:6px"></div>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <select id="alfred_chain_add_select" class="form-control input-sm" style="width:auto;min-width:150px"></select>
+                    <button type="button" class="btn btn-default btn-sm" id="bt_alfred_chain_add">
+                        <i class="fas fa-plus"></i> {{Add}}
+                    </button>
+                </div>
+                <span class="help-block" style="padding-left:0;margin-top:4px">{{Providers are tried in order. If one fails due to quota or unavailability, the next is used automatically.}}</span>
             </div>
-            <span class="help-block col-sm-4">{{Select the AI provider to use.}}</span>
         </div>
 
         <!-- Mistral -->
@@ -360,6 +374,42 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
     white-space: pre-wrap;
     line-height: 1.4;
 }
+.alfred-chain-entry {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+    padding: 5px 10px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+.alfred-chain-badge {
+    flex: 1;
+    font-size: 13px;
+}
+.alfred-chain-num {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #5bc0de;
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 18px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+.alfred-chain-entry:first-child .alfred-chain-num {
+    background: #5cb85c;
+}
+.alfred-chain-test-result {
+    font-size: 12px;
+    margin-left: 4px;
+    white-space: nowrap;
+}
 </style>
 
 <script>
@@ -368,6 +418,8 @@ var _alfredMcpAutoApiKey   = <?php echo json_encode($_mcpAutoApiKey); ?>;
 var _alfredMcpServersJson  = <?php echo json_encode($_mcpServersJson); ?>;
 var _alfredI18n            = <?php echo json_encode($_js_i18n); ?>;
 var _alfredSchemaTarget    = <?php echo (int) $_schemaTargetVersion; ?>;
+var _alfredChainJson       = <?php echo json_encode($_chainJson); ?>;
+var _alfredProviderLabels  = <?php echo json_encode($_providers); ?>;
 
 $('#bt_alfred_repair_db').on('click', function () {
     var $btn    = $(this);
@@ -655,37 +707,162 @@ $('#bt_alfred_autodetect_mcp').on('click', function() {
     $.fn.showAlert({ message: _alfredI18n.mcp_autodetected, level: 'success' });
 });
 
-// ---- LLM provider selector ----
-function alfredShowProvider(provider) {
-    $('.alfred-provider-section').hide();
-    $('.alfred-provider-section[data-provider="' + provider + '"]').show();
+// ============================================================
+// Provider chain manager
+// ============================================================
+
+var _alfredChain          = [];
+var _alfredChainSaveTimer = null;
+
+function alfredChainSerialize(skipSave) {
+    var json = JSON.stringify(_alfredChain);
+    $('#alfred_provider_chain_json').val(json);
+    if (!skipSave) {
+        clearTimeout(_alfredChainSaveTimer);
+        _alfredChainSaveTimer = setTimeout(function () {
+            $.ajax({
+                type: 'POST',
+                url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+                data: { action: 'saveProviderChain', provider_chain: json },
+                dataType: 'json'
+            });
+        }, 600);
+    }
 }
 
-// Initialize MCP server list immediately from PHP-injected value — no polling needed.
-// Relying on Jeedom's configKey AJAX load has a race condition: if the AJAX response
-// arrives after the poll timeout (2s), the hidden field is empty when we first read it.
+function alfredChainRender() {
+    var $list = $('#alfred-chain-list');
+    $list.empty();
+
+    if (_alfredChain.length === 0) {
+        $list.append('<p class="text-muted" style="margin:4px 0">' + _alfredI18n.chain_empty + '</p>');
+    }
+
+    $.each(_alfredChain, function (i, slug) {
+        var label = _alfredProviderLabels[slug] || slug;
+        var $entry = $('<div class="alfred-chain-entry">');
+        $entry.append(
+            $('<span class="alfred-chain-badge">')
+                .append($('<span class="alfred-chain-num">').text(i + 1))
+                .append(label)
+        );
+
+        // Up / Down
+        var $up = $('<button type="button" class="btn btn-default btn-xs" title="Up"><i class="fas fa-arrow-up"></i></button>');
+        $up.prop('disabled', i === 0).on('click', (function (idx) {
+            return function () { alfredChainMove(idx, -1); };
+        })(i));
+
+        var $down = $('<button type="button" class="btn btn-default btn-xs" title="Down"><i class="fas fa-arrow-down"></i></button>');
+        $down.prop('disabled', i === _alfredChain.length - 1).on('click', (function (idx) {
+            return function () { alfredChainMove(idx, 1); };
+        })(i));
+
+        // Remove
+        var $remove = $('<button type="button" class="btn btn-danger btn-xs" title="Remove"><i class="fas fa-trash"></i></button>');
+        $remove.on('click', (function (idx) {
+            return function () { alfredChainRemove(idx); };
+        })(i));
+
+        // Test
+        var $testResult = $('<span class="alfred-chain-test-result">');
+        var $test = $('<button type="button" class="btn btn-default btn-xs"><i class="fas fa-plug"></i></button>');
+        $test.on('click', (function (s, $r) {
+            return function () { alfredChainTest(s, $r); };
+        })(slug, $testResult));
+
+        $entry.append($up).append($down).append($remove).append($test).append($testResult);
+        $list.append($entry);
+    });
+
+    alfredChainUpdateAddSelect();
+    alfredUpdateProviderSections();
+}
+
+function alfredChainMove(i, dir) {
+    var j = i + dir;
+    if (j < 0 || j >= _alfredChain.length) return;
+    var tmp = _alfredChain[i];
+    _alfredChain[i] = _alfredChain[j];
+    _alfredChain[j] = tmp;
+    alfredChainSerialize();
+    alfredChainRender();
+}
+
+function alfredChainRemove(i) {
+    _alfredChain.splice(i, 1);
+    alfredChainSerialize();
+    alfredChainRender();
+}
+
+function alfredChainUpdateAddSelect() {
+    var $select = $('#alfred_chain_add_select');
+    $select.empty();
+    $.each(_alfredProviderLabels, function (slug, label) {
+        if (_alfredChain.indexOf(slug) === -1) {
+            $select.append($('<option>').val(slug).text(label));
+        }
+    });
+    $('#bt_alfred_chain_add').prop('disabled', $select.find('option').length === 0);
+}
+
+function alfredUpdateProviderSections() {
+    $.each(_alfredProviderLabels, function (slug) {
+        var inChain = _alfredChain.indexOf(slug) !== -1;
+        $('.alfred-provider-section[data-provider="' + slug + '"]').toggle(inChain);
+    });
+}
+
+function alfredChainTest(slug, $result) {
+    var $section = $('.alfred-provider-section[data-provider="' + slug + '"]');
+    var apiKey   = $section.find('.alfred-api-key').val().trim();
+    var model    = $section.find('.alfred-model-select').val();
+
+    if (!apiKey) {
+        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i></span>');
+        return;
+    }
+
+    $result.html('<i class="fas fa-spinner fa-spin"></i>');
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/alfred/core/ajax/alfred.ajax.php',
+        data: { action: 'testLLM', provider: slug, api_key: apiKey, model: model },
+        dataType: 'json',
+        success: function (data) {
+            if (data.state === 'ok') {
+                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i></span>');
+            } else {
+                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i></span>');
+            }
+        },
+        error: function () {
+            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i></span>');
+        }
+    });
+}
+
+$('#bt_alfred_chain_add').on('click', function () {
+    var slug = $('#alfred_chain_add_select').val();
+    if (!slug || _alfredChain.indexOf(slug) !== -1) return;
+    _alfredChain.push(slug);
+    alfredChainSerialize();
+    alfredChainRender();
+});
+
+// Initialize chain from PHP-injected value (no race condition, same pattern as MCP servers)
+(function () {
+    try { _alfredChain = JSON.parse(_alfredChainJson); } catch (e) { _alfredChain = []; }
+    alfredChainSerialize(true);
+    alfredChainRender();
+})();
+
+// Initialize MCP server list
 (function () {
     try { _alfredMcpServers = JSON.parse(_alfredMcpServersJson); } catch (e) { _alfredMcpServers = []; }
     alfredMcpSerialize(true);  // sync hidden field only, no save on init
     alfredMcpRender();
 })();
-
-// Wait until Jeedom has loaded config values, then show the correct provider section.
-var _alfredPollCount = 0;
-var _alfredProviderPoll = setInterval(function () {
-    _alfredPollCount++;
-    var hasKey = !!($('[data-l1key="mistral_api_key"]').val()
-                  || $('[data-l1key="gemini_api_key"]').val()
-                  || $('[data-l1key="ollama_base_url"]').val());
-    if (hasKey || _alfredPollCount >= 20) {
-        clearInterval(_alfredProviderPoll);
-        alfredShowProvider($('#alfred_provider').val());
-    }
-}, 100);
-
-$('#alfred_provider').on('change', function () {
-    alfredShowProvider($(this).val());
-});
 
 // ---- Lazy model loading ----
 var _alfredModelsLoaded = {};
@@ -954,12 +1131,18 @@ $(document).on('click', '.alfred-memory-create-cancel', function () {
 });
 
 $('#bt_alfred_test_llm').on('click', function () {
-    var $btn      = $(this);
-    var $result   = $('#alfred_test_llm_result');
-    var provider  = $('#alfred_provider').val();
-    var $section  = $('.alfred-provider-section[data-provider="' + provider + '"]');
-    var apiKey    = $section.find('.alfred-api-key').val().trim();
-    var model     = $section.find('.alfred-model-select').val();
+    var $btn     = $(this);
+    var $result  = $('#alfred_test_llm_result');
+    var provider = _alfredChain.length > 0 ? _alfredChain[0] : null;
+
+    if (!provider) {
+        $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> {{Add a provider to the chain first.}}</span>');
+        return;
+    }
+
+    var $section = $('.alfred-provider-section[data-provider="' + provider + '"]');
+    var apiKey   = $section.find('.alfred-api-key').val().trim();
+    var model    = $section.find('.alfred-model-select').val();
 
     if (!apiKey) {
         var _missingMsg = (provider === 'ollama') ? '{{Enter the Ollama URL first.}}' : _alfredI18n.enter_api_key;

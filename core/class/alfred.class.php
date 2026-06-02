@@ -14,6 +14,12 @@ class alfred extends eqLogic {
         if (config::byKey('provider', __CLASS__) === '') {
             config::save('provider', 'mistral', __CLASS__);
         }
+        // Migrate single provider to provider_chain
+        if (config::byKey('provider_chain', __CLASS__) === '') {
+            $existing = config::byKey('provider', __CLASS__);
+            if ($existing === '') $existing = 'mistral';
+            config::save('provider_chain', json_encode([$existing]), __CLASS__);
+        }
         // Set default models
         $defaults = [
             'mistral_model'   => 'mistral-large-latest',
@@ -82,7 +88,18 @@ class alfred extends eqLogic {
     // -------------------------------------------------------------------------
 
     public static function getProvider(): string {
+        $chain = self::getProviderChain();
+        if (!empty($chain)) return $chain[0];
         return (string)config::byKey('provider', __CLASS__);
+    }
+
+    public static function getProviderChain(): array {
+        $raw = config::byKey('provider_chain', __CLASS__);
+        if (is_array($raw)) return $raw;
+        $json = (string)$raw;
+        if ($json === '') return [];
+        $decoded = json_decode($json, true);
+        return is_array($decoded) ? $decoded : [];
     }
 
     public static function getApiKey(string $provider = ''): string {

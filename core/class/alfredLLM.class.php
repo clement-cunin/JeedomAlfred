@@ -109,16 +109,142 @@ abstract class alfredLLMAdapter
 
 // =============================================================================
 
+class alfredLLMChain extends alfredLLMAdapter
+{
+    /** @var alfredLLMAdapter[] */
+    private $adapters;
+
+    public function __construct(array $adapters)
+    {
+        if (empty($adapters)) {
+            throw new Exception('alfredLLMChain requires at least one adapter.');
+        }
+        parent::__construct('', '');
+        $this->adapters = $adapters;
+    }
+
+    public function getProvider(): string
+    {
+        return implode(',', array_map(function ($a) { return $a->getProvider(); }, $this->adapters));
+    }
+
+    public function getModel(): string
+    {
+        return $this->adapters[0]->getModel();
+    }
+
+    public function chat(array $messages, array $tools, string $systemPrompt): array
+    {
+        $lastException = null;
+        foreach ($this->adapters as $i => $adapter) {
+            try {
+                $result = $adapter->chat($messages, $tools, $systemPrompt);
+                if ($i > 0) {
+                    log::add('alfred', 'info', 'LLM chain: fallback to ' . $adapter->getProvider() . ' succeeded after ' . $i . ' failure(s)');
+                }
+                return $result;
+            } catch (Exception $e) {
+                $lastException = $e;
+                if (!self::isRetriable($e)) {
+                    throw $e;
+                }
+                log::add('alfred', 'warning', 'LLM chain: ' . $adapter->getProvider() . ' failed (retriable): ' . $e->getMessage());
+            }
+        }
+        throw new Exception('All LLM providers failed. Last error: ' . $lastException->getMessage());
+    }
+
+    public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
+    {
+        $lastException = null;
+        foreach ($this->adapters as $i => $adapter) {
+            $emitted = false;
+            $wrapped = function (string $chunk) use (&$emitted, $onDelta) {
+                $emitted = true;
+                $onDelta($chunk);
+            };
+            try {
+                $result = $adapter->chatStream($messages, $tools, $systemPrompt, $wrapped);
+                if ($i > 0) {
+                    log::add('alfred', 'info', 'LLM chain: stream fallback to ' . $adapter->getProvider() . ' succeeded after ' . $i . ' failure(s)');
+                }
+                return $result;
+            } catch (Exception $e) {
+                $lastException = $e;
+                if ($emitted || !self::isRetriable($e)) {
+                    throw $e;
+                }
+                log::add('alfred', 'warning', 'LLM chain: ' . $adapter->getProvider() . ' stream failed (retriable, no data emitted): ' . $e->getMessage());
+            }
+        }
+        throw new Exception('All LLM providers failed. Last error: ' . $lastException->getMessage());
+    }
+
+    public function testConnection(): array
+    {
+        return $this->adapters[0]->testConnection();
+    }
+
+    public function listModels(): array
+    {
+        return $this->adapters[0]->listModels();
+    }
+
+    private static function isRetriable(Exception $e): bool
+    {
+        $msg = $e->getMessage();
+        // Curl-level: timeout, connection refused, network unreachable
+        if (strpos($msg, 'HTTP request failed') !== false) return true;
+        // HTTP 429 rate limit, 502 bad gateway, 503 unavailable, 504 timeout
+        if (preg_match('/\b(429|502|503|504)\b/', $msg)) return true;
+        return false;
+    }
+}
+
+// =============================================================================
+
 class alfredLLM
 {
     /**
-     * Instantiate the right adapter for the configured provider.
+     * Build the configured LLM adapter (or chain of adapters for fallback).
+     * If $provider is given explicitly, bypass chain and return a single adapter
+     * (used by testLLM, listModels, etc.).
      */
     public static function make(string $provider = '', string $apiKey = '', string $model = ''): alfredLLMAdapter
     {
-        if ($provider === '') $provider = alfred::getProvider();
-        if ($apiKey   === '') $apiKey   = alfred::getApiKey($provider);
-        if ($model    === '') $model    = alfred::getModel($provider);
+        if ($provider !== '') {
+            return self::makeAdapter($provider, $apiKey, $model);
+        }
+
+        $chain = alfred::getProviderChain();
+        if (empty($chain)) {
+            $chain = [alfred::getProvider()];
+        }
+
+        if (count($chain) === 1) {
+            return self::makeAdapter($chain[0]);
+        }
+
+        $adapters = [];
+        foreach ($chain as $slug) {
+            try {
+                $adapters[] = self::makeAdapter($slug);
+            } catch (Exception $e) {
+                log::add('alfred', 'warning', "LLM chain: skipping '{$slug}' (not configured): " . $e->getMessage());
+            }
+        }
+
+        if (empty($adapters)) {
+            throw new Exception('No LLM provider is configured. Please set an API key in the plugin settings.');
+        }
+
+        return count($adapters) === 1 ? $adapters[0] : new alfredLLMChain($adapters);
+    }
+
+    private static function makeAdapter(string $provider, string $apiKey = '', string $model = ''): alfredLLMAdapter
+    {
+        if ($apiKey === '') $apiKey = alfred::getApiKey($provider);
+        if ($model  === '') $model  = alfred::getModel($provider);
 
         switch ($provider) {
             case 'mistral':
@@ -130,7 +256,7 @@ class alfredLLM
                 require_once __DIR__ . '/alfredLLMGeminiAdapter.class.php';
                 return new alfredLLMGeminiAdapter($apiKey, $model);
             case 'ollama':
-                if ($apiKey === '') $apiKey = (string)config::byKey('ollama_base_url', 'alfred');
+                if ($apiKey === '') $apiKey = alfred::getBaseUrl('ollama');
                 if ($apiKey === '') $apiKey = 'http://localhost:11434';
                 require_once __DIR__ . '/alfredLLMOllamaAdapter.class.php';
                 return new alfredLLMOllamaAdapter($apiKey, $model);
