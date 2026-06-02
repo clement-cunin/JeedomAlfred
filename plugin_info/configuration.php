@@ -89,7 +89,7 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
         <!-- ================================================================ -->
         <legend><i class="fas fa-robot"></i> {{AI provider}}</legend>
 
-        <input type="hidden" id="alfred_provider_chain_json" class="configKey" data-l1key="provider_chain" />
+        <input type="text" id="alfred_provider_chain_json" class="configKey" data-l1key="provider_chain" style="display:none" tabindex="-1" aria-hidden="true" />
 
         <div class="form-group">
             <div class="col-sm-offset-4 col-sm-8">
@@ -640,23 +640,10 @@ $('#bt_alfred_autodetect_mcp').on('click', function() {
 // Provider chain manager — card-based, one card per provider entry
 // ============================================================
 
-var _alfredChain          = [];
-var _alfredChainSaveTimer = null;
+var _alfredChain = [];
 
-function alfredChainSerialize(skipSave) {
-    var json = JSON.stringify(_alfredChain);
-    $('#alfred_provider_chain_json').val(json);
-    if (!skipSave) {
-        clearTimeout(_alfredChainSaveTimer);
-        _alfredChainSaveTimer = setTimeout(function () {
-            $.ajax({
-                type: 'POST',
-                url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-                data: { action: 'saveProviderChain', provider_chain: json },
-                dataType: 'json'
-            });
-        }, 600);
-    }
+function alfredChainSerialize() {
+    $('#alfred_provider_chain_json').val(JSON.stringify(_alfredChain));
 }
 
 function alfredChainRender() {
@@ -846,7 +833,7 @@ $('#bt_alfred_chain_add').on('click', function () {
             return { id: '', type: slug, api_key: '', model: '', enabled: true };
         });
     }
-    alfredChainSerialize(true);
+    alfredChainSerialize();
     alfredChainRender();
 })();
 
