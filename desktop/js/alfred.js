@@ -208,7 +208,12 @@ $(function () {
                     });
                 }
                 if (msg.content !== '') {
-                    appendBubble('assistant', msg.content);
+                    var $b = appendBubble('assistant', msg.content);
+                    if (msg.provider) {
+                        $b.find('.alfred-msg-body').append(
+                            $('<div class="alfred-model-label">').text(msg.provider + ' · ' + msg.model)
+                        );
+                    }
                 }
             } else if (msg.role === 'user') {
                 if (msg.content.indexOf('[SCHEDULED]') === 0) {
@@ -639,6 +644,11 @@ $(function () {
             }
             if ($assistantBubble) {
                 $assistantBubble.data('tts-text', finalText);
+                if (d.provider) {
+                    $assistantBubble.find('.alfred-msg-body').append(
+                        $('<div class="alfred-model-label">').text(d.provider + ' · ' + d.model)
+                    );
+                }
             }
             if (d.limit_reached) {
                 appendLimitReached(sessionId);
@@ -719,7 +729,8 @@ $(function () {
 
     function appendBubble(role, text) {
         var $bubble = $('<div class="alfred-msg-bubble">').html(markdownToHtml(text));
-        var $msg    = $('<div class="alfred-msg ' + role + '">').append($bubble);
+        var $inner  = role === 'assistant' ? $('<div class="alfred-msg-body">').append($bubble) : $bubble;
+        var $msg    = $('<div class="alfred-msg ' + role + '">').append($inner);
         if (role === 'assistant' && window.speechSynthesis) {
             $msg.data('tts-text', text);
             var $actions = $('<div class="alfred-msg-actions">');

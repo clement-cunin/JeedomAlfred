@@ -293,6 +293,20 @@
     width: 100%;
 }
 
+.alfred-msg-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.alfred-model-label {
+    font-size: 11px;
+    color: #aaa;
+    padding: 2px 4px;
+    margin-top: 3px;
+    line-height: 1.2;
+}
+
 /* Per-message TTS action bar */
 .alfred-msg.assistant {
     align-items: flex-start;

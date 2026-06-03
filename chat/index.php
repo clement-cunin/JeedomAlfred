@@ -357,6 +357,20 @@ if (isConnect()) {
 
         .alfred-retry-btn:hover { background: #7a2020; border-color: #7a2020; color: #fff; }
 
+        .alfred-msg-body {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .alfred-model-label {
+            font-size: 11px;
+            color: #aaa;
+            padding: 2px 4px;
+            margin-top: 3px;
+            line-height: 1.2;
+        }
+
         /* Per-message TTS actions */
         .alfred-msg-actions {
             display: flex;
@@ -1213,7 +1227,12 @@ $(function () {
                     if (msg.error) {
                         appendErrorBubble(msg.content, currentSessionId, idx === messages.length - 1);
                     } else {
-                        appendBubble('assistant', msg.content);
+                        var $b = appendBubble('assistant', msg.content);
+                        if (msg.provider) {
+                            $b.find('.alfred-msg-body').append(
+                                $('<div class="alfred-model-label">').text(msg.provider + ' · ' + msg.model)
+                            );
+                        }
                     }
                 }
             } else if (msg.role === 'user') {
@@ -1686,7 +1705,14 @@ $(function () {
             var finalText = d.text || assistantText;
             hideTyping();
             if (!$assistantBubble && finalText) $assistantBubble = appendBubble('assistant', finalText);
-            if ($assistantBubble) $assistantBubble.data('tts-text', finalText);
+            if ($assistantBubble) {
+                $assistantBubble.data('tts-text', finalText);
+                if (d.provider) {
+                    $assistantBubble.find('.alfred-msg-body').append(
+                        $('<div class="alfred-model-label">').text(d.provider + ' · ' + d.model)
+                    );
+                }
+            }
             if (d.limit_reached) { appendLimitReached(sessionId); } else { speak(finalText, $assistantBubble); }
             source.close(); currentSource = null; isStreaming = false; setInputEnabled(true);
             loadSessions();
@@ -1739,7 +1765,8 @@ $(function () {
 
     function appendBubble(role, text) {
         var $bubble = $('<div class="alfred-msg-bubble">').html(markdownToHtml(text));
-        var $msg    = $('<div class="alfred-msg ' + role + '">').append($bubble);
+        var $inner  = role === 'assistant' ? $('<div class="alfred-msg-body">').append($bubble) : $bubble;
+        var $msg    = $('<div class="alfred-msg ' + role + '">').append($inner);
         if (role === 'assistant' && window.speechSynthesis) {
             $msg.data('tts-text', text);
             var $actions   = $('<div class="alfred-msg-actions">');

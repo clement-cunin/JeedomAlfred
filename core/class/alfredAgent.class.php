@@ -521,6 +521,8 @@ class alfredAgent
         // ReAct loop
         $finalText    = '';
         $iterations   = 0;
+        $llmProvider  = '';
+        $llmModel     = '';
         $systemChars  = strlen($effectiveSystemPrompt);
         $toolsChars   = strlen(json_encode($tools));
         $prevMsgChars = strlen(json_encode($messages));
@@ -665,14 +667,14 @@ class alfredAgent
             if ($this->userProfil === 'admin') {
                 $this->emit('timing', $timing);
             }
-            $this->emit('done', ['text' => '', 'iterations' => $iterations, 'limit_reached' => true]);
+            $this->emit('done', ['text' => '', 'iterations' => $iterations, 'limit_reached' => true, 'provider' => $llmProvider, 'model' => $llmModel]);
             return '';
         }
 
         if ($this->userProfil === 'admin') {
             $this->emit('timing', $timing);
         }
-        $this->emit('done', ['text' => $finalText, 'iterations' => $iterations]);
+        $this->emit('done', ['text' => $finalText, 'iterations' => $iterations, 'provider' => $llmProvider, 'model' => $llmModel]);
 
         return $finalText;
     }

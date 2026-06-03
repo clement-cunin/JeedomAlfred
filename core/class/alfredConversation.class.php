@@ -236,6 +236,10 @@ class alfredConversation
                 if (!empty($meta['error'])) {
                     $msg['error'] = true;
                 }
+                if (!empty($meta['provider'])) {
+                    $msg['provider'] = $meta['provider'];
+                    $msg['model']    = $meta['model'] ?? '';
+                }
             }
             if ($row['role'] === 'tool') {
                 $msg['tool_call_id'] = $meta['tool_call_id'] ?? '';
