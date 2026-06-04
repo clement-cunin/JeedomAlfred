@@ -99,6 +99,10 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
             throw new Exception("Ollama error (HTTP {$code}): " . ($error_body ?: "HTTP {$code}"));
         }
 
+        if ($error_body !== '') {
+            throw new Exception("Ollama stream error: {$error_body}");
+        }
+
         $tool_calls = [];
         ksort($tool_acc);
         foreach ($tool_acc as $tc) {
