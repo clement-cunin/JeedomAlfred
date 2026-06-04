@@ -109,6 +109,10 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
             ];
         }
 
+        if (!empty($tool_calls)) {
+            $stop_reason = 'tool_use';
+        }
+
         return [
             'text'        => trim($text),
             'tool_calls'  => $tool_calls,
@@ -287,7 +291,7 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
         return [
             'text'        => trim((string)$text),
             'tool_calls'  => $tool_calls,
-            'stop_reason' => $finishReason === 'tool_calls' ? 'tool_use' : 'end_turn',
+            'stop_reason' => (!empty($tool_calls) || $finishReason === 'tool_calls') ? 'tool_use' : 'end_turn',
             'usage'       => [
                 'input_tokens'  => (int)($u['prompt_tokens']     ?? 0),
                 'output_tokens' => (int)($u['completion_tokens'] ?? 0),
