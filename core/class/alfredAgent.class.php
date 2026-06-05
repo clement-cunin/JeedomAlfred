@@ -354,6 +354,10 @@ class alfredAgent
                             'type'        => 'string',
                             'description' => 'The fact or information to remember.',
                         ],
+                        'expires_in_days' => [
+                            'type'        => 'integer',
+                            'description' => 'Optional. Number of days until this memory expires and is automatically deleted. Omit for a permanent memory.',
+                        ],
                     ],
                     'required' => ['scope', 'label', 'content'],
                 ],
@@ -367,6 +371,10 @@ class alfredAgent
                     'properties' => [
                         'label'   => ['type' => 'string', 'description' => 'Text label of the memory to update.'],
                         'content' => ['type' => 'string', 'description' => 'New content for this memory.'],
+                        'expires_in_days' => [
+                            'type'        => 'integer',
+                            'description' => 'Optional. Set or update the expiration: positive integer = days from now, 0 = remove expiration (make permanent). Omit to keep existing expiration unchanged.',
+                        ],
                     ],
                     'required' => ['label', 'content'],
                 ],
@@ -823,6 +831,9 @@ class alfredAgent
             $block = "\n\n## Persistent memory\n";
             foreach ($memories as $m) {
                 $heading = $m['label'] !== '' ? $m['label'] : (($m['scope'] === 'global' ? 'global' : 'personal') . '-' . $m['id']);
+                if (!empty($m['expires_at'])) {
+                    $heading .= ' *(expires ' . substr($m['expires_at'], 0, 10) . ')*';
+                }
                 $block  .= "\n### {$heading}\n{$m['content']}\n";
             }
             $prompt .= $block;
@@ -873,7 +884,11 @@ class alfredAgent
                     } else {
                         $scope = 'global';
                     }
-                    alfredMemory::save($scope, $label, $content);
+                    $expiresAt = null;
+                    if (isset($input['expires_in_days']) && (int)$input['expires_in_days'] > 0) {
+                        $expiresAt = date('Y-m-d H:i:s', strtotime('+' . (int)$input['expires_in_days'] . ' days'));
+                    }
+                    alfredMemory::save($scope, $label, $content, $expiresAt);
                     return "Memory '{$label}' saved.";
 
                 case 'alfred_memory_update':
@@ -881,7 +896,17 @@ class alfredAgent
                     $content = trim((string)($input['content'] ?? ''));
                     if ($label   === '') return 'Error: label must not be empty.';
                     if ($content === '') return 'Error: content must not be empty.';
-                    alfredMemory::updateByLabel($label, $content, $allowedScopes);
+                    $setExpiry = false;
+                    $expiresAt = null;
+                    if (array_key_exists('expires_in_days', $input)) {
+                        $setExpiry = true;
+                        $days = (int)$input['expires_in_days'];
+                        if ($days > 0) {
+                            $expiresAt = date('Y-m-d H:i:s', strtotime('+' . $days . ' days'));
+                        }
+                        // $days === 0: clear expiration, $expiresAt stays null
+                    }
+                    alfredMemory::updateByLabel($label, $content, $allowedScopes, $setExpiry, $expiresAt);
                     return "Memory '{$label}' updated.";
 
                 case 'alfred_memory_forget':

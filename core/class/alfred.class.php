@@ -114,6 +114,11 @@ class alfred extends eqLogic {
         } catch (Exception $e) {
             log::add('alfred_cron', 'error', 'cronDaily: alfredJournal failed — ' . $e->getMessage());
         }
+        try {
+            alfredMemory::cronDaily();
+        } catch (Exception $e) {
+            log::add('alfred_cron', 'error', 'cronDaily: memory cleanup failed — ' . $e->getMessage());
+        }
     }
 
     // -------------------------------------------------------------------------

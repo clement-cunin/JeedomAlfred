@@ -400,7 +400,7 @@ class alfredMigration
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Migration 4 — Add expires_at column to alfred_memory (for journal expiry)
+    // Migration 4 — Optional expiration date on memory entries
     // ─────────────────────────────────────────────────────────────────────────
 
     private static function migration_004_memory_expiry(): void
@@ -413,7 +413,20 @@ class alfredMigration
         );
         if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
             DB::Prepare(
-                'ALTER TABLE `alfred_memory` ADD COLUMN `expires_at` DATETIME DEFAULT NULL',
+                'ALTER TABLE `alfred_memory` ADD COLUMN `expires_at` DATETIME DEFAULT NULL AFTER `updated_at`',
+                [],
+                DB::FETCH_TYPE_ROW
+            );
+        }
+        $idxRow = DB::Prepare(
+            "SELECT COUNT(*) as cnt FROM information_schema.statistics
+             WHERE table_schema = DATABASE() AND table_name = 'alfred_memory' AND index_name = 'idx_expires_at'",
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+        if (!isset($idxRow['cnt']) || (int)$idxRow['cnt'] === 0) {
+            DB::Prepare(
+                'ALTER TABLE `alfred_memory` ADD INDEX `idx_expires_at` (`expires_at`)',
                 [],
                 DB::FETCH_TYPE_ROW
             );

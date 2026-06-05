@@ -157,16 +157,19 @@ try {
 
     if ($action === 'updateMemory') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
-        $id      = (int)init('id');
-        $label   = trim(init('label'));
-        $content = trim(init('content'));
-        $scope   = trim(init('scope'));
+        $id         = (int)init('id');
+        $label      = trim(init('label'));
+        $content    = trim(init('content'));
+        $scope      = trim(init('scope'));
+        $expiresRaw = trim(init('expires_at', ''));
         if ($id <= 0)        throw new Exception('Missing or invalid id');
         if ($label === '')   throw new Exception('Label must not be empty');
         if ($content === '') throw new Exception('Content must not be empty');
         if ($scope === '')   throw new Exception('Scope must not be empty');
+        $setExpiry = ($expiresRaw !== '__KEEP__');
+        $expiresAt = ($setExpiry && $expiresRaw !== '') ? $expiresRaw . ' 00:00:00' : null;
         require_once __DIR__ . '/../class/alfredMemory.class.php';
-        alfredMemory::adminUpdate($id, $label, $content, $scope);
+        alfredMemory::adminUpdate($id, $label, $content, $scope, $setExpiry, $expiresAt);
         ajax::success();
     }
 
@@ -181,16 +184,18 @@ try {
 
     if ($action === 'createMemory') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
-        $label   = trim(init('label'));
-        $content = trim(init('content'));
-        $scope   = trim(init('scope'));
+        $label      = trim(init('label'));
+        $content    = trim(init('content'));
+        $scope      = trim(init('scope'));
+        $expiresRaw = trim(init('expires_at', ''));
         if ($label === '')   throw new Exception('Label must not be empty');
         if ($content === '') throw new Exception('Content must not be empty');
         if ($scope === '')   throw new Exception('Scope must not be empty');
+        $expiresAt = $expiresRaw !== '' ? $expiresRaw . ' 00:00:00' : null;
         require_once __DIR__ . '/../class/alfredMemory.class.php';
-        $id  = alfredMemory::save($scope, $label, $content);
+        $id  = alfredMemory::save($scope, $label, $content, $expiresAt);
         $now = date('Y-m-d H:i:s');
-        ajax::success(['id' => $id, 'scope' => $scope, 'label' => $label, 'content' => $content, 'created_at' => $now, 'updated_at' => $now]);
+        ajax::success(['id' => $id, 'scope' => $scope, 'label' => $label, 'content' => $content, 'created_at' => $now, 'updated_at' => $now, 'expires_at' => $expiresAt]);
     }
 
     if ($action === 'deletePhone') {

@@ -355,6 +355,7 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
                             <th style="width:150px">{{Label}}</th>
                             <th>{{Content}}</th>
                             <th style="width:140px">{{Date}}</th>
+                            <th style="width:110px">{{Expires}}</th>
                             <th style="width:60px"></th>
                         </tr>
                     </thead>
@@ -1021,13 +1022,15 @@ function alfredMemoryRowView(m) {
     var scopeBadge = m.scope === 'global'
         ? '<span class="label label-primary">global</span>'
         : '<span class="label label-default">' + m.scope + '</span>';
-    var date  = m.created_at ? m.created_at.substring(0, 16) : '';
-    var label = m.label ? '<code>' + $('<span>').text(m.label).html() + '</code>' : '<em style="color:#aaa">—</em>';
+    var date    = m.created_at ? m.created_at.substring(0, 16) : '';
+    var expires = m.expires_at ? '<span class="label label-warning" title="{{Expires}}">' + m.expires_at.substring(0, 10) + '</span>' : '<em style="color:#aaa">—</em>';
+    var label   = m.label ? '<code>' + $('<span>').text(m.label).html() + '</code>' : '<em style="color:#aaa">—</em>';
     return '<td><small>#' + m.id + '</small></td>'
         + '<td class="alfred-mem-scope-cell">' + scopeBadge + '</td>'
         + '<td class="alfred-mem-label-cell">' + label + '</td>'
         + '<td class="alfred-mem-content-cell" style="word-break:break-word">' + $('<span>').text(m.content).html() + '</td>'
         + '<td><small>' + date + '</small></td>'
+        + '<td>' + expires + '</td>'
         + '<td style="white-space:nowrap">'
         + '<button type="button" class="btn btn-xs btn-default alfred-memory-edit" data-id="' + m.id + '" title="{{Edit}}"><i class="fas fa-pencil-alt"></i></button> '
         + '<button type="button" class="btn btn-xs btn-danger alfred-memory-delete" data-id="' + m.id + '" title="{{Delete}}"><i class="fas fa-trash"></i></button>'
@@ -1035,11 +1038,13 @@ function alfredMemoryRowView(m) {
 }
 
 function alfredMemoryRowEdit(m) {
+    var expiresVal = m.expires_at ? m.expires_at.substring(0, 10) : '';
     return '<td><small>#' + m.id + '</small></td>'
         + '<td><select class="form-control input-sm alfred-mem-scope-input" style="min-width:110px">' + alfredScopeOptions(m.scope) + '</select></td>'
         + '<td><input type="text" class="form-control input-sm alfred-mem-label-input" value="' + $('<span>').text(m.label || '').html() + '" style="font-size:12px;font-family:monospace"></td>'
         + '<td><textarea class="form-control alfred-mem-content-input" rows="2" style="font-size:12px">' + $('<span>').text(m.content).html() + '</textarea></td>'
         + '<td></td>'
+        + '<td><input type="date" class="form-control input-sm alfred-mem-expires-input" value="' + expiresVal + '" style="font-size:12px" title="{{Leave blank for no expiration}}"></td>'
         + '<td style="white-space:nowrap">'
         + '<button type="button" class="btn btn-xs btn-success alfred-memory-save" data-id="' + m.id + '" title="{{Save}}"><i class="fas fa-check"></i></button> '
         + '<button type="button" class="btn btn-xs btn-default alfred-memory-cancel" data-id="' + m.id + '" title="{{Cancel}}"><i class="fas fa-times"></i></button>'
@@ -1098,24 +1103,26 @@ $(document).on('click', '.alfred-memory-cancel', function () {
 });
 
 $(document).on('click', '.alfred-memory-save', function () {
-    var $btn     = $(this);
-    var id       = $btn.data('id');
-    var $tr      = $btn.closest('tr');
-    var label    = $tr.find('.alfred-mem-label-input').val().trim();
-    var content  = $tr.find('.alfred-mem-content-input').val().trim();
-    var scope    = $tr.find('.alfred-mem-scope-input').val();
+    var $btn       = $(this);
+    var id         = $btn.data('id');
+    var $tr        = $btn.closest('tr');
+    var label      = $tr.find('.alfred-mem-label-input').val().trim();
+    var content    = $tr.find('.alfred-mem-content-input').val().trim();
+    var scope      = $tr.find('.alfred-mem-scope-input').val();
+    var expiresVal = $tr.find('.alfred-mem-expires-input').val().trim();
     if (!label || !content) return;
     $btn.prop('disabled', true);
     $.ajax({
         type: 'POST',
         url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-        data: { action: 'updateMemory', id: id, label: label, content: content, scope: scope },
+        data: { action: 'updateMemory', id: id, label: label, content: content, scope: scope, expires_at: expiresVal },
         dataType: 'json',
         success: function (resp) {
             if (resp.state === 'ok') {
                 var m = _alfredMemories.filter(function (x) { return x.id == id; })[0];
-                if (m) { m.label = label; m.content = content; m.scope = scope; }
-                $tr.html(alfredMemoryRowView(m || { id: id, label: label, content: content, scope: scope, created_at: '' }));
+                var expiresAt = expiresVal ? expiresVal + ' 00:00:00' : null;
+                if (m) { m.label = label; m.content = content; m.scope = scope; m.expires_at = expiresAt; }
+                $tr.html(alfredMemoryRowView(m || { id: id, label: label, content: content, scope: scope, created_at: '', expires_at: expiresAt }));
             }
         },
         complete: function () { $btn.prop('disabled', false); }
@@ -1167,6 +1174,7 @@ function alfredMemoryRowNew() {
         + '<td><input type="text" class="form-control input-sm alfred-mem-label-input" placeholder="' + _alfredI18n.memory_label_ph + '" style="font-size:12px;font-family:monospace"></td>'
         + '<td><textarea class="form-control alfred-mem-content-input" rows="2" style="font-size:12px" placeholder="' + _alfredI18n.memory_content_ph + '"></textarea></td>'
         + '<td></td>'
+        + '<td><input type="date" class="form-control input-sm alfred-mem-expires-input" style="font-size:12px" title="{{Leave blank for no expiration}}"></td>'
         + '<td style="white-space:nowrap">'
         + '<button class="btn btn-xs btn-success alfred-memory-create-save" title="{{Save}}"><i class="fas fa-check"></i></button> '
         + '<button class="btn btn-xs btn-default alfred-memory-create-cancel" title="{{Cancel}}"><i class="fas fa-times"></i></button>'
@@ -1174,17 +1182,18 @@ function alfredMemoryRowNew() {
 }
 
 $(document).on('click', '.alfred-memory-create-save', function () {
-    var $btn    = $(this);
-    var $tr     = $btn.closest('tr');
-    var label   = $tr.find('.alfred-mem-label-input').val().trim();
-    var content = $tr.find('.alfred-mem-content-input').val().trim();
-    var scope   = $tr.find('.alfred-mem-scope-input').val();
+    var $btn       = $(this);
+    var $tr        = $btn.closest('tr');
+    var label      = $tr.find('.alfred-mem-label-input').val().trim();
+    var content    = $tr.find('.alfred-mem-content-input').val().trim();
+    var scope      = $tr.find('.alfred-mem-scope-input').val();
+    var expiresVal = $tr.find('.alfred-mem-expires-input').val().trim();
     if (!label || !content) return;
     $btn.prop('disabled', true);
     $.ajax({
         type: 'POST',
         url: 'plugins/alfred/core/ajax/alfred.ajax.php',
-        data: { action: 'createMemory', label: label, content: content, scope: scope },
+        data: { action: 'createMemory', label: label, content: content, scope: scope, expires_at: expiresVal },
         dataType: 'json',
         success: function (resp) {
             if (resp.state === 'ok') {
