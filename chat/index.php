@@ -7,15 +7,18 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 // PHP session works only when accessed through Jeedom's router.
 // Fallback: JS reads user_hash from localStorage (saved by the desktop page).
-$_userHash     = '';
-$_isConfigured = false;
-$_isAdmin      = false;
+$_userHash       = '';
+$_isConfigured   = false;
+$_isAdmin        = false;
+$_vapidPublicKey = '';
 if (isConnect()) {
     require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
     $_userHash     = $_SESSION['user']->getHash();
     $_isConfigured = alfred::getApiKey() !== '';
     $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
 }
+// VAPID keys are generated lazily on first subscribe request (api/push.php).
+// No need to inject the public key into the page — the JS fetches it from the API.
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -186,6 +189,51 @@ if (isConnect()) {
             font-family: inherit;
         }
 
+        /* Push notification banner (main area, always visible) */
+        #alfred-notif-bar {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 14px;
+            background: #eef3fc;
+            border-bottom: 1px solid #c5d0e8;
+            font-size: 13px;
+            color: #2c4a8a;
+            flex-shrink: 0;
+        }
+
+        #alfred-notif-bar.push-active {
+            background: #f0fdf4;
+            border-bottom-color: #a7d7a2;
+            color: #166534;
+        }
+
+        #alfred-notif-bar i { font-size: 14px; flex-shrink: 0; }
+
+        #alfred-notif-bar span { flex: 1; }
+
+        #alfred-push-btn {
+            background: #2c4a8a;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.12s;
+        }
+
+        #alfred-push-btn:hover { background: #1e3466; }
+
+        #alfred-notif-bar.push-active #alfred-push-btn {
+            background: #166534;
+        }
+
+        #alfred-notif-bar.push-active #alfred-push-btn:hover {
+            background: #0f4a25;
+        }
+
         /* Sidebar toggle (mobile) */
         #alfred-sidebar-toggle {
             display: none;
@@ -290,6 +338,18 @@ if (isConnect()) {
             align-self: flex-start;
             align-items: flex-start;
             gap: 0;
+        }
+
+        .alfred-msg.scenario {
+            align-self: flex-start;
+        }
+
+        .alfred-msg.scenario .alfred-msg-bubble {
+            background: #f0f0f0;
+            color: #555;
+            font-style: italic;
+            border-left: 3px solid #aaa;
+            border-radius: 4px 12px 12px 4px;
         }
 
         .alfred-msg-bubble {
@@ -962,6 +1022,12 @@ if (isConnect()) {
             <button id="alfred-install-dismiss">✕</button>
         </div>
 
+        <div id="alfred-notif-bar">
+            <i id="alfred-push-icon" class="fas fa-bell-slash"></i>
+            <span id="alfred-push-label">Activer les notifications push pour recevoir des messages Alfred</span>
+            <button id="alfred-push-btn">Activer</button>
+        </div>
+
         <div id="alfred-messages"></div>
 
         <input type="file" id="alfred-file-input" accept="image/*,.pdf" style="display:none">
@@ -1238,7 +1304,11 @@ $(function () {
             } else if (msg.role === 'user') {
                 // [SCHEDULED] messages are shown via their pending task bubble — skip duplicate
                 if (msg.content.indexOf('[SCHEDULED]') !== 0) {
-                    appendBubble('user', msg.content);
+                    if (msg.scenario_display !== undefined) {
+                        appendBubble('scenario', msg.scenario_display);
+                    } else {
+                        appendBubble('user', msg.content);
+                    }
                 }
             } else if (msg.role === 'tool') {
                 var input  = toolInputMap[msg.tool_call_id];
@@ -2116,12 +2186,17 @@ $(function () {
             }
 
         } else {
-            var lastId = localStorage.getItem('alfred_last_session');
-            if (lastId && $('[data-session-id="' + lastId + '"]').length) {
-                loadSession(lastId);
+            var urlSession = new URLSearchParams(window.location.search).get('session');
+            if (urlSession) {
+                loadSession(urlSession);
             } else {
-                startNewSession();
-                setInputEnabled(!!alfred_config.isConfigured);
+                var lastId = localStorage.getItem('alfred_last_session');
+                if (lastId && $('[data-session-id="' + lastId + '"]').length) {
+                    loadSession(lastId);
+                } else {
+                    startNewSession();
+                    setInputEnabled(!!alfred_config.isConfigured);
+                }
             }
         }
     });
@@ -2161,6 +2236,136 @@ if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js');
     });
 }
+</script>
+<script>
+// ── Push notifications ────────────────────────────────────────────────────────
+(function () {
+    console.log('[Alfred push] PushManager:', 'PushManager' in window, '| SW:', 'serviceWorker' in navigator);
+
+    if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
+        console.warn('[Alfred push] Push API not available — button hidden');
+        return;
+    }
+
+    var pushApiUrl = alfred_config.basePath + '/api/push.php';
+    var $bar       = document.getElementById('alfred-notif-bar');
+    var $btn       = document.getElementById('alfred-push-btn');
+    var $icon      = document.getElementById('alfred-push-icon');
+    var $label     = document.getElementById('alfred-push-label');
+    if (!$btn) { console.warn('[Alfred push] Button element not found'); return; }
+
+    var _vapidKey = null;
+
+    function updateUI(active) {
+        if (active) {
+            $bar.classList.add('push-active');
+            $icon.className    = 'fas fa-bell';
+            $label.textContent = 'Notifications activées';
+            $btn.textContent   = 'Désactiver';
+        } else {
+            $bar.classList.remove('push-active');
+            $icon.className    = 'fas fa-bell-slash';
+            $label.textContent = 'Activer les notifications push pour recevoir des messages Alfred';
+            $btn.textContent   = 'Activer';
+        }
+    }
+
+    function sendTokenToSW(token) {
+        navigator.serviceWorker.ready.then(function (reg) {
+            if (reg.active) reg.active.postMessage({ type: 'ALFRED_PUSH_TOKEN', token: token });
+        });
+    }
+
+    function urlB64ToUint8(b64) {
+        var pad = '='.repeat((4 - b64.length % 4) % 4);
+        var raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+        var arr = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+        return arr;
+    }
+
+    // Fetch VAPID public key from server (public endpoint, no auth needed).
+    // We only show the button once we confirm the key is available.
+    fetch(pushApiUrl + '?action=vapid_public')
+        .then(function (r) { console.log('[Alfred push] vapid_public HTTP', r.status); return r.json(); })
+        .then(function (data) {
+            console.log('[Alfred push] vapid_public response:', JSON.stringify(data));
+            if (!data.public_key) return;
+            _vapidKey = data.public_key;
+
+            // Restore state from a previous session
+            var storedToken = localStorage.getItem('alfred_push_token');
+            updateUI(!!storedToken);
+            if (storedToken) sendTokenToSW(storedToken);
+
+            $bar.style.display = 'flex';
+        })
+        .catch(function (err) {
+            console.warn('Alfred push: could not fetch VAPID key —', err.message);
+        });
+
+    // Re-send token to SW whenever the controller changes (SW update)
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+        var t = localStorage.getItem('alfred_push_token');
+        if (t) sendTokenToSW(t);
+    });
+
+    $btn.addEventListener('click', function () {
+        if ($btn.classList.contains('push-active')) {
+            navigator.serviceWorker.ready
+                .then(function (reg) { return reg.pushManager.getSubscription(); })
+                .then(function (sub)  { return sub ? sub.unsubscribe() : null; })
+                .then(function () {
+                    localStorage.removeItem('alfred_push_token');
+                    localStorage.removeItem('alfred_phone_id');
+                    updateUI(false);
+                });
+            return;
+        }
+
+        if (!_vapidKey) {
+            alert('Clé VAPID non disponible — vérifier la configuration du plugin Alfred.');
+            return;
+        }
+
+        navigator.serviceWorker.ready
+            .then(function (reg) {
+                return reg.pushManager.subscribe({
+                    userVisibleOnly:      true,
+                    applicationServerKey: urlB64ToUint8(_vapidKey),
+                });
+            })
+            .then(function (subscription) {
+                var j = subscription.toJSON();
+                return fetch(pushApiUrl, {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        action:    'subscribe',
+                        endpoint:  j.endpoint,
+                        p256dh:    j.keys.p256dh,
+                        auth:      j.keys.auth,
+                        user_hash: alfred_config.userHash,
+                    }),
+                });
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.ok) {
+                    alert('Erreur activation notifications : ' + (data.error || 'unknown'));
+                    return;
+                }
+                localStorage.setItem('alfred_push_token', data.fetch_token);
+                localStorage.setItem('alfred_phone_id',   data.eqLogic_id);
+                sendTokenToSW(data.fetch_token);
+                updateUI(true);
+            })
+            .catch(function (err) {
+                console.error('Push subscribe error:', err);
+                alert('Impossible d\'activer les notifications.\n' + err.message);
+            });
+    });
+})();
 </script>
 </body>
 </html>

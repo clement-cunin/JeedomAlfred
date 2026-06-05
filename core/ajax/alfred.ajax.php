@@ -193,6 +193,31 @@ try {
         ajax::success(['id' => $id, 'scope' => $scope, 'label' => $label, 'content' => $content, 'created_at' => $now, 'updated_at' => $now]);
     }
 
+    if ($action === 'deletePhone') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        $id = (int) init('eqLogic_id');
+        if ($id <= 0) throw new Exception('Missing eqLogic_id');
+        require_once __DIR__ . '/../class/alfred.class.php';
+        require_once __DIR__ . '/../class/alfredPush.class.php';
+        $eq = alfred::byId($id);
+        if (!$eq || $eq->getConfiguration('alfred_type') !== 'phone') {
+            throw new Exception('Phone equipment not found');
+        }
+        alfredPush::deleteSubscriptionsForEqLogic($id);
+        alfredPush::deleteNotificationsForEqLogic($id);
+        $eq->remove();
+        ajax::success();
+    }
+
+    if ($action === 'regenVapid') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfredPush.class.php';
+        // Invalidate all subscriptions — devices must re-subscribe with new key
+        DB::Prepare('DELETE FROM `alfred_push_subscription` WHERE 1', [], DB::FETCH_TYPE_ROW);
+        $publicKey = alfredPush::generateAndSaveVapidKeys();
+        ajax::success(['public_key' => $publicKey]);
+    }
+
     throw new Exception(__('No method found for: ', __FILE__) . $action);
 
 } catch (Exception $e) {

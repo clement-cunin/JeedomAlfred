@@ -1,0 +1,39 @@
+<!--template/scenario/cmd.action.alfred_conversation.default-->
+<div class="input-group input-group-sm" style="width:100%;margin-bottom:2px">
+  <span class="input-group-addon roundedLeft" style="width:115px">Session name</span>
+  <input class="expressionAttr form-control input-sm" data-l1key="options" data-l2key="session_name" value="#session_name#" placeholder="Nom de la conversation" data-cmd_id="#id#" data-uid="#uid#"/>
+  <span class="input-group-addon hasBtn roundedRight">
+    <button class="btn btn-default roundedRight alfredListCmd" type="button" data-target="session_name" data-cmd_id="#id#" data-uid="#uid#" tooltip="{{Sélectionner une commande}}"><i class="fas fa-list-alt"></i></button>
+  </span>
+</div>
+<div class="input-group input-group-sm" style="width:100%;margin-bottom:2px">
+  <span class="input-group-addon roundedLeft" style="width:115px">Message</span>
+  <textarea class="expressionAttr form-control ta_autosize" data-l1key="options" data-l2key="message" rows="1" style="resize:vertical;" placeholder="Message visible (supporte les #[Objet][Équipement][Commande]#)" data-cmd_id="#id#" data-uid="#uid#">#message#</textarea>
+  <span class="input-group-addon hasBtn roundedRight">
+    <button class="btn btn-default roundedRight alfredListCmd" type="button" data-target="message" data-cmd_id="#id#" data-uid="#uid#" tooltip="{{Sélectionner une commande}}"><i class="fas fa-list-alt"></i></button>
+  </span>
+</div>
+<div class="input-group input-group-sm" style="width:100%">
+  <span class="input-group-addon roundedLeft" style="width:115px">Prompt</span>
+  <textarea class="expressionAttr form-control ta_autosize" data-l1key="options" data-l2key="prompt" rows="1" style="resize:vertical;" placeholder="Contexte caché envoyé au LLM (optionnel)" data-cmd_id="#id#" data-uid="#uid#">#prompt#</textarea>
+  <span class="input-group-addon hasBtn roundedRight">
+    <button class="btn btn-default roundedRight alfredListCmd" type="button" data-target="prompt" data-cmd_id="#id#" data-uid="#uid#" tooltip="{{Sélectionner une commande}}"><i class="fas fa-list-alt"></i></button>
+  </span>
+</div>
+<script>
+  (function() {
+    var uid = '#uid#';
+    document.querySelectorAll('.alfredListCmd[data-uid="' + uid + '"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var target = btn.getAttribute('data-target');
+        jeedom.cmd.getSelectModal({cmd: {type: 'info'}}, function(result) {
+          var field = document.querySelector('.expressionAttr[data-l1key="options"][data-l2key="' + target + '"][data-uid="' + uid + '"]');
+          if (field) field.insertAtCursor(result.human);
+        });
+      });
+    });
+    document.querySelectorAll('.expressionAttr.ta_autosize[data-uid="' + uid + '"]').forEach(function(ta) {
+      jeedomUtils.taAutosize(ta);
+    });
+  })();
+</script>

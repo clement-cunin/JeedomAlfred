@@ -1,7 +1,7 @@
 'use strict';
 
 // Increment CACHE_VERSION on each deployment to invalidate stale caches.
-var CACHE_VERSION = 'v1';
+var CACHE_VERSION = 'v2';
 var SHELL_CACHE   = 'alfred-shell-' + CACHE_VERSION;
 var CDN_CACHE     = 'alfred-cdn-'   + CACHE_VERSION;
 
@@ -23,14 +23,22 @@ var API_PATTERNS = [
     '/api/chat.php',
     '/api/upload.php',
     '/api/share.php',
-    '/api/file.php'
+    '/api/file.php',
+    '/api/push.php'
 ];
 
 // ── Install: pre-cache app-shell statics ─────────────────────────────────────
 self.addEventListener('install', function (e) {
     e.waitUntil(
         caches.open(SHELL_CACHE)
-            .then(function (cache) { return cache.addAll(PRECACHE_ASSETS); })
+            .then(function (cache) {
+                // Cache each asset individually so one failure doesn't abort the install.
+                return Promise.all(
+                    PRECACHE_ASSETS.map(function (url) {
+                        return cache.add(url).catch(function () { /* ignore */ });
+                    })
+                );
+            })
             .then(function () { return self.skipWaiting(); })
     );
 });
@@ -89,8 +97,11 @@ self.addEventListener('fetch', function (e) {
             fetch(e.request)
                 .then(function (response) {
                     if (response.ok) {
+                        // Clone SYNCHRONOUSLY before any async operation —
+                        // once caches.open() resolves the body may already be consumed.
+                        var clone = response.clone();
                         caches.open(SHELL_CACHE).then(function (cache) {
-                            cache.put(e.request, response.clone());
+                            cache.put(e.request, clone);
                         });
                     }
                     return response;
@@ -109,12 +120,105 @@ self.addEventListener('fetch', function (e) {
             if (cached) return cached;
             return fetch(e.request).then(function (response) {
                 if (response.ok) {
+                    var clone = response.clone(); // clone synchronously
                     caches.open(SHELL_CACHE).then(function (cache) {
-                        cache.put(e.request, response.clone());
+                        cache.put(e.request, clone);
                     });
                 }
                 return response;
             });
+        })
+    );
+});
+
+// ── Push token — sent by the main page on every load ─────────────────────────
+var _alfredPushToken = null;
+
+self.addEventListener('message', function (event) {
+    if (event.data && event.data.type === 'ALFRED_PUSH_TOKEN') {
+        _alfredPushToken = event.data.token || null;
+    }
+});
+
+// ── Push event — SW receives push, fetches pending notifications from server ──
+self.addEventListener('push', function (event) {
+    // Derive API URL from SW scope: .../plugins/alfred/chat/ → .../plugins/alfred/api/push.php
+    var apiBase = self.registration.scope.replace(/\/chat\/?$/, '/');
+    var apiUrl  = apiBase + 'api/push.php';
+    var iconUrl = apiBase + 'plugin_info/alfred_icon.png';
+    var chatUrl = new URL('index.php', self.registration.scope).href;
+
+    function showGeneric() {
+        return self.registration.showNotification('Alfred', {
+            body:  'Vous avez un nouveau message.',
+            icon:  iconUrl,
+            badge: iconUrl,
+            data:  { url: chatUrl },
+            tag:   'alfred-push',
+        });
+    }
+
+    event.waitUntil(
+        (function () {
+            if (!_alfredPushToken) {
+                return showGeneric();
+            }
+
+            return fetch(apiUrl, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ action: 'pending', token: _alfredPushToken }),
+            })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (notifications) {
+                if (!Array.isArray(notifications) || notifications.length === 0) {
+                    return showGeneric();
+                }
+
+                // Mark as read immediately so they don't re-appear
+                fetch(apiUrl, {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ action: 'read', token: _alfredPushToken }),
+                });
+
+                return Promise.all(notifications.map(function (n) {
+                    return self.registration.showNotification(n.title || 'Alfred', {
+                        body:  n.body  || '',
+                        icon:  iconUrl,
+                        badge: iconUrl,
+                        data:  {
+                            url:        chatUrl,
+                            session_id: n.session_id || '',
+                        },
+                        tag: 'alfred-push-' + (n.id || Date.now()),
+                    });
+                }));
+            })
+            .catch(function () { return showGeneric(); });
+        })()
+    );
+});
+
+// ── Notification click — open the linked Alfred conversation ─────────────────
+self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+
+    var data    = event.notification.data || {};
+    var baseUrl = data.url || new URL('index.php', self.registration.scope).href;
+    var url     = data.session_id
+        ? baseUrl + '?session=' + encodeURIComponent(data.session_id)
+        : baseUrl;
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
+            for (var i = 0; i < clientList.length; i++) {
+                var c = clientList[i];
+                if (c.url.indexOf('/alfred/chat/') !== -1 && 'focus' in c) {
+                    return c.focus();
+                }
+            }
+            return clients.openWindow(url);
         })
     );
 });

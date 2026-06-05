@@ -5,6 +5,11 @@ if (!isConnect('admin')) {
 
 include_file('core', 'alfredMigration', 'class', 'alfred');
 alfredMigration::runPending();
+include_file('core', 'alfred', 'class', 'alfred');
+include_file('core', 'alfredPush', 'class', 'alfred');
+alfredPush::ensureVapidKeys();
+$_phones        = alfred::getPhones();
+$_vapidPublicKey = alfredPush::getPublicKey();
 $_schemaVersion       = alfredMigration::getVersion();
 $_schemaTargetVersion = alfredMigration::getTargetVersion();
 
@@ -226,6 +231,67 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
                 <button type="button" class="btn btn-success btn-sm" id="bt_alfred_add_memory" style="margin-left:8px">
                     <i class="fas fa-plus"></i> {{Add memory}}
                 </button>
+            </div>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- Phones -->
+        <!-- ================================================================ -->
+        <legend><i class="fas fa-mobile-alt"></i> {{Phones}}</legend>
+
+        <div class="form-group">
+            <div class="col-sm-offset-1 col-sm-10">
+                <?php if (empty($_phones)): ?>
+                <p class="text-muted" style="margin:6px 0">
+                    {{No phones registered yet. Open the Alfred PWA on a device and click «&nbsp;Activer les notifications&nbsp;» to register it.}}
+                </p>
+                <?php else: ?>
+                <table class="table table-bordered table-condensed" id="alfred-phones-table">
+                    <thead>
+                        <tr>
+                            <th>{{Name}}</th>
+                            <th style="width:90px">{{Status}}</th>
+                            <th style="width:110px">{{Subscriptions}}</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($_phones as $phone): ?>
+                        <tr id="alfred-phone-row-<?php echo (int)$phone->getId(); ?>">
+                            <td><?php echo htmlspecialchars($phone->getName()); ?></td>
+                            <td>
+                                <?php if ($phone->getIsEnable()): ?>
+                                <span class="label label-success">{{Enabled}}</span>
+                                <?php else: ?>
+                                <span class="label label-default">{{Disabled}}</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?php echo count(alfredPush::listSubscriptions($phone->getId())); ?></td>
+                            <td>
+                                <button type="button" class="btn btn-xs btn-danger alfred-phone-delete"
+                                        data-id="<?php echo (int)$phone->getId(); ?>"
+                                        title="{{Delete}}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{VAPID public key}}</label>
+            <div class="col-sm-5" style="padding-top:7px;word-break:break-all">
+                <code style="font-size:11px"><?php echo htmlspecialchars($_vapidPublicKey); ?></code>
+            </div>
+            <div class="col-sm-3">
+                <button type="button" class="btn btn-default btn-sm" id="bt_alfred_regen_vapid">
+                    <i class="fas fa-sync-alt"></i> {{Regenerate VAPID keys}}
+                </button>
+                <span id="alfred_regen_vapid_result" style="margin-left:8px;font-size:12px"></span>
             </div>
         </div>
 
@@ -1087,6 +1153,55 @@ $(document).on('click', '.alfred-memory-create-cancel', function () {
         $('#alfred_memory_table').hide();
         $('#alfred_memory_empty').show();
     }
+});
+
+// ============================================================
+// Phones management
+// ============================================================
+
+$(document).on('click', '.alfred-phone-delete', function () {
+    var id  = $(this).data('id');
+    var $tr = $('#alfred-phone-row-' + id);
+    if (!confirm('{{Delete this phone and all its push subscriptions?}}')) return;
+    var $btn = $(this).prop('disabled', true);
+    $.ajax({
+        type:     'POST',
+        url:      'plugins/alfred/core/ajax/alfred.ajax.php',
+        data:     { action: 'deletePhone', eqLogic_id: id },
+        dataType: 'json',
+        success:  function (data) {
+            if (data.state === 'ok') {
+                $tr.fadeOut(200, function () { $(this).remove(); });
+            } else {
+                $btn.prop('disabled', false);
+            }
+        },
+        error: function () { $btn.prop('disabled', false); }
+    });
+});
+
+$('#bt_alfred_regen_vapid').on('click', function () {
+    if (!confirm('{{Regenerate VAPID keys? All registered devices will need to re-enable notifications.}}')) return;
+    var $btn    = $(this).prop('disabled', true);
+    var $result = $('#alfred_regen_vapid_result');
+    $result.html('<i class="fas fa-spinner fa-spin"></i>');
+    $.ajax({
+        type:     'POST',
+        url:      'plugins/alfred/core/ajax/alfred.ajax.php',
+        data:     { action: 'regenVapid' },
+        dataType: 'json',
+        success:  function (data) {
+            if (data.state === 'ok') {
+                $result.html('<span style="color:#3c763d"><i class="fas fa-check"></i> {{Done — reload page to see new key}}</span>');
+            } else {
+                $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + (data.result || 'Error') + '</span>');
+            }
+        },
+        error:    function (jqXHR) {
+            $result.html('<span style="color:#a94442"><i class="fas fa-times"></i> ' + jqXHR.responseText + '</span>');
+        },
+        complete: function () { $btn.prop('disabled', false); }
+    });
 });
 
 </script>

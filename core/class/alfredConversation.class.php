@@ -241,6 +241,9 @@ class alfredConversation
                     $msg['model']    = $meta['model'] ?? '';
                 }
             }
+            if ($row['role'] === 'user' && ($meta['type'] ?? '') === 'scenario') {
+                $msg['scenario_display'] = $meta['display'] ?? $content;
+            }
             if ($row['role'] === 'tool') {
                 $msg['tool_call_id'] = $meta['tool_call_id'] ?? '';
                 $msg['name']         = $meta['name'] ?? '';

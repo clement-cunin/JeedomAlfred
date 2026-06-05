@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/alfredCmd.class.php';
+
 class alfred extends eqLogic {
 
     // -------------------------------------------------------------------------
@@ -192,6 +194,53 @@ class alfred extends eqLogic {
         unset($map[$id]);
         config::save('provider_temp_disabled', json_encode($map), __CLASS__);
         return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Phone equipment helpers
+    // -------------------------------------------------------------------------
+
+    public function isPhone(): bool
+    {
+        return $this->getConfiguration('alfred_type') === 'phone';
+    }
+
+    public static function getPhones(): array
+    {
+        return array_values(array_filter(
+            self::byType('alfred'),
+            function ($eq) { return $eq->getConfiguration('alfred_type') === 'phone'; }
+        ));
+    }
+
+    /**
+     * Ensure the Phone equipment has exactly one push command.
+     * Also cleans up legacy commands from older versions.
+     */
+    public function postSave(): void
+    {
+        if (!$this->isPhone()) {
+            return;
+        }
+
+        // Remove legacy "Envoyer message" command if it exists
+        $simple = $this->getCmd(null, 'alfred_push_simple');
+        if ($simple) {
+            $simple->remove();
+        }
+
+        // Create or rename the single conversation command
+        $cmd = $this->getCmd(null, 'alfred_push_reflect');
+        if (!$cmd) {
+            $cmd = new alfredCmd();
+            $cmd->setLogicalId('alfred_push_reflect');
+            $cmd->setEqLogic_id($this->getId());
+            $cmd->setType('action');
+            $cmd->setSubType('message');
+        }
+        $cmd->setName('Démarrer une conversation');
+        $cmd->setSubType('alfred_conversation');
+        $cmd->save();
     }
 
     // -------------------------------------------------------------------------

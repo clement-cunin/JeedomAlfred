@@ -5,6 +5,7 @@ class alfredMigration
     const MIGRATIONS = [
         1 => 'migration_001_baseline',
         2 => 'migration_002_async_tasks',
+        3 => 'migration_003_push_notifications',
     ];
 
     private static function downDir(): string
@@ -335,6 +336,56 @@ class alfredMigration
              FROM `alfred_async_task`
              WHERE type = \'schedule\'',
             'DROP TABLE IF EXISTS `alfred_async_task`',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Migration 3 — Web Push tables (subscriptions + notifications)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static function migration_003_push_notifications(): void
+    {
+        DB::Prepare(
+            'CREATE TABLE IF NOT EXISTS `alfred_push_subscription` (
+                `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+                `eqLogic_id`  INT UNSIGNED  NOT NULL,
+                `endpoint`    VARCHAR(500)  NOT NULL,
+                `p256dh_key`  VARCHAR(255)  NOT NULL,
+                `auth_key`    VARCHAR(255)  NOT NULL,
+                `fetch_token` VARCHAR(64)   NOT NULL,
+                `user_agent`  VARCHAR(255)  DEFAULT NULL,
+                `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uq_endpoint` (`endpoint`(255)),
+                KEY `idx_eqLogic` (`eqLogic_id`),
+                KEY `idx_token` (`fetch_token`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+
+        DB::Prepare(
+            'CREATE TABLE IF NOT EXISTS `alfred_push_notification` (
+                `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+                `eqLogic_id`  INT UNSIGNED  NOT NULL,
+                `session_id`  VARCHAR(36)   DEFAULT NULL,
+                `title`       VARCHAR(255)  NOT NULL DEFAULT \'Alfred\',
+                `body`        TEXT          DEFAULT NULL,
+                `read_at`     DATETIME      DEFAULT NULL,
+                `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_eqLogic_unread` (`eqLogic_id`, `read_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+    }
+
+    private static function migration_003_push_notifications_down(): string
+    {
+        return implode(";\n", [
+            'DROP TABLE IF EXISTS `alfred_push_notification`',
+            'DROP TABLE IF EXISTS `alfred_push_subscription`',
         ]);
     }
 }
