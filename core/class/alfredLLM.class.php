@@ -101,7 +101,7 @@ abstract class alfredLLMAdapter
         }
         if ($code >= 400) {
             $msg = $data['error']['message'] ?? $data['error']['status'] ?? json_encode($data);
-            throw new Exception("API error (HTTP {$code}): {$msg}");
+            throw new Exception("API error (HTTP {$code}) [{$url}]: {$msg}");
         }
         return $data;
     }

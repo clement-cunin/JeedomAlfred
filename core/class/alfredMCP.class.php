@@ -171,12 +171,17 @@ class alfredMCP
                 return strlen($header);
             },
         ]);
-        $raw = curl_exec($ch);
-        $err = curl_error($ch);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
         curl_close($ch);
 
         if ($raw === false) {
             throw new Exception("MCP HTTP request failed [{$this->url}]: {$err}");
+        }
+        if ($code >= 400) {
+            $preview = substr(trim($raw), 0, 200);
+            throw new Exception("MCP server HTTP {$code} [{$this->url}]: {$preview}");
         }
         return $raw;
     }

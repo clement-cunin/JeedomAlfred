@@ -47,9 +47,11 @@ class alfredMCPRegistry
             try {
                 $registry->addServer($mcp, $slug, $prefixTools);
             } catch (Exception $e) {
+                $label  = $cfg['name'] ?? $cfg['url'] ?? 'unknown';
+                $errMsg = "MCP server '{$label}' unavailable: " . $e->getMessage();
+                log::add('alfred', 'error', $errMsg);
                 if ($onError !== null) {
-                    $label = $cfg['name'] ?? $cfg['url'] ?? 'unknown';
-                    ($onError)("MCP server '{$label}' unavailable: " . $e->getMessage());
+                    ($onError)($errMsg);
                 }
             }
         }

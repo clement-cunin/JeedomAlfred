@@ -77,6 +77,7 @@ try {
     );
     $agent->run($sessionId, $message);
 } catch (Exception $e) {
+    log::add('alfred', 'error', 'Agent error: ' . $e->getMessage());
     if ($sessionId !== '') {
         alfredConversation::addMessage($sessionId, 'assistant', $e->getMessage(), ['error' => true]);
     }
