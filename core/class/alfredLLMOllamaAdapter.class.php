@@ -19,6 +19,7 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
     public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
     {
         $body        = $this->buildBody($messages, $tools, $systemPrompt, true);
+        log::add('alfred', 'debug', '[OllamaAdapter] chatStream — model=' . $this->model . ' tools=' . count($tools) . ' url=' . $this->chatUrl());
         $text        = '';
         $tool_acc    = [];
         $stop_reason = 'end_turn';
@@ -100,8 +101,11 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
         }
 
         if ($error_body !== '') {
+            log::add('alfred', 'debug', '[OllamaAdapter] SSE error_body: ' . $error_body);
             throw new Exception("Ollama stream error: {$error_body}");
         }
+
+        log::add('alfred', 'debug', '[OllamaAdapter] chatStream done — stop_reason=' . $stop_reason . ' tool_acc=' . json_encode($tool_acc));
 
         $tool_calls = [];
         ksort($tool_acc);
