@@ -235,6 +235,40 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
         </div>
 
         <!-- ================================================================ -->
+        <!-- Daily Journal -->
+        <!-- ================================================================ -->
+        <legend><i class="fas fa-book"></i> {{Daily journal}}</legend>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Enable daily journal}}</label>
+            <div class="col-sm-8" style="padding-top:7px">
+                <input type="checkbox" class="configKey" data-l1key="journal_daily_enabled" />
+                <span class="help-block" style="display:inline;margin-left:8px">
+                    {{Each night, summarize the day's conversations into a per-user memory entry.}}
+                </span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Journal prompt}}</label>
+            <div class="col-sm-6">
+                <textarea class="configKey form-control" data-l1key="journal_daily_prompt" rows="5"
+                          style="font-family: monospace; font-size: 12px;"
+                          placeholder="{{Leave empty to use the default prompt.}}"></textarea>
+            </div>
+            <span class="help-block col-sm-2">{{LLM instruction for generating the journal entry. Leave empty for the default.}}</span>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Journal expiry (days)}}</label>
+            <div class="col-sm-2">
+                <input type="number" class="configKey form-control" data-l1key="journal_daily_expiry_days"
+                       min="0" max="365" placeholder="10" />
+            </div>
+            <span class="help-block col-sm-6">{{Days before the journal memory entry expires. 0 = never.}}</span>
+        </div>
+
+        <!-- ================================================================ -->
         <!-- Phones -->
         <!-- ================================================================ -->
         <legend><i class="fas fa-mobile-alt"></i> {{Phones}}</legend>

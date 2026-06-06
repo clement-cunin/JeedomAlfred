@@ -5,13 +5,14 @@ class alfredMemory
     /**
      * Save a new memory. $scope must be "global" or "user:{login}".
      * $label is a short text identifier (e.g. "vacation-july-2026").
+     * $expiresAt is an optional MySQL DATETIME string; NULL means never expires.
      * Returns the new memory ID.
      */
-    public static function save(string $scope, string $label, string $content): int
+    public static function save(string $scope, string $label, string $content, ?string $expiresAt = null): int
     {
         DB::Prepare(
-            'INSERT INTO alfred_memory (scope, label, content) VALUES (:scope, :label, :content)',
-            [':scope' => $scope, ':label' => $label, ':content' => $content],
+            'INSERT INTO alfred_memory (scope, label, content, expires_at) VALUES (:scope, :label, :content, :expires_at)',
+            [':scope' => $scope, ':label' => $label, ':content' => $content, ':expires_at' => $expiresAt],
             DB::FETCH_TYPE_ROW
         );
         return (int)DB::getLastInsertId();
@@ -89,13 +90,15 @@ class alfredMemory
     }
 
     /**
-     * Load all memories visible to a user: global + user:{login}.
+     * Load all non-expired memories visible to a user: global + user:{login}.
      */
     public static function loadForUser(string $login): array
     {
         return DB::Prepare(
             'SELECT id, scope, label, content, created_at FROM alfred_memory'
-            . ' WHERE scope IN (:g, :u) ORDER BY created_at ASC',
+            . ' WHERE scope IN (:g, :u)'
+            . ' AND (expires_at IS NULL OR expires_at > NOW())'
+            . ' ORDER BY created_at ASC',
             [':g' => 'global', ':u' => 'user:' . $login],
             DB::FETCH_TYPE_ALL
         ) ?: [];
@@ -107,7 +110,7 @@ class alfredMemory
     public static function loadAll(): array
     {
         return DB::Prepare(
-            'SELECT id, scope, label, content, created_at, updated_at FROM alfred_memory ORDER BY scope, created_at ASC',
+            'SELECT id, scope, label, content, created_at, updated_at, expires_at FROM alfred_memory ORDER BY scope, created_at ASC',
             [],
             DB::FETCH_TYPE_ALL
         ) ?: [];
