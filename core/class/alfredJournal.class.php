@@ -68,6 +68,7 @@ class alfredJournal
         if ($prompt === '') {
             $prompt = self::defaultPrompt();
         }
+        $prompt = str_replace(['{date}', '{username}'], [$date, $login], $prompt);
 
         $transcript = self::buildTranscript($login, $date);
         if ($transcript === '') {
@@ -171,10 +172,12 @@ class alfredJournal
 
     private static function defaultPrompt(): string
     {
-        return 'Below is a transcript of conversations between a user and Alfred (an AI home assistant) from yesterday.'
-            . ' Write a concise memory note (3-7 sentences) summarizing:'
-            . ' the main topics discussed, any decisions or instructions given,'
-            . ' preferences or habits expressed, and anything useful for future context.'
-            . ' Write in third person about the user. No preamble or headings.';
+        return "Tu es Alfred, le majordome de la maison.\n"
+            . "Voici la transcription de tes échanges du {date} avec {username}.\n"
+            . "Ta mémoire persistante est disponible dans le contexte système.\n\n"
+            . "Extrait uniquement les faits NOUVEAUX par rapport à ta mémoire existante,"
+            . " en te concentrant sur les réponses de l'utilisateur (pas tes propres messages).\n"
+            . "Format : une ligne par fait, pas de phrase complète.\n"
+            . "Maximum 300 caractères. Si rien de nouveau : réponds uniquement \"rien\".";
     }
 }
