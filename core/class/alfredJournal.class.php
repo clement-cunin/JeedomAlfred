@@ -75,9 +75,19 @@ class alfredJournal
             return ['login' => $login, 'date' => $date, 'prompt' => $prompt, 'transcript' => '', 'result' => null, 'skipped' => true];
         }
 
+        $memories     = alfredMemory::loadForUser($login);
+        $systemPrompt = '';
+        if (!empty($memories)) {
+            $systemPrompt = "## Persistent memory\n";
+            foreach ($memories as $m) {
+                $heading       = $m['label'] !== '' ? $m['label'] : (($m['scope'] === 'global' ? 'global' : 'personal') . '-' . $m['id']);
+                $systemPrompt .= "\n### {$heading}\n{$m['content']}\n";
+            }
+        }
+
         $llm      = alfredLLM::make();
         $messages = [['role' => 'user', 'content' => $prompt . "\n\n" . $transcript]];
-        $response = $llm->chat($messages, [], '');
+        $response = $llm->chat($messages, [], $systemPrompt);
 
         $content = trim($response['text'] ?? '');
         if ($content === '') {
