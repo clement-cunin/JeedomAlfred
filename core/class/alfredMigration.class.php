@@ -6,6 +6,7 @@ class alfredMigration
         1 => 'migration_001_baseline',
         2 => 'migration_002_async_tasks',
         3 => 'migration_003_push_notifications',
+        4 => 'migration_004_memory_expiry',
     ];
 
     private static function downDir(): string
@@ -387,5 +388,31 @@ class alfredMigration
             'DROP TABLE IF EXISTS `alfred_push_notification`',
             'DROP TABLE IF EXISTS `alfred_push_subscription`',
         ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Migration 4 — Add expires_at column to alfred_memory (for journal expiry)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static function migration_004_memory_expiry(): void
+    {
+        $row = DB::Prepare(
+            "SELECT COUNT(*) as cnt FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = 'alfred_memory' AND column_name = 'expires_at'",
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
+            DB::Prepare(
+                'ALTER TABLE `alfred_memory` ADD COLUMN `expires_at` DATETIME DEFAULT NULL',
+                [],
+                DB::FETCH_TYPE_ROW
+            );
+        }
+    }
+
+    private static function migration_004_memory_expiry_down(): string
+    {
+        return 'ALTER TABLE `alfred_memory` DROP COLUMN `expires_at`';
     }
 }

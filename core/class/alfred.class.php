@@ -41,12 +41,14 @@ class alfred extends eqLogic {
         }
         // Set default models
         $defaults = [
-            'mistral_model'   => 'mistral-large-latest',
-            'gemini_model'    => 'gemini-1.5-pro',
-            'ollama_base_url' => 'http://localhost:11434',
-            'ollama_model'    => 'mistral:latest',
-            'max_iterations'  => '10',
-            'system_prompt'   => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
+            'mistral_model'            => 'mistral-large-latest',
+            'gemini_model'             => 'gemini-1.5-pro',
+            'ollama_base_url'          => 'http://localhost:11434',
+            'ollama_model'             => 'mistral:latest',
+            'max_iterations'           => '10',
+            'system_prompt'            => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
+            'journal_daily_enabled'    => '0',
+            'journal_daily_expiry_days' => '10',
         ];
         foreach ($defaults as $key => $value) {
             if (config::byKey($key, __CLASS__) === '') {
@@ -99,6 +101,18 @@ class alfred extends eqLogic {
             alfredAsyncTask::processPending();
         } catch (Exception $e) {
             log::add('alfred_cron', 'error', 'cron: alfredAsyncTask failed — ' . $e->getMessage());
+        }
+    }
+
+    public static function cronDaily() {
+        require_once __DIR__ . '/alfredLLM.class.php';
+        require_once __DIR__ . '/alfredConversation.class.php';
+        require_once __DIR__ . '/alfredMemory.class.php';
+        require_once __DIR__ . '/alfredJournal.class.php';
+        try {
+            alfredJournal::cronDaily();
+        } catch (Exception $e) {
+            log::add('alfred_cron', 'error', 'cronDaily: alfredJournal failed — ' . $e->getMessage());
         }
     }
 
