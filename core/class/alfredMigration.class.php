@@ -283,25 +283,34 @@ class alfredMigration
         );
 
         // Migrate pending/running schedules — done/error are historical noise, skip them
-        DB::Prepare(
-            'INSERT INTO `alfred_async_task`
-                (session_id, type, status, payload, error_msg, created_at)
-             SELECT
-                session_id,
-                \'schedule\',
-                status,
-                JSON_OBJECT(
-                    \'instruction\', instruction,
-                    \'run_at\',      DATE_FORMAT(run_at, \'%Y-%m-%d %H:%i:%s\'),
-                    \'strategy\',    strategy
-                ),
-                error_msg,
-                created_at
-             FROM `alfred_schedule`
-             WHERE status IN (\'pending\', \'running\')',
+        // Guard: alfred_schedule may not exist on fresh installs (only on upgrades from <=v1)
+        $row = DB::Prepare(
+            "SELECT COUNT(*) AS cnt FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = 'alfred_schedule'",
             [],
             DB::FETCH_TYPE_ROW
         );
+        if (($row['cnt'] ?? 0) > 0) {
+            DB::Prepare(
+                'INSERT INTO `alfred_async_task`
+                    (session_id, type, status, payload, error_msg, created_at)
+                 SELECT
+                    session_id,
+                    \'schedule\',
+                    status,
+                    JSON_OBJECT(
+                        \'instruction\', instruction,
+                        \'run_at\',      DATE_FORMAT(run_at, \'%Y-%m-%d %H:%i:%s\'),
+                        \'strategy\',    strategy
+                    ),
+                    error_msg,
+                    created_at
+                 FROM `alfred_schedule`
+                 WHERE status IN (\'pending\', \'running\')',
+                [],
+                DB::FETCH_TYPE_ROW
+            );
+        }
 
         DB::Prepare('DROP TABLE IF EXISTS `alfred_schedule`', [], DB::FETCH_TYPE_ROW);
     }
