@@ -209,6 +209,18 @@ try {
         ajax::success();
     }
 
+    if ($action === 'runJournal') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        $date = trim(init('date'));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new Exception('Invalid date format (expected YYYY-MM-DD)');
+        }
+        require_once __DIR__ . '/../class/alfredJournal.class.php';
+        require_once __DIR__ . '/../class/alfredLLM.class.php';
+        require_once __DIR__ . '/../class/alfredMemory.class.php';
+        ajax::success(alfredJournal::runForDate($date));
+    }
+
     if ($action === 'regenVapid') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
         require_once __DIR__ . '/../class/alfredPush.class.php';

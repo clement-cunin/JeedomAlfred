@@ -48,17 +48,31 @@ class alfredJournal
         return array_column($rows, 'user_login');
     }
 
-    private static function generateJournalEntry(string $login, string $date): void
+    /**
+     * Run journal generation for all active users on $date.
+     * Returns per-user results (prompt, transcript, LLM output).
+     */
+    public static function runForDate(string $date): array
     {
-        $transcript = self::buildTranscript($login, $date);
-        if ($transcript === '') {
-            log::add('alfred_cron', 'info', "journal: empty transcript for user {$login} on {$date}");
-            return;
+        $users   = self::getActiveUsersForDate($date);
+        $results = [];
+        foreach ($users as $login) {
+            $results[] = self::generateJournalEntry($login, $date);
         }
+        return $results;
+    }
 
+    public static function generateJournalEntry(string $login, string $date): array
+    {
         $prompt = (string)config::byKey('journal_daily_prompt', 'alfred');
         if ($prompt === '') {
             $prompt = self::defaultPrompt();
+        }
+
+        $transcript = self::buildTranscript($login, $date);
+        if ($transcript === '') {
+            log::add('alfred_cron', 'info', "journal: empty transcript for user {$login} on {$date}");
+            return ['login' => $login, 'date' => $date, 'prompt' => $prompt, 'transcript' => '', 'result' => null, 'skipped' => true];
         }
 
         $llm      = alfredLLM::make();
@@ -68,7 +82,7 @@ class alfredJournal
         $content = trim($response['text'] ?? '');
         if ($content === '') {
             log::add('alfred_cron', 'warning', "journal: LLM returned empty response for user {$login} on {$date}");
-            return;
+            return ['login' => $login, 'date' => $date, 'prompt' => $prompt, 'transcript' => $transcript, 'result' => null, 'skipped' => false];
         }
 
         $expiryDays = (int)config::byKey('journal_daily_expiry_days', 'alfred');
@@ -85,6 +99,7 @@ class alfredJournal
         }
 
         log::add('alfred_cron', 'info', "journal: entry saved for user {$login} ({$date})");
+        return ['login' => $login, 'date' => $date, 'prompt' => $prompt, 'transcript' => $transcript, 'result' => $content, 'skipped' => false];
     }
 
     private static function buildTranscript(string $login, string $date): string
