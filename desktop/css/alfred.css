@@ -87,6 +87,15 @@
     font-style: italic;
 }
 
+.alfred-date-group-label {
+    padding: 8px 12px 3px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #aaa;
+    font-weight: 600;
+}
+
 .alfred-session-item {
     display: flex;
     align-items: center;

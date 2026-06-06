@@ -80,6 +80,19 @@ $(function () {
         });
     }
 
+    function getDateGroupLabel(dateStr) {
+        if (!dateStr) return '';
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        var d = new Date(dateStr.replace(' ', 'T'));
+        d.setHours(0, 0, 0, 0);
+        if (d.getTime() === today.getTime()) return alfred_config.i18n.today;
+        if (d.getTime() === yesterday.getTime()) return alfred_config.i18n.yesterday;
+        return d.toLocaleDateString(navigator.language, { day: 'numeric', month: 'long' });
+    }
+
     function renderSessionList(sessions) {
         var $container = $('#alfred-conversations').empty();
         if (!sessions || sessions.length === 0) {
@@ -87,7 +100,13 @@ $(function () {
             return;
         }
 
+        var currentGroup = null;
         sessions.forEach(function (s) {
+            var label = getDateGroupLabel(s.updated_at);
+            if (label !== currentGroup) {
+                currentGroup = label;
+                $container.append($('<div class="alfred-date-group-label">').text(label));
+            }
             var $title = $('<span class="alfred-session-title">').text(s.title || s.session_id.substr(0, 8) + '…');
             var $rename = $('<button type="button" class="alfred-session-rename" title="{{Rename}}">')
                 .html('<i class="fas fa-pencil-alt"></i>');
