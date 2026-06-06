@@ -115,7 +115,7 @@ class alfredMigration
             }
             file_put_contents($dir . $filename, $downSql);
             DB::Prepare(
-                'INSERT INTO `alfred_migration_log` (version, hash, filename) VALUES (:v, :h, :f)',
+                'INSERT IGNORE INTO `alfred_migration_log` (version, hash, filename) VALUES (:v, :h, :f)',
                 [':v' => $v, ':h' => $hash, ':f' => $filename],
                 DB::FETCH_TYPE_ROW
             );
