@@ -16,12 +16,12 @@ Alfred peut envoyer des notifications push sur vos appareils mobiles directement
 
 1. Ouvrez la PWA Alfred (`https://…/plugins/alfred/chat/index.php`).
 2. Connectez-vous avec votre compte Jeedom si ce n'est pas déjà le cas.
-3. En bas de la barre latérale, cliquez sur **🔔 Activer les notifications**.
+3. Une bannière apparaît en haut de l'écran lors du premier lancement — cliquez sur **Activer**. Une fois activées, les notifications sont gérées via le menu **Settings** (icône ☰ → Paramètres).
 4. Acceptez la permission dans la boîte de dialogue du navigateur.
 
 Un équipement **Téléphone** est alors créé automatiquement dans Alfred (ex. : « iPhone Clément »), et deux commandes action y sont attachées.
 
-Pour désactiver, cliquez à nouveau sur le bouton (il indique « Notifications activées »).
+Pour désactiver, ouvrez le menu Settings (☰ → Paramètres) et désactivez les notifications.
 
 ---
 
