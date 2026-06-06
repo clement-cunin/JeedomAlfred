@@ -200,6 +200,7 @@ class alfredLLMChain extends alfredLLMAdapter
         $msg = $e->getMessage();
         if (strpos($msg, 'HTTP request failed') !== false) return true;
         if (preg_match('/\b(429|502|503|504)\b/', $msg)) return true;
+        if (stripos($msg, 'expired') !== false && stripos($msg, 'token') !== false) return true;
         return false;
     }
 }
