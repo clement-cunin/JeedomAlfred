@@ -1247,7 +1247,7 @@ $('#bt_alfred_run_journal').on('click', function () {
     $.ajax({
         type:     'POST',
         url:      'plugins/alfred/core/ajax/alfred.ajax.php',
-        data:     { action: 'runJournal', date: date },
+        data:     { action: 'runJournal', date: date, prompt: $('[data-l1key="journal_daily_prompt"]').val() },
         dataType: 'json',
         success:  function (data) {
             if (data.state !== 'ok') {

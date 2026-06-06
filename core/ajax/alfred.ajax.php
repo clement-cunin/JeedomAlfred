@@ -218,7 +218,8 @@ try {
         require_once __DIR__ . '/../class/alfredJournal.class.php';
         require_once __DIR__ . '/../class/alfredLLM.class.php';
         require_once __DIR__ . '/../class/alfredMemory.class.php';
-        ajax::success(alfredJournal::runForDate($date));
+        $promptOverride = trim(init('prompt'));
+        ajax::success(alfredJournal::runForDate($date, $promptOverride));
     }
 
     if ($action === 'regenVapid') {
