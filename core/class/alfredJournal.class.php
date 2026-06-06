@@ -52,19 +52,19 @@ class alfredJournal
      * Run journal generation for all active users on $date.
      * Returns per-user results (prompt, transcript, LLM output).
      */
-    public static function runForDate(string $date): array
+    public static function runForDate(string $date, string $promptOverride = ''): array
     {
         $users   = self::getActiveUsersForDate($date);
         $results = [];
         foreach ($users as $login) {
-            $results[] = self::generateJournalEntry($login, $date);
+            $results[] = self::generateJournalEntry($login, $date, $promptOverride);
         }
         return $results;
     }
 
-    public static function generateJournalEntry(string $login, string $date): array
+    public static function generateJournalEntry(string $login, string $date, string $promptOverride = ''): array
     {
-        $prompt = (string)config::byKey('journal_daily_prompt', 'alfred');
+        $prompt = $promptOverride !== '' ? $promptOverride : (string)config::byKey('journal_daily_prompt', 'alfred');
         if ($prompt === '') {
             $prompt = self::defaultPrompt();
         }
