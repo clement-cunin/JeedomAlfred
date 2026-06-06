@@ -91,8 +91,10 @@ var alfred_config = {
     userHash: "<?php echo htmlspecialchars($_userHash, ENT_QUOTES); ?>",
     isAdmin: <?php echo ($_SESSION['user']->getProfils() === 'admin') ? 'true' : 'false'; ?>,
     i18n: {
-        hello: "{{Hello, I'm Alfred.}}",
-        ask:   "{{Ask me anything about your home automation system.}}"
+        hello:     "{{Hello, I'm Alfred.}}",
+        ask:       "{{Ask me anything about your home automation system.}}",
+        today:     "{{Today}}",
+        yesterday: "{{Yesterday}}"
     }
 };
 // Persist auth info so the standalone PWA can work without a PHP session
