@@ -20,8 +20,10 @@ class alfredMemory
 
     /**
      * Update content of a memory by label. Enforces scope unless $allowedScopes is null (admin).
+     * If $setExpiry is true, expires_at is set to $expiresAt (null clears expiration).
+     * If $setExpiry is false, the existing expires_at value is preserved.
      */
-    public static function updateByLabel(string $label, string $content, ?array $allowedScopes = null): void
+    public static function updateByLabel(string $label, string $content, ?array $allowedScopes = null, bool $setExpiry = false, ?string $expiresAt = null): void
     {
         $row = self::getByLabel($label);
         if ($row === null) {
@@ -30,11 +32,19 @@ class alfredMemory
         if ($allowedScopes !== null && !in_array($row['scope'], $allowedScopes, true)) {
             throw new Exception("Memory '{$label}' access denied.");
         }
-        DB::Prepare(
-            'UPDATE alfred_memory SET content = :content, updated_at = NOW() WHERE id = :id',
-            [':content' => $content, ':id' => $row['id']],
-            DB::FETCH_TYPE_ROW
-        );
+        if ($setExpiry) {
+            DB::Prepare(
+                'UPDATE alfred_memory SET content = :content, expires_at = :expires_at, updated_at = NOW() WHERE id = :id',
+                [':content' => $content, ':expires_at' => $expiresAt, ':id' => $row['id']],
+                DB::FETCH_TYPE_ROW
+            );
+        } else {
+            DB::Prepare(
+                'UPDATE alfred_memory SET content = :content, updated_at = NOW() WHERE id = :id',
+                [':content' => $content, ':id' => $row['id']],
+                DB::FETCH_TYPE_ROW
+            );
+        }
     }
 
     /**
@@ -58,17 +68,27 @@ class alfredMemory
 
     /**
      * Admin: update content, scope and label of a memory by numeric ID.
+     * If $setExpiry is true, expires_at is set to $expiresAt (null clears expiration).
+     * If $setExpiry is false, the existing expires_at value is preserved.
      */
-    public static function adminUpdate(int $id, string $label, string $content, string $scope): void
+    public static function adminUpdate(int $id, string $label, string $content, string $scope, bool $setExpiry = false, ?string $expiresAt = null): void
     {
         if (self::getById($id) === null) {
             throw new Exception('Memory #' . $id . ' not found.');
         }
-        DB::Prepare(
-            'UPDATE alfred_memory SET label = :label, content = :content, scope = :scope, updated_at = NOW() WHERE id = :id',
-            [':label' => $label, ':content' => $content, ':scope' => $scope, ':id' => $id],
-            DB::FETCH_TYPE_ROW
-        );
+        if ($setExpiry) {
+            DB::Prepare(
+                'UPDATE alfred_memory SET label = :label, content = :content, scope = :scope, expires_at = :expires_at, updated_at = NOW() WHERE id = :id',
+                [':label' => $label, ':content' => $content, ':scope' => $scope, ':expires_at' => $expiresAt, ':id' => $id],
+                DB::FETCH_TYPE_ROW
+            );
+        } else {
+            DB::Prepare(
+                'UPDATE alfred_memory SET label = :label, content = :content, scope = :scope, updated_at = NOW() WHERE id = :id',
+                [':label' => $label, ':content' => $content, ':scope' => $scope, ':id' => $id],
+                DB::FETCH_TYPE_ROW
+            );
+        }
     }
 
     /**
@@ -95,7 +115,7 @@ class alfredMemory
     public static function loadForUser(string $login): array
     {
         return DB::Prepare(
-            'SELECT id, scope, label, content, created_at FROM alfred_memory'
+            'SELECT id, scope, label, content, created_at, expires_at FROM alfred_memory'
             . ' WHERE scope IN (:g, :u)'
             . ' AND (expires_at IS NULL OR expires_at > NOW())'
             . ' ORDER BY created_at ASC',
@@ -114,6 +134,18 @@ class alfredMemory
             [],
             DB::FETCH_TYPE_ALL
         ) ?: [];
+    }
+
+    /**
+     * Delete all expired memory rows. Called from the daily cron to keep the table lean.
+     */
+    public static function cronDaily(): void
+    {
+        DB::Prepare(
+            'DELETE FROM alfred_memory WHERE expires_at IS NOT NULL AND expires_at <= NOW()',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
     }
 
     /**
