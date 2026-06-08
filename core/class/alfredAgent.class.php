@@ -356,6 +356,7 @@ class alfredAgent
                         ],
                         'expires_in_days' => [
                             'type'        => 'integer',
+                            'minimum'     => 1,
                             'description' => 'Optional. Number of days until this memory expires and is automatically deleted. Omit for a permanent memory.',
                         ],
                     ],
@@ -373,6 +374,7 @@ class alfredAgent
                         'content' => ['type' => 'string', 'description' => 'New content for this memory.'],
                         'expires_in_days' => [
                             'type'        => 'integer',
+                            'minimum'     => 0,
                             'description' => 'Optional. Set or update the expiration: positive integer = days from now, 0 = remove expiration (make permanent). Omit to keep existing expiration unchanged.',
                         ],
                     ],

@@ -166,10 +166,12 @@ try {
         if ($label === '')   throw new Exception('Label must not be empty');
         if ($content === '') throw new Exception('Content must not be empty');
         if ($scope === '')   throw new Exception('Scope must not be empty');
-        $setExpiry = ($expiresRaw !== '__KEEP__');
-        $expiresAt = ($setExpiry && $expiresRaw !== '') ? $expiresRaw . ' 00:00:00' : null;
+        if ($expiresRaw !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiresRaw)) {
+            throw new Exception('Invalid expires_at format, expected YYYY-MM-DD');
+        }
+        $expiresAt = $expiresRaw !== '' ? $expiresRaw . ' 00:00:00' : null;
         require_once __DIR__ . '/../class/alfredMemory.class.php';
-        alfredMemory::adminUpdate($id, $label, $content, $scope, $setExpiry, $expiresAt);
+        alfredMemory::adminUpdate($id, $label, $content, $scope, true, $expiresAt);
         ajax::success();
     }
 
@@ -191,6 +193,9 @@ try {
         if ($label === '')   throw new Exception('Label must not be empty');
         if ($content === '') throw new Exception('Content must not be empty');
         if ($scope === '')   throw new Exception('Scope must not be empty');
+        if ($expiresRaw !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiresRaw)) {
+            throw new Exception('Invalid expires_at format, expected YYYY-MM-DD');
+        }
         $expiresAt = $expiresRaw !== '' ? $expiresRaw . ' 00:00:00' : null;
         require_once __DIR__ . '/../class/alfredMemory.class.php';
         $id  = alfredMemory::save($scope, $label, $content, $expiresAt);
