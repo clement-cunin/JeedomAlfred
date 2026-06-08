@@ -994,6 +994,179 @@ if (isConnect()) {
         #alfred-share-btn-current { background: #fff; color: #337ab7; border: 1.5px solid #337ab7; }
         #alfred-share-btn-new     { background: #337ab7; color: #fff; }
         #alfred-share-btn-cancel  { background: transparent; color: #999; font-size: 14px; font-weight: 400; padding: 10px; }
+
+        /* ---- Sidebar footer ---- */
+        #alfred-sidebar-footer {
+            border-top: 1px solid #ddd;
+            padding: 8px 10px;
+            flex-shrink: 0;
+        }
+
+        #alfred-settings-btn {
+            width: 100%;
+            text-align: left;
+            padding: 8px 12px;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #alfred-settings-btn:hover { background: #e8e8e8; }
+
+        /* ---- Settings sheet ---- */
+        #alfred-settings-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 3000;
+        }
+
+        #alfred-settings-sheet {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #fff;
+            border-radius: 16px 16px 0 0;
+            padding: 0 0 calc(16px + env(safe-area-inset-bottom));
+            z-index: 3001;
+            box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #alfred-settings-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid #eee;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 1;
+        }
+
+        #alfred-settings-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: #333; }
+
+        #alfred-settings-close {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            color: #aaa;
+            cursor: pointer;
+            padding: 0 4px;
+            line-height: 1;
+        }
+
+        #alfred-settings-close:hover { color: #333; }
+
+        .alfred-settings-section {
+            padding: 12px 20px 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .alfred-settings-section:last-child { border-bottom: none; }
+
+        .alfred-settings-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #aaa;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .alfred-settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 6px 0;
+        }
+
+        .alfred-settings-row > label,
+        .alfred-settings-row > span { font-size: 14px; color: #333; }
+
+        .alfred-settings-row select {
+            font-size: 13px;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            color: #333;
+            max-width: 180px;
+        }
+
+        .alfred-settings-rate-val {
+            font-size: 12px;
+            color: #333;
+            min-width: 34px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        #alfred-settings-push-status {
+            font-size: 12px;
+            color: #166534;
+            font-weight: 500;
+        }
+
+        /* Toggle switch */
+        .alfred-toggle {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+            display: inline-block;
+        }
+
+        .alfred-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+        .alfred-toggle-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 11px;
+            background: #ccc;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .alfred-toggle input:checked + .alfred-toggle-track { background: #337ab7; }
+
+        .alfred-toggle-track::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .alfred-toggle input:checked + .alfred-toggle-track::before { transform: translateX(18px); }
+
+        /* Dismiss button in push banner */
+        #alfred-push-dismiss {
+            background: transparent;
+            border: none;
+            color: rgba(44,74,138,0.5);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        #alfred-push-dismiss:hover { color: #2c4a8a; }
     </style>
 </head>
 <body>
@@ -1017,6 +1190,11 @@ if (isConnect()) {
         </div>
         <div id="alfred-conversations-label">Conversations</div>
         <div id="alfred-conversations"></div>
+        <div id="alfred-sidebar-footer">
+            <button id="alfred-settings-btn">
+                <i class="fas fa-cog"></i> Settings
+            </button>
+        </div>
     </div>
 
     <button id="alfred-sidebar-toggle" title="Menu">
@@ -1035,6 +1213,7 @@ if (isConnect()) {
             <i id="alfred-push-icon" class="fas fa-bell-slash"></i>
             <span id="alfred-push-label">Activer les notifications push pour recevoir des messages Alfred</span>
             <button id="alfred-push-btn">Activer</button>
+            <button id="alfred-push-dismiss" title="Dismiss">&#x2715;</button>
         </div>
 
         <div id="alfred-messages"></div>
@@ -1047,7 +1226,6 @@ if (isConnect()) {
             <textarea id="alfred-input" placeholder="Type a message…" rows="1"></textarea>
             <div id="alfred-tts-wrap">
                 <button id="alfred-tts" title="Text-to-speech"><i class="fas fa-volume-up"></i></button>
-                <button id="alfred-tts-settings" title="TTS settings"><i class="fas fa-sliders-h"></i></button>
             </div>
             <button id="alfred-mic-autosend" title="Auto-send: OFF"><i class="fas fa-bolt"></i></button>
             <button id="alfred-mic" title="Voice input"><i class="fas fa-microphone"></i></button>
@@ -1068,6 +1246,47 @@ if (isConnect()) {
     <button class="alfred-share-btn" id="alfred-share-btn-current">Conversation actuelle</button>
     <button class="alfred-share-btn" id="alfred-share-btn-new">Nouvelle conversation</button>
     <button class="alfred-share-btn" id="alfred-share-btn-cancel">Annuler</button>
+</div>
+
+<!-- Settings sheet -->
+<div id="alfred-settings-overlay"></div>
+<div id="alfred-settings-sheet">
+    <div id="alfred-settings-header">
+        <h3>Settings</h3>
+        <button id="alfred-settings-close" title="Close">&#x2715;</button>
+    </div>
+    <div class="alfred-settings-section" id="alfred-settings-push-section" style="display:none">
+        <div class="alfred-settings-section-title">Notifications</div>
+        <div class="alfred-settings-row">
+            <span>Push notifications</span>
+            <span id="alfred-settings-push-status"></span>
+            <button id="alfred-settings-push-btn" class="alfred-limit-btn" style="flex-shrink:0"></button>
+        </div>
+    </div>
+    <div class="alfred-settings-section" id="alfred-settings-tts-section" style="display:none">
+        <div class="alfred-settings-section-title">Text-to-speech</div>
+        <div class="alfred-settings-row">
+            <label for="alfred-tts-voice">Voice</label>
+            <select id="alfred-tts-voice"></select>
+        </div>
+        <div class="alfred-settings-row">
+            <label for="alfred-tts-rate">Speed</label>
+            <div style="display:flex;align-items:center;gap:8px">
+                <input type="range" id="alfred-tts-rate" min="0.5" max="2" step="0.1" style="width:100px">
+                <span class="alfred-settings-rate-val" id="alfred-tts-rate-val"></span>
+            </div>
+        </div>
+    </div>
+    <div class="alfred-settings-section">
+        <div class="alfred-settings-section-title">Display</div>
+        <div class="alfred-settings-row">
+            <label for="alfred-settings-show-model">Show AI model name</label>
+            <label class="alfred-toggle">
+                <input type="checkbox" id="alfred-settings-show-model">
+                <span class="alfred-toggle-track"></span>
+            </label>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -1122,6 +1341,7 @@ $(function () {
     var ttsEnabled    = localStorage.getItem('alfred_tts') === '1';
     var ttsVoice      = null;
     var ttsRate       = parseFloat(localStorage.getItem('alfred_tts_rate') || '1');
+    var showModel     = localStorage.getItem('alfred_show_model') !== '0';
     var ttsCurrentMsg = null;
     var ttsCurrentUtt = null;
 
@@ -1324,7 +1544,7 @@ $(function () {
                         var $b = appendBubble('assistant', msg.content);
                         if (msg.provider) {
                             $b.find('.alfred-msg-body').append(
-                                $('<div class="alfred-model-label">').text(msg.provider + ' · ' + msg.model)
+                                $('<div class="alfred-model-label">').text(msg.provider + ' · ' + msg.model).toggle(showModel)
                             );
                         }
                     }
@@ -1384,8 +1604,12 @@ $(function () {
 
     (function initTts() {
         if (!window.speechSynthesis) return;
-        var $btn = $('#alfred-tts');
+        $('#alfred-settings-tts-section').show();
+        var $btn    = $('#alfred-tts');
+        var rateVal = isNaN(ttsRate) ? 1 : ttsRate;
         $btn.toggleClass('active', ttsEnabled);
+        $('#alfred-tts-rate').val(rateVal);
+        $('#alfred-tts-rate-val').text(rateVal.toFixed(1) + 'x');
 
         $btn.on('click', function () {
             ttsEnabled = !ttsEnabled;
@@ -1396,18 +1620,6 @@ $(function () {
                 speechSynthesis.cancel();
             }
         });
-
-        var rateDisplay = isNaN(ttsRate) ? '1.0' : ttsRate.toFixed(1);
-        var $popover = $('<div id="alfred-tts-popover">')
-            .append('<span class="alfred-tts-label">Voice</span>')
-            .append('<select id="alfred-tts-voice"></select>')
-            .append('<span class="alfred-tts-label">Speed</span>')
-            .append(
-                $('<div class="alfred-tts-rate-row">')
-                    .append('<input type="range" id="alfred-tts-rate" min="0.5" max="2" step="0.1" value="' + (isNaN(ttsRate) ? 1 : ttsRate) + '">')
-                    .append('<span class="alfred-tts-rate-val" id="alfred-tts-rate-val">' + rateDisplay + 'x</span>')
-            );
-        $('#alfred-tts-wrap').append($popover);
 
         function populateVoices() {
             var voices = speechSynthesis.getVoices();
@@ -1445,11 +1657,6 @@ $(function () {
             ttsRate = parseFloat(this.value);
             localStorage.setItem('alfred_tts_rate', String(ttsRate));
             $('#alfred-tts-rate-val').text(ttsRate.toFixed(1) + 'x');
-        });
-
-        $('#alfred-tts-settings').on('click', function (e) { e.stopPropagation(); $popover.toggleClass('open'); });
-        $(document).on('click.tts-popover', function (e) {
-            if (!$(e.target).closest('#alfred-tts-wrap').length) $popover.removeClass('open');
         });
     }());
 
@@ -1586,6 +1793,35 @@ $(function () {
             micAutoSend = !micAutoSend;
             localStorage.setItem('alfred_mic_autosend', micAutoSend ? '1' : '0');
             $(this).toggleClass('active', micAutoSend).attr('title', micAutoSend ? 'Auto-send: ON' : 'Auto-send: OFF');
+        });
+    }());
+
+    // =========================================================================
+    // Settings panel
+    // =========================================================================
+
+    (function initSettings() {
+        function openSettings() {
+            $('#alfred-settings-overlay').show();
+            $('#alfred-settings-sheet').show();
+            if ($(window).width() < 768) $('#alfred-sidebar').removeClass('open');
+        }
+
+        function closeSettings() {
+            $('#alfred-settings-overlay').hide();
+            $('#alfred-settings-sheet').hide();
+        }
+
+        $('#alfred-settings-btn').on('click', openSettings);
+        $('#alfred-settings-close').on('click', closeSettings);
+        $('#alfred-settings-overlay').on('click', closeSettings);
+
+        var $showModelToggle = $('#alfred-settings-show-model');
+        $showModelToggle.prop('checked', showModel);
+        $showModelToggle.on('change', function () {
+            showModel = this.checked;
+            localStorage.setItem('alfred_show_model', showModel ? '1' : '0');
+            $('.alfred-model-label').toggle(showModel);
         });
     }());
 
@@ -1807,7 +2043,7 @@ $(function () {
                 $assistantBubble.data('tts-text', finalText);
                 if (d.provider) {
                     $assistantBubble.find('.alfred-msg-body').append(
-                        $('<div class="alfred-model-label">').text(d.provider + ' · ' + d.model)
+                        $('<div class="alfred-model-label">').text(d.provider + ' · ' + d.model).toggle(showModel)
                     );
                 }
             }
@@ -2268,33 +2504,34 @@ if ('serviceWorker' in navigator) {
 <script>
 // ── Push notifications ────────────────────────────────────────────────────────
 (function () {
-    console.log('[Alfred push] PushManager:', 'PushManager' in window, '| SW:', 'serviceWorker' in navigator);
+    if (!('PushManager' in window) || !('serviceWorker' in navigator)) return;
 
-    if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
-        console.warn('[Alfred push] Push API not available — button hidden');
-        return;
-    }
-
-    var pushApiUrl = alfred_config.basePath + '/api/push.php';
-    var $bar       = document.getElementById('alfred-notif-bar');
-    var $btn       = document.getElementById('alfred-push-btn');
-    var $icon      = document.getElementById('alfred-push-icon');
-    var $label     = document.getElementById('alfred-push-label');
-    if (!$btn) { console.warn('[Alfred push] Button element not found'); return; }
+    var pushApiUrl           = alfred_config.basePath + '/api/push.php';
+    var $bar                 = document.getElementById('alfred-notif-bar');
+    var $btn                 = document.getElementById('alfred-push-btn');
+    var $icon                = document.getElementById('alfred-push-icon');
+    var $label               = document.getElementById('alfred-push-label');
+    var $dismiss             = document.getElementById('alfred-push-dismiss');
+    var $settingsPushBtn     = document.getElementById('alfred-settings-push-btn');
+    var $settingsPushStatus  = document.getElementById('alfred-settings-push-status');
+    var $settingsPushSection = document.getElementById('alfred-settings-push-section');
 
     var _vapidKey = null;
 
+    function isActive()    { return !!localStorage.getItem('alfred_push_token'); }
+    function isDismissed() { return localStorage.getItem('alfred_push_dismissed') === '1'; }
+
     function updateUI(active) {
+        if ($settingsPushBtn)    $settingsPushBtn.textContent    = active ? 'Disable' : 'Enable';
+        if ($settingsPushStatus) $settingsPushStatus.textContent = active ? 'Active' : '';
         if (active) {
-            $bar.classList.add('push-active');
-            $icon.className    = 'fas fa-bell';
-            $label.textContent = 'Notifications activées';
-            $btn.textContent   = 'Désactiver';
+            localStorage.setItem('alfred_push_dismissed', '1');
+            $bar.style.display = 'none';
         } else {
-            $bar.classList.remove('push-active');
             $icon.className    = 'fas fa-bell-slash';
             $label.textContent = 'Activer les notifications push pour recevoir des messages Alfred';
             $btn.textContent   = 'Activer';
+            $bar.style.display = isDismissed() ? 'none' : 'flex';
         }
     }
 
@@ -2312,50 +2549,8 @@ if ('serviceWorker' in navigator) {
         return arr;
     }
 
-    // Fetch VAPID public key from server (public endpoint, no auth needed).
-    // We only show the button once we confirm the key is available.
-    fetch(pushApiUrl + '?action=vapid_public')
-        .then(function (r) { console.log('[Alfred push] vapid_public HTTP', r.status); return r.json(); })
-        .then(function (data) {
-            console.log('[Alfred push] vapid_public response:', JSON.stringify(data));
-            if (!data.public_key) return;
-            _vapidKey = data.public_key;
-
-            // Restore state from a previous session
-            var storedToken = localStorage.getItem('alfred_push_token');
-            updateUI(!!storedToken);
-            if (storedToken) sendTokenToSW(storedToken);
-
-            $bar.style.display = 'flex';
-        })
-        .catch(function (err) {
-            console.warn('Alfred push: could not fetch VAPID key —', err.message);
-        });
-
-    // Re-send token to SW whenever the controller changes (SW update)
-    navigator.serviceWorker.addEventListener('controllerchange', function () {
-        var t = localStorage.getItem('alfred_push_token');
-        if (t) sendTokenToSW(t);
-    });
-
-    $btn.addEventListener('click', function () {
-        if ($btn.classList.contains('push-active')) {
-            navigator.serviceWorker.ready
-                .then(function (reg) { return reg.pushManager.getSubscription(); })
-                .then(function (sub)  { return sub ? sub.unsubscribe() : null; })
-                .then(function () {
-                    localStorage.removeItem('alfred_push_token');
-                    localStorage.removeItem('alfred_phone_id');
-                    updateUI(false);
-                });
-            return;
-        }
-
-        if (!_vapidKey) {
-            alert('Clé VAPID non disponible — vérifier la configuration du plugin Alfred.');
-            return;
-        }
-
+    function doSubscribe() {
+        if (!_vapidKey) { alert('Clé VAPID non disponible — vérifier la configuration du plugin Alfred.'); return; }
         navigator.serviceWorker.ready
             .then(function (reg) {
                 return reg.pushManager.subscribe({
@@ -2379,20 +2574,53 @@ if ('serviceWorker' in navigator) {
             })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                if (!data.ok) {
-                    alert('Erreur activation notifications : ' + (data.error || 'unknown'));
-                    return;
-                }
+                if (!data.ok) { alert('Erreur activation notifications : ' + (data.error || 'unknown')); return; }
                 localStorage.setItem('alfred_push_token', data.fetch_token);
                 localStorage.setItem('alfred_phone_id',   data.eqLogic_id);
                 sendTokenToSW(data.fetch_token);
                 updateUI(true);
             })
-            .catch(function (err) {
-                console.error('Push subscribe error:', err);
-                alert('Impossible d\'activer les notifications.\n' + err.message);
+            .catch(function (err) { console.error('Push subscribe error:', err); alert('Impossible d\'activer les notifications.\n' + err.message); });
+    }
+
+    function doUnsubscribe() {
+        navigator.serviceWorker.ready
+            .then(function (reg) { return reg.pushManager.getSubscription(); })
+            .then(function (sub)  { return sub ? sub.unsubscribe() : null; })
+            .then(function () {
+                localStorage.removeItem('alfred_push_token');
+                localStorage.removeItem('alfred_phone_id');
+                updateUI(false);
             });
+    }
+
+    function handleToggle() { if (isActive()) doUnsubscribe(); else doSubscribe(); }
+
+    if ($btn)             $btn.addEventListener('click', handleToggle);
+    if ($settingsPushBtn) $settingsPushBtn.addEventListener('click', handleToggle);
+    if ($dismiss) {
+        $dismiss.addEventListener('click', function () {
+            localStorage.setItem('alfred_push_dismissed', '1');
+            $bar.style.display = 'none';
+        });
+    }
+
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+        var t = localStorage.getItem('alfred_push_token');
+        if (t) sendTokenToSW(t);
     });
+
+    fetch(pushApiUrl + '?action=vapid_public')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.public_key) return;
+            _vapidKey = data.public_key;
+            var storedToken = localStorage.getItem('alfred_push_token');
+            if (storedToken) sendTokenToSW(storedToken);
+            updateUI(!!storedToken);
+            if ($settingsPushSection) $settingsPushSection.style.display = '';
+        })
+        .catch(function (err) { console.warn('Alfred push: could not fetch VAPID key —', err.message); });
 })();
 </script>
 </body>
