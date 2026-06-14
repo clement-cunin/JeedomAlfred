@@ -76,8 +76,22 @@ class alfredJournal
         }
 
         $llm      = alfredLLM::make();
+        $memories = alfredMemory::loadForUser($login);
+        $systemPrompt = '';
+        if (!empty($memories)) {
+            $systemPrompt = "## Persistent memory\n";
+            foreach ($memories as $m) {
+                $heading = $m['label'] !== ''
+                    ? $m['label']
+                    : (($m['scope'] === 'global' ? 'global' : 'personal') . '-' . $m['id']);
+                if (!empty($m['expires_at'])) {
+                    $heading .= ' *(expires ' . substr($m['expires_at'], 0, 10) . ')*';
+                }
+                $systemPrompt .= "\n### {$heading}\n{$m['content']}\n";
+            }
+        }
         $messages = [['role' => 'user', 'content' => $prompt . "\n\n" . $transcript]];
-        $response = $llm->chat($messages, [], '');
+        $response = $llm->chat($messages, [], $systemPrompt);
 
         $content = trim($response['text'] ?? '');
         if ($content === '') {
