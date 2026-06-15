@@ -386,6 +386,59 @@ if (isConnect()) {
             font-size: 12px;
         }
 
+        .alfred-msg-bubble h3,
+        .alfred-msg-bubble h4,
+        .alfred-msg-bubble h5,
+        .alfred-msg-bubble h6 {
+            margin: 8px 0 3px;
+            line-height: 1.3;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .alfred-msg-bubble h3 { font-size: 16px; }
+        .alfred-msg-bubble h4 { font-size: 15px; }
+        .alfred-msg-bubble ul,
+        .alfred-msg-bubble ol {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+        .alfred-msg-bubble li { margin: 2px 0; }
+        .alfred-msg-bubble a { color: #337ab7; }
+        .alfred-msg.user .alfred-msg-bubble a { color: #d4e9ff; }
+
+        .alfred-md-table-wrap {
+            overflow-x: auto;
+            margin: 6px 0;
+        }
+        .alfred-md-table {
+            border-collapse: collapse;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .alfred-md-table th,
+        .alfred-md-table td {
+            border: 1px solid rgba(0,0,0,0.18);
+            padding: 5px 10px;
+            text-align: left;
+        }
+        .alfred-md-table th {
+            background: rgba(0,0,0,0.08);
+            font-weight: 600;
+        }
+        .alfred-md-table tr:nth-child(even) td {
+            background: rgba(0,0,0,0.03);
+        }
+        .alfred-msg.user .alfred-md-table th,
+        .alfred-msg.user .alfred-md-table td {
+            border-color: rgba(255,255,255,0.3);
+        }
+        .alfred-msg.user .alfred-md-table th {
+            background: rgba(255,255,255,0.15);
+        }
+        .alfred-msg.user .alfred-md-table tr:nth-child(even) td {
+            background: rgba(255,255,255,0.07);
+        }
+
         .alfred-msg.user .alfred-msg-bubble {
             background: #337ab7;
             color: #fff;
@@ -2258,18 +2311,115 @@ $(function () {
 
     function markdownToHtml(text) {
         if (!text) return '';
+        var lines = text.split('\n');
+        var html  = '';
+        var i     = 0;
+
+        while (i < lines.length) {
+            var line = lines[i];
+
+            // Fenced code block
+            if (/^```/.test(line)) {
+                var code = [];
+                i++;
+                while (i < lines.length && !/^```/.test(lines[i])) {
+                    code.push(escHtml(lines[i]));
+                    i++;
+                }
+                if (i < lines.length) i++; // skip closing ```
+                html += '<pre><code>' + code.join('\n') + '</code></pre>';
+                continue;
+            }
+
+            // Heading (# through ######)
+            var hm = line.match(/^(#{1,6})\s+(.+)$/);
+            if (hm) {
+                var lvl = Math.min(hm[1].length + 2, 6);
+                html += '<h' + lvl + '>' + inlineMd(hm[2]) + '</h' + lvl + '>';
+                i++;
+                continue;
+            }
+
+            // Table (lines starting with |)
+            if (/^\|/.test(line)) {
+                var trows = [];
+                while (i < lines.length && /^\|/.test(lines[i])) {
+                    trows.push(lines[i]);
+                    i++;
+                }
+                html += renderMdTable(trows);
+                continue;
+            }
+
+            // Unordered list
+            if (/^[-*]\s/.test(line)) {
+                html += '<ul>';
+                while (i < lines.length && /^[-*]\s/.test(lines[i])) {
+                    html += '<li>' + inlineMd(lines[i].replace(/^[-*]\s/, '')) + '</li>';
+                    i++;
+                }
+                html += '</ul>';
+                continue;
+            }
+
+            // Ordered list
+            if (/^\d+\.\s/.test(line)) {
+                html += '<ol>';
+                while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+                    html += '<li>' + inlineMd(lines[i].replace(/^\d+\.\s+/, '')) + '</li>';
+                    i++;
+                }
+                html += '</ol>';
+                continue;
+            }
+
+            // Blank line → paragraph break
+            if (line.trim() === '') {
+                html += '<br>';
+                i++;
+                continue;
+            }
+
+            // Regular text line
+            html += inlineMd(line) + '<br>';
+            i++;
+        }
+
+        return html.replace(/<br>$/, '');
+    }
+
+    function inlineMd(text) {
         var s = escHtml(text);
-        s = s.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-        s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
         s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
         s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-        s = s.replace(/^### (.+)$/gm, '<h5>$1</h5>');
-        s = s.replace(/^## (.+)$/gm,  '<h4>$1</h4>');
-        s = s.replace(/^# (.+)$/gm,   '<h3>$1</h3>');
-        s = s.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
-        s = s.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-        s = s.replace(/\n/g, '<br>');
+        s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+        s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, label, href) {
+            // Block javascript: URIs
+            var raw = href.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+            if (/^javascript:/i.test(raw.trim())) return label;
+            return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+        });
         return s;
+    }
+
+    function renderMdTable(rows) {
+        if (!rows.length) return '';
+        var html   = '<div class="alfred-md-table-wrap"><table class="alfred-md-table"><tbody>';
+        var isHead = true;
+        for (var i = 0; i < rows.length; i++) {
+            // Separator row (|---|---|)
+            if (/^\|[-:| ]+\|?$/.test(rows[i])) { isHead = false; continue; }
+            var parts = rows[i].split('|');
+            if (parts[0].trim() === '') parts.shift();
+            if (parts.length > 0 && parts[parts.length - 1].trim() === '') parts.pop();
+            var tag = isHead ? 'th' : 'td';
+            html += '<tr>';
+            for (var j = 0; j < parts.length; j++) {
+                html += '<' + tag + '>' + inlineMd(parts[j].trim()) + '</' + tag + '>';
+            }
+            html += '</tr>';
+        }
+        return html + '</tbody></table></div>';
     }
 
     function escHtml(str) {
