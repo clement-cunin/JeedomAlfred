@@ -209,7 +209,7 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
                 if (!empty($msg['tool_calls'])) {
                     $m['tool_calls'] = array_map(function ($tc) {
                         return [
-                            'id'       => $tc['id'],
+                            'id'       => $this->sanitizeToolCallId($tc['id']),
                             'type'     => 'function',
                             'function' => [
                                 'name'      => $tc['name'],
@@ -223,13 +223,18 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
             } elseif ($role === 'tool') {
                 $out[] = [
                     'role'         => 'tool',
-                    'tool_call_id' => $msg['tool_call_id'],
+                    'tool_call_id' => $this->sanitizeToolCallId($msg['tool_call_id']),
                     'content'      => $msg['content'],
                     'name'         => $msg['name'] ?? '',
                 ];
             }
         }
         return $out;
+    }
+
+    private function sanitizeToolCallId(string $id): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_-]/', '_', $id);
     }
 
     private function toTools(array $tools): array
