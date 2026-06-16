@@ -252,7 +252,7 @@ class alfredLLMGeminiAdapter extends alfredLLMAdapter
                 $text .= $part['text'];
             } elseif (isset($part['functionCall'])) {
                 $tool_calls[] = [
-                    'id'          => uniqid('gemini_', true), // Gemini has no call IDs
+                    'id'          => 'gemini_' . bin2hex(random_bytes(8)),
                     'name'        => $part['functionCall']['name'],
                     'input'       => $part['functionCall']['args'] ?? [],
                     'gemini_part' => $part, // preserve full part (may contain thoughtSignature)
