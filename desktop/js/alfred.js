@@ -27,6 +27,12 @@ $(function () {
     var ttsCurrentMsg = null; // $msg element currently playing/paused
     var ttsCurrentUtt = null; // current SpeechSynthesisUtterance
 
+    // Display settings state (theme + input size)
+    var alfredTheme     = localStorage.getItem('alfred_theme') || 'default';
+    var alfredInputSize = localStorage.getItem('alfred_input_size') || 'normal';
+    if (alfredTheme !== 'default') $('#alfred-app').attr('data-alfred-theme', alfredTheme);
+    if (alfredInputSize === 'large') $('#alfred-app').attr('data-alfred-input-size', 'large');
+
     // =========================================================================
     // Sidebar toggle (mobile)
     // =========================================================================
@@ -259,8 +265,9 @@ $(function () {
     // =========================================================================
 
     $('#alfred-input').on('input', function () {
+        var maxHeight = alfredInputSize === 'large' ? 240 : 120;
         this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        this.style.height = Math.min(this.scrollHeight, maxHeight) + 'px';
     });
 
     $('#alfred-input').on('keydown', function (e) {
@@ -385,6 +392,64 @@ $(function () {
 
         $(document).on('click.tts-popover', function (e) {
             if (!$(e.target).closest('#alfred-tts-wrap').length) {
+                $popover.removeClass('open');
+            }
+        });
+    }());
+
+    // =========================================================================
+    // Display settings (background theme + larger input area)
+    // =========================================================================
+
+    (function initDisplaySettings() {
+        var $popover = $('<div id="alfred-display-popover">')
+            .append('<span class="alfred-display-label">{{Theme}}</span>')
+            .append(
+                $('<select id="alfred-display-theme">')
+                    .append('<option value="default">{{Default}}</option>')
+                    .append('<option value="pastel">{{Pastel}}</option>')
+                    .append('<option value="dark">{{Dark}}</option>')
+                    .val(alfredTheme)
+            )
+            .append('<span class="alfred-display-label">{{Input area}}</span>')
+            .append(
+                $('<label class="alfred-display-checkbox-row">')
+                    .append(
+                        $('<input type="checkbox" id="alfred-display-input-size">')
+                            .prop('checked', alfredInputSize === 'large')
+                    )
+                    .append('<span>{{Larger input area}}</span>')
+            );
+        $('#alfred-sidebar-header-row').append($popover);
+
+        $('#alfred-display-theme').on('change', function () {
+            alfredTheme = this.value;
+            localStorage.setItem('alfred_theme', alfredTheme);
+            if (alfredTheme === 'default') {
+                $('#alfred-app').removeAttr('data-alfred-theme');
+            } else {
+                $('#alfred-app').attr('data-alfred-theme', alfredTheme);
+            }
+        });
+
+        $('#alfred-display-input-size').on('change', function () {
+            alfredInputSize = this.checked ? 'large' : 'normal';
+            localStorage.setItem('alfred_input_size', alfredInputSize);
+            if (alfredInputSize === 'large') {
+                $('#alfred-app').attr('data-alfred-input-size', 'large');
+            } else {
+                $('#alfred-app').removeAttr('data-alfred-input-size');
+            }
+            $('#alfred-input').trigger('input');
+        });
+
+        $('#alfred-display-settings').on('click', function (e) {
+            e.stopPropagation();
+            $popover.toggleClass('open');
+        });
+
+        $(document).on('click.display-popover', function (e) {
+            if (!$(e.target).closest('#alfred-sidebar-header-row').length) {
                 $popover.removeClass('open');
             }
         });

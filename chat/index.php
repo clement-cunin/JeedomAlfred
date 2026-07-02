@@ -22,6 +22,16 @@ if (isConnect()) {
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        // Applied before first paint to avoid a flash of the default theme.
+        (function () {
+            var theme = localStorage.getItem('alfred_theme') || 'default';
+            if (theme !== 'default') document.documentElement.setAttribute('data-alfred-theme', theme);
+            if (localStorage.getItem('alfred_input_size') === 'large') {
+                document.documentElement.setAttribute('data-alfred-input-size', 'large');
+            }
+        }());
+    </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1220,6 +1230,55 @@ if (isConnect()) {
         }
 
         #alfred-push-dismiss:hover { color: #2c4a8a; }
+
+        /* ---- Larger input area (persistent, opt-in via Settings) ---- */
+        #alfred-input { max-height: 120px; }
+        html[data-alfred-input-size="large"] #alfred-input { max-height: 240px; }
+
+        /* ---- Themes ---- */
+        html[data-alfred-theme="pastel"] body,
+        html[data-alfred-theme="pastel"] #alfred-app { background: #fbf3f8; }
+        html[data-alfred-theme="pastel"] #alfred-sidebar { background: #f3e9f7; border-right-color: #e3d3ea; }
+        html[data-alfred-theme="pastel"] #alfred-sidebar-header { border-bottom-color: #e3d3ea; }
+        html[data-alfred-theme="pastel"] #alfred-new-chat { color: #5b4a63; border-color: #d9c0e2; }
+        html[data-alfred-theme="pastel"] #alfred-new-chat:hover { background: #ecd9f2; }
+        html[data-alfred-theme="pastel"] .alfred-session-item { color: #5b4a63; }
+        html[data-alfred-theme="pastel"] .alfred-session-item:hover { background: #ecd9f2; }
+        html[data-alfred-theme="pastel"] .alfred-session-item.active { background: #e0c7ec; }
+        html[data-alfred-theme="pastel"] #alfred-welcome h2 { color: #5b4a63; }
+        html[data-alfred-theme="pastel"] .alfred-msg.assistant .alfred-msg-bubble { background: #eaf6ee; color: #3d5c46; }
+        html[data-alfred-theme="pastel"] #alfred-input-bar { background: #fbf3f8; border-top-color: #e3d3ea; }
+        html[data-alfred-theme="pastel"] #alfred-input { background: #fff; border-color: #d9c0e2; color: #5b4a63; }
+        html[data-alfred-theme="pastel"] #alfred-settings-sheet,
+        html[data-alfred-theme="pastel"] #alfred-settings-header { background: #fbf3f8; }
+
+        html[data-alfred-theme="dark"] body,
+        html[data-alfred-theme="dark"] #alfred-app { background: #16171c; }
+        html[data-alfred-theme="dark"] #alfred-sidebar { background: #1c1d24; border-right-color: #303138; }
+        html[data-alfred-theme="dark"] #alfred-sidebar-header { border-bottom-color: #303138; }
+        html[data-alfred-theme="dark"] #alfred-conversations-label { color: #777; }
+        html[data-alfred-theme="dark"] #alfred-new-chat { color: #ddd; border-color: #40414a; }
+        html[data-alfred-theme="dark"] #alfred-new-chat:hover { background: #2a2b33; }
+        html[data-alfred-theme="dark"] .alfred-session-item { color: #ddd; }
+        html[data-alfred-theme="dark"] .alfred-session-item:hover { background: #2a2b33; }
+        html[data-alfred-theme="dark"] .alfred-session-item.active { background: #33475f; }
+        html[data-alfred-theme="dark"] .alfred-session-title-input { color: #ddd; }
+        html[data-alfred-theme="dark"] #alfred-welcome { color: #999; }
+        html[data-alfred-theme="dark"] #alfred-welcome h2 { color: #eee; }
+        html[data-alfred-theme="dark"] .alfred-msg.assistant .alfred-msg-bubble { background: #2a2b33; color: #e4e4e4; }
+        html[data-alfred-theme="dark"] .alfred-msg.scenario .alfred-msg-bubble { background: #2a2b33; color: #bbb; }
+        html[data-alfred-theme="dark"] .alfred-msg-bubble.alfred-msg-error { background: #3a2323; border-color: #7a3a3a; color: #f0b4b4; }
+        html[data-alfred-theme="dark"] #alfred-input-bar { background: #16171c; border-top-color: #303138; }
+        html[data-alfred-theme="dark"] #alfred-input { background: #1c1d24; border-color: #40414a; color: #eee; }
+        html[data-alfred-theme="dark"] #alfred-input:disabled { background: #1a1b20; color: #666; }
+        html[data-alfred-theme="dark"] #alfred-settings-sheet,
+        html[data-alfred-theme="dark"] #alfred-settings-header { background: #1c1d24; }
+        html[data-alfred-theme="dark"] #alfred-settings-header h3 { color: #eee; }
+        html[data-alfred-theme="dark"] .alfred-settings-section { border-bottom-color: #303138; }
+        html[data-alfred-theme="dark"] .alfred-settings-row > label,
+        html[data-alfred-theme="dark"] .alfred-settings-row > span { color: #ddd; }
+        html[data-alfred-theme="dark"] .alfred-settings-row select { background: #1c1d24; border-color: #40414a; color: #ddd; }
+        html[data-alfred-theme="dark"] #alfred-sidebar-toggle { background: rgba(28,29,36,0.9); color: #ddd; }
     </style>
 </head>
 <body>
@@ -1336,6 +1395,21 @@ if (isConnect()) {
             <label for="alfred-settings-show-model">Show AI model name</label>
             <label class="alfred-toggle">
                 <input type="checkbox" id="alfred-settings-show-model">
+                <span class="alfred-toggle-track"></span>
+            </label>
+        </div>
+        <div class="alfred-settings-row">
+            <label for="alfred-settings-theme">Theme</label>
+            <select id="alfred-settings-theme">
+                <option value="default">Default</option>
+                <option value="pastel">Pastel</option>
+                <option value="dark">Dark</option>
+            </select>
+        </div>
+        <div class="alfred-settings-row">
+            <label for="alfred-settings-input-size">Larger input area</label>
+            <label class="alfred-toggle">
+                <input type="checkbox" id="alfred-settings-input-size">
                 <span class="alfred-toggle-track"></span>
             </label>
         </div>
@@ -1628,8 +1702,9 @@ $(function () {
     // =========================================================================
 
     $('#alfred-input').on('input', function () {
+        var maxHeight = document.documentElement.getAttribute('data-alfred-input-size') === 'large' ? 240 : 120;
         this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        this.style.height = Math.min(this.scrollHeight, maxHeight) + 'px';
     });
 
     $('#alfred-input').on('keydown', function (e) {
@@ -1875,6 +1950,31 @@ $(function () {
             showModel = this.checked;
             localStorage.setItem('alfred_show_model', showModel ? '1' : '0');
             $('.alfred-model-label').toggle(showModel);
+        });
+
+        var $themeSelect = $('#alfred-settings-theme');
+        $themeSelect.val(localStorage.getItem('alfred_theme') || 'default');
+        $themeSelect.on('change', function () {
+            var theme = this.value;
+            localStorage.setItem('alfred_theme', theme);
+            if (theme === 'default') {
+                document.documentElement.removeAttribute('data-alfred-theme');
+            } else {
+                document.documentElement.setAttribute('data-alfred-theme', theme);
+            }
+        });
+
+        var $inputSizeToggle = $('#alfred-settings-input-size');
+        $inputSizeToggle.prop('checked', localStorage.getItem('alfred_input_size') === 'large');
+        $inputSizeToggle.on('change', function () {
+            if (this.checked) {
+                localStorage.setItem('alfred_input_size', 'large');
+                document.documentElement.setAttribute('data-alfred-input-size', 'large');
+            } else {
+                localStorage.setItem('alfred_input_size', 'normal');
+                document.documentElement.removeAttribute('data-alfred-input-size');
+            }
+            $('#alfred-input').trigger('input');
         });
     }());
 
