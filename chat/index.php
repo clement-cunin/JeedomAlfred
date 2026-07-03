@@ -2275,15 +2275,29 @@ $(function () {
         scrollToBottom();
     }
 
-    // Formats a timestamp as "HH:MM" for today, or "DD/MM/YYYY HH:MM" otherwise.
+    // Formats a timestamp as "HH:MM" for today, "hier à HH:MM" for yesterday,
+    // "5 janvier à HH:MM" within the last 6 months, else "5 janvier 2024 à HH:MM".
     function formatTimestamp(value) {
         var d = value instanceof Date ? value : new Date(String(value).replace(' ', 'T'));
         if (isNaN(d.getTime())) return '';
-        var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-        var now      = new Date();
-        var sameDay  = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-        var hhmm     = pad(d.getHours()) + ':' + pad(d.getMinutes());
-        return sameDay ? hhmm : (pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + hhmm);
+        var pad  = function (n) { return (n < 10 ? '0' : '') + n; };
+        var hhmm = pad(d.getHours()) + ':' + pad(d.getMinutes());
+
+        var now       = new Date();
+        var today     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        var day       = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+        if (day.getTime() === today.getTime()) return hhmm;
+        if (day.getTime() === yesterday.getTime()) return 'hier à ' + hhmm;
+
+        var sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        var withYear     = day.getTime() < sixMonthsAgo.getTime();
+        var dateLabel    = d.toLocaleDateString(navigator.language, withYear
+            ? { day: 'numeric', month: 'long', year: 'numeric' }
+            : { day: 'numeric', month: 'long' });
+        return dateLabel + ' à ' + hhmm;
     }
 
     function appendTimestamp($msg, value) {
