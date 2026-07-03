@@ -495,11 +495,18 @@ if (isConnect()) {
             min-width: 0;
         }
 
+        .alfred-msg-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 2px 4px;
+            margin-top: 3px;
+        }
+
+        .alfred-timestamp-label,
         .alfred-model-label {
             font-size: 11px;
             color: #aaa;
-            padding: 2px 4px;
-            margin-top: 3px;
             line-height: 1.2;
         }
 
@@ -1413,6 +1420,13 @@ if (isConnect()) {
                 <span class="alfred-toggle-track"></span>
             </label>
         </div>
+        <div class="alfred-settings-row">
+            <label for="alfred-settings-show-timestamp">Show message timestamps</label>
+            <label class="alfred-toggle">
+                <input type="checkbox" id="alfred-settings-show-timestamp">
+                <span class="alfred-toggle-track"></span>
+            </label>
+        </div>
     </div>
 </div>
 
@@ -1469,6 +1483,7 @@ $(function () {
     var ttsVoice      = null;
     var ttsRate       = parseFloat(localStorage.getItem('alfred_tts_rate') || '1');
     var showModel     = localStorage.getItem('alfred_show_model') !== '0';
+    var showTimestamp = localStorage.getItem('alfred_show_timestamp') !== '0';
     var ttsCurrentMsg = null;
     var ttsCurrentUtt = null;
 
@@ -1669,9 +1684,10 @@ $(function () {
                         appendErrorBubble(msg.content, currentSessionId, idx === messages.length - 1);
                     } else {
                         var $b = appendBubble('assistant', msg.content);
+                        appendTimestamp($b, msg.created_at);
                         if (msg.provider) {
-                            $b.find('.alfred-msg-body').append(
-                                $('<div class="alfred-model-label">').text(msg.provider + ' · ' + msg.model).toggle(showModel)
+                            $b.find('.alfred-msg-meta').append(
+                                $('<span class="alfred-model-label">').text(msg.provider + ' · ' + msg.model).toggle(showModel)
                             );
                         }
                     }
@@ -1680,9 +1696,9 @@ $(function () {
                 // [SCHEDULED] messages are shown via their pending task bubble — skip duplicate
                 if (msg.content.indexOf('[SCHEDULED]') !== 0) {
                     if (msg.scenario_display !== undefined) {
-                        appendBubble('scenario', msg.scenario_display);
+                        appendTimestamp(appendBubble('scenario', msg.scenario_display), msg.created_at);
                     } else {
-                        appendBubble('user', msg.content);
+                        appendTimestamp(appendBubble('user', msg.content), msg.created_at);
                     }
                 }
             } else if (msg.role === 'tool') {
@@ -1976,6 +1992,14 @@ $(function () {
             }
             $('#alfred-input').trigger('input');
         });
+
+        var $showTimestampToggle = $('#alfred-settings-show-timestamp');
+        $showTimestampToggle.prop('checked', showTimestamp);
+        $showTimestampToggle.on('change', function () {
+            showTimestamp = this.checked;
+            localStorage.setItem('alfred_show_timestamp', showTimestamp ? '1' : '0');
+            $('.alfred-timestamp-label').toggle(showTimestamp);
+        });
     }());
 
     // =========================================================================
@@ -2120,7 +2144,7 @@ $(function () {
 
     function sendMessage(sessionId, text) {
         $('#alfred-welcome').remove();
-        appendBubble('user', text);
+        appendTimestamp(appendBubble('user', text), new Date());
         showTyping();
         setInputEnabled(false);
         isStreaming = true;
@@ -2194,9 +2218,10 @@ $(function () {
             if (!$assistantBubble && finalText) $assistantBubble = appendBubble('assistant', finalText);
             if ($assistantBubble) {
                 $assistantBubble.data('tts-text', finalText);
+                appendTimestamp($assistantBubble, d.created_at);
                 if (d.provider) {
-                    $assistantBubble.find('.alfred-msg-body').append(
-                        $('<div class="alfred-model-label">').text(d.provider + ' · ' + d.model).toggle(showModel)
+                    $assistantBubble.find('.alfred-msg-meta').append(
+                        $('<span class="alfred-model-label">').text(d.provider + ' · ' + d.model).toggle(showModel)
                     );
                 }
             }
@@ -2250,9 +2275,28 @@ $(function () {
         scrollToBottom();
     }
 
+    // Formats a timestamp as "HH:MM" for today, or "DD/MM/YYYY HH:MM" otherwise.
+    function formatTimestamp(value) {
+        var d = value instanceof Date ? value : new Date(String(value).replace(' ', 'T'));
+        if (isNaN(d.getTime())) return '';
+        var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+        var now      = new Date();
+        var sameDay  = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+        var hhmm     = pad(d.getHours()) + ':' + pad(d.getMinutes());
+        return sameDay ? hhmm : (pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + hhmm);
+    }
+
+    function appendTimestamp($msg, value) {
+        if (!value) return;
+        $msg.find('.alfred-msg-meta').prepend(
+            $('<span class="alfred-timestamp-label">').text(formatTimestamp(value)).toggle(showTimestamp)
+        );
+    }
+
     function appendBubble(role, text) {
         var $bubble = $('<div class="alfred-msg-bubble">').html(markdownToHtml(text));
-        var $inner  = role === 'assistant' ? $('<div class="alfred-msg-body">').append($bubble) : $bubble;
+        var $meta   = $('<div class="alfred-msg-meta">');
+        var $inner  = $('<div class="alfred-msg-body">').append($bubble).append($meta);
         var $msg    = $('<div class="alfred-msg ' + role + '">').append($inner);
         if (role === 'assistant' && window.speechSynthesis) {
             $msg.data('tts-text', text);

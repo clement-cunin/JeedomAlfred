@@ -677,14 +677,14 @@ class alfredAgent
             if ($this->userProfil === 'admin') {
                 $this->emit('timing', $timing);
             }
-            $this->emit('done', ['text' => '', 'iterations' => $iterations, 'limit_reached' => true, 'provider' => $llmProvider, 'model' => $llmModel]);
+            $this->emit('done', ['text' => '', 'iterations' => $iterations, 'limit_reached' => true, 'provider' => $llmProvider, 'model' => $llmModel, 'created_at' => date('Y-m-d H:i:s')]);
             return '';
         }
 
         if ($this->userProfil === 'admin') {
             $this->emit('timing', $timing);
         }
-        $this->emit('done', ['text' => $finalText, 'iterations' => $iterations, 'provider' => $llmProvider, 'model' => $llmModel]);
+        $this->emit('done', ['text' => $finalText, 'iterations' => $iterations, 'provider' => $llmProvider, 'model' => $llmModel, 'created_at' => date('Y-m-d H:i:s')]);
 
         return $finalText;
     }
