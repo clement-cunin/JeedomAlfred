@@ -14,9 +14,14 @@ $_userHash     = $_SESSION['user']->getHash();
     <!-- Sidebar: conversation list -->
     <div id="alfred-sidebar">
         <div id="alfred-sidebar-header">
-            <button id="alfred-new-chat" class="btn btn-sm btn-default" title="{{New conversation}}">
-                <i class="fas fa-plus"></i> <span class="alfred-label">{{New conversation}}</span>
-            </button>
+            <div id="alfred-sidebar-header-row">
+                <button id="alfred-new-chat" class="btn btn-sm btn-default" title="{{New conversation}}">
+                    <i class="fas fa-plus"></i> <span class="alfred-label">{{New conversation}}</span>
+                </button>
+                <button id="alfred-display-settings" title="{{Display settings}}">
+                    <i class="fas fa-palette"></i>
+                </button>
+            </div>
         </div>
         <div id="alfred-conversations-label">{{Conversations}}</div>
         <div id="alfred-conversations"></div>
