@@ -165,8 +165,8 @@ curl "https://<jeedom>/plugins/alfred/api/conversation.php?session_id=<uuid>" \
     "user_login": "myst"
   },
   "messages": [
-    { "role": "user",      "content": "Quelle heure est-il ?" },
-    { "role": "assistant", "content": "Il est actuellement 11h07." }
+    { "role": "user",      "content": "Quelle heure est-il ?",         "created_at": "2026-05-18 11:06:52" },
+    { "role": "assistant", "content": "Il est actuellement 11h07.",    "created_at": "2026-05-18 11:06:54" }
   ]
 }
 ```
@@ -186,8 +186,8 @@ GET /conversation.php?session_id=<uuid>&action=messages
   "success": true,
   "count": 2,
   "messages": [
-    { "role": "user",      "content": "Bonjour !" },
-    { "role": "assistant", "content": "Bonjour ! Comment puis-je vous aider ?" }
+    { "role": "user",      "content": "Bonjour !",                              "created_at": "2026-05-18 11:06:52" },
+    { "role": "assistant", "content": "Bonjour ! Comment puis-je vous aider ?",  "created_at": "2026-05-18 11:06:54" }
   ]
 }
 ```

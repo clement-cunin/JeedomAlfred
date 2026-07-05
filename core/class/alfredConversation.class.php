@@ -173,7 +173,7 @@ class alfredConversation
     public static function getMessages(string $sessionId): array
     {
         $rows = DB::Prepare(
-            'SELECT role, content, metadata FROM alfred_message
+            'SELECT role, content, metadata, created_at FROM alfred_message
              WHERE session_id = :session_id ORDER BY id ASC',
             [':session_id' => $sessionId],
             DB::FETCH_TYPE_ALL
@@ -187,6 +187,12 @@ class alfredConversation
             // Skip display-only messages
             if (!empty($meta['error'])) continue;
             if ($row['role'] === 'pending') continue;
+
+            // Prefix the user message with its timestamp so the LLM can reason
+            // about pauses/delays between turns (e.g. "it's been 3 hours").
+            if ($row['role'] === 'user' && !empty($row['created_at'])) {
+                $content = '[' . $row['created_at'] . '] ' . $content;
+            }
 
             $msg = ['role' => $row['role'], 'content' => $content];
 
@@ -216,7 +222,7 @@ class alfredConversation
     public static function getDisplayMessages(string $sessionId): array
     {
         $rows = DB::Prepare(
-            'SELECT role, content, metadata FROM alfred_message
+            'SELECT role, content, metadata, created_at FROM alfred_message
              WHERE session_id = :session_id ORDER BY id ASC',
             [':session_id' => $sessionId],
             DB::FETCH_TYPE_ALL
@@ -227,7 +233,7 @@ class alfredConversation
             $meta    = $row['metadata'] ? json_decode($row['metadata'], true) : [];
             $content = $row['content'];
 
-            $msg = ['role' => $row['role'], 'content' => $content];
+            $msg = ['role' => $row['role'], 'content' => $content, 'created_at' => $row['created_at']];
 
             if ($row['role'] === 'assistant') {
                 if (!empty($meta['tool_calls'])) {
