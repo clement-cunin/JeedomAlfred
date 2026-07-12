@@ -27,6 +27,9 @@
  */
 class alfredAgent
 {
+    /** Maximum size (in bytes) of a file that uploaded_file_read will return to the LLM. */
+    const MAX_FILE_READ_BYTES = 5 * 1024 * 1024; // 5 Mo
+
     private alfredLLMAdapter  $llm;
     private alfredMCPRegistry $registry;
     private int               $maxIterations;
@@ -733,6 +736,17 @@ class alfredAgent
 
         if (!file_exists($filePath)) {
             return ['error' => 'File data missing'];
+        }
+
+        $size = (int)($meta['size'] ?? filesize($filePath));
+        if ($size > self::MAX_FILE_READ_BYTES) {
+            return [
+                'error' => sprintf(
+                    'File too large to read (%.1f Mo > limit %.1f Mo). Ask the user for a smaller file or a summary.',
+                    $size / (1024 * 1024),
+                    self::MAX_FILE_READ_BYTES / (1024 * 1024)
+                ),
+            ];
         }
 
         return [
