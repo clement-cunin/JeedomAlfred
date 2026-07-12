@@ -5,8 +5,16 @@
  *
  * Orchestrates:
  *   - alfredLLM          : sends messages to the LLM, gets back text or tool calls
- *   - alfredMCPRegistry  : aggregates tools from all enabled MCP servers and routes calls
- *   - alfredConversation : persists every turn
+ *   - alfredMCPRegistry  : routes calls to MCP servers; tools are loaded lazily, only for
+ *                          servers the LLM has activated (2-phase discovery, see below)
+ *   - alfredConversation : persists every turn, including the set of activated MCP servers
+ *
+ * MCP tool discovery is 2-phase to keep the system prompt small: by default only a short
+ * name+description list of configured servers is shown (see run()'s "## MCP servers" block),
+ * plus the always-available activate_mcp_server tool. When the LLM calls it, that server's
+ * tools are merged into the registry and become usable for the rest of the turn. Which
+ * servers are active is persisted explicitly on alfred_conversation (not inferred from the
+ * message history) since Alfred has no in-memory state between HTTP requests.
  *
  * The caller supplies an optional $onEvent callback to receive real-time events:
  *   $onEvent(string $type, array $data)
@@ -24,6 +32,7 @@
  *   alfred_schedule        — schedule a deferred re-invocation of the agent
  *   uploaded_file_read     — read a session-scoped uploaded file as base64
  *   file_create            — register base64 content as a downloadable session file
+ *   activate_mcp_server    — load a configured MCP server's tools into the conversation
  */
 class alfredAgent
 {
@@ -56,14 +65,7 @@ class alfredAgent
         $this->userLogin     = $userLogin;
         $this->userProfil    = $userProfil;
 
-        if ($registry !== null) {
-            $this->registry = $registry;
-        } else {
-            $this->registry = alfredMCPRegistry::fromConfig(function (string $msg): void {
-                $this->pendingMcpErrors[] = $msg;
-                $this->emit('error', ['message' => $msg]);
-            });
-        }
+        $this->registry = $registry ?? alfredMCPRegistry::fromConfig();
     }
 
     // -------------------------------------------------------------------------
@@ -398,6 +400,35 @@ class alfredAgent
         ];
     }
 
+    /**
+     * Synthetic tool letting the LLM load a configured MCP server's tools on demand
+     * (2-phase discovery — see alfredMCPRegistry::listServerSummaries()).
+     */
+    private static function activateMcpServerTool(array $serverSummaries): array
+    {
+        $keys = array_column($serverSummaries, 'key');
+        return [
+            'name'        => 'activate_mcp_server',
+            'description' => 'Activate a configured MCP server to load its tools into this conversation.'
+                           . ' Available servers are listed in the "## MCP servers" section of the system prompt,'
+                           . ' with a short description of what each one is for.'
+                           . ' Call this before attempting to use a tool from a server that is not yet active.'
+                           . ' Newly exposed tools become usable immediately, in the same turn.'
+                           . ' Activation persists for the rest of the conversation.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'server' => [
+                        'type'        => 'string',
+                        'enum'        => $keys,
+                        'description' => 'The server key, as listed in the "## MCP servers" section.',
+                    ],
+                ],
+                'required' => ['server'],
+            ],
+        ];
+    }
+
     private static function fileReadTool(): array
     {
         return [
@@ -483,9 +514,22 @@ class alfredAgent
             alfredConversation::addMessage($sessionId, 'user', $userMessage);
         }
 
+        // Re-load tools for MCP servers previously activated in this session. Alfred is
+        // stateless between HTTP requests, so this state must come from the DB (persisted
+        // explicitly by handleActivateMcpServerTool()) rather than from re-scanning the
+        // message history, which would break silently under any future history truncation.
+        foreach (alfredConversation::getActiveMcpServers($sessionId) as $serverKey) {
+            try {
+                $this->registry->activateServer($serverKey);
+            } catch (Exception $e) {
+                $this->pendingMcpErrors[] = "MCP server '{$serverKey}' unavailable: " . $e->getMessage();
+            }
+        }
+
         // Persist any MCP init errors so they survive page reloads (excluded from LLM context)
         foreach ($this->pendingMcpErrors as $errMsg) {
             alfredConversation::addMessage($sessionId, 'error', $errMsg, ['error' => true]);
+            $this->emit('error', ['message' => $errMsg]);
         }
         $this->pendingMcpErrors = [];
 
@@ -513,6 +557,23 @@ class alfredAgent
             $effectiveSystemPrompt .= $fileBlock;
         }
 
+        // List every configured MCP server (name + description) without loading its tools —
+        // the LLM activates the ones it needs via activate_mcp_server (2-phase discovery).
+        $mcpServerSummaries = $this->registry->listServerSummaries();
+        if (!empty($mcpServerSummaries)) {
+            $mcpBlock = "\n\n## MCP servers\n"
+                      . "The following external tool servers are configured. Their tools are NOT loaded"
+                      . " by default, to keep this prompt small. Call `activate_mcp_server` with the"
+                      . " server key below when a user request needs one of them — its tools become"
+                      . " available immediately, in the same turn.\n";
+            foreach ($mcpServerSummaries as $s) {
+                $status = $s['active'] ? ' *(active)*' : '';
+                $desc   = $s['description'] !== '' ? $s['description'] : $s['name'];
+                $mcpBlock .= "\n- **{$s['key']}**{$status} — {$desc}";
+            }
+            $effectiveSystemPrompt .= $mcpBlock;
+        }
+
         $timing['prompt_build'] = (int)round((microtime(true) - $tPhase) * 1000);
 
         // Emit full system prompt for admin debugging
@@ -520,13 +581,16 @@ class alfredAgent
             $this->emit('debug', ['system_prompt' => $effectiveSystemPrompt]);
         }
 
-        // Fetch aggregated tool list from all enabled MCP servers, then prepend synthetic tools
+        // Fetch aggregated tool list from activated MCP servers only, then prepend synthetic tools
         $tools = $this->registry->listTools();
         foreach (array_reverse(self::memoryTools()) as $t) {
             array_unshift($tools, $t);
         }
         array_unshift($tools, self::scheduleTool());
         array_unshift($tools, self::fileCreateTool());
+        if (!empty($mcpServerSummaries)) {
+            array_unshift($tools, self::activateMcpServerTool($mcpServerSummaries));
+        }
         if (!empty($uploadedFiles)) {
             array_unshift($tools, self::fileReadTool());
         }
@@ -537,11 +601,12 @@ class alfredAgent
         $llmProvider  = '';
         $llmModel     = '';
         $systemChars  = strlen($effectiveSystemPrompt);
-        $toolsChars   = strlen(json_encode($tools));
         $prevMsgChars = strlen(json_encode($messages));
         while ($iterations < $this->maxIterations) {
             $iterations++;
 
+            // Recomputed each iteration: activate_mcp_server may have grown $tools mid-turn
+            $toolsChars      = strlen(json_encode($tools));
             $currentMsgChars = strlen(json_encode($messages));
             $newResChars     = max(0, $currentMsgChars - $prevMsgChars);
 
@@ -624,6 +689,8 @@ class alfredAgent
                     $result = $this->handleFileCreateTool($sessionId, $tc['input']);
                 } elseif (strpos($tc['name'], 'alfred_memory_') === 0) {
                     $result = $this->handleMemoryTool($tc['name'], $tc['input']);
+                } elseif ($tc['name'] === 'activate_mcp_server') {
+                    $result = $this->handleActivateMcpServerTool($sessionId, $tc['input'], $tools);
                 } else {
                     try {
                         $result = $this->registry->callTool($tc['name'], $tc['input'], $sessionId);
@@ -709,6 +776,47 @@ class alfredAgent
         }
 
         return alfredAsyncTask::schedule($sessionId, $delaySeconds, $instruction);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Handle a call to the synthetic activate_mcp_server tool.
+     * Loads the server's tools into the registry, persists the activation so it survives
+     * future turns without re-scanning history, and appends the new tools to $tools by
+     * reference so they're usable for the rest of the current turn.
+     */
+    private function handleActivateMcpServerTool(string $sessionId, array $input, array &$tools): array
+    {
+        $key = trim((string)($input['server'] ?? ''));
+        if ($key === '') {
+            return ['error' => 'server is required'];
+        }
+        if (!$this->registry->hasServer($key)) {
+            return ['error' => "Unknown MCP server '{$key}'."];
+        }
+        if ($this->registry->isServerActive($key)) {
+            return ['status' => 'already_active', 'server' => $key];
+        }
+
+        try {
+            $newTools = $this->registry->activateServer($key);
+        } catch (Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        alfredConversation::activateMcpServer($sessionId, $key);
+        foreach ($newTools as $t) {
+            $tools[] = $t;
+        }
+
+        return [
+            'status' => 'activated',
+            'server' => $key,
+            'tools'  => array_map(function ($t) {
+                return ['name' => $t['name'], 'description' => $t['description'] ?? ''];
+            }, $newTools),
+        ];
     }
 
     // -------------------------------------------------------------------------

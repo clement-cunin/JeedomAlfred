@@ -7,6 +7,7 @@ class alfredMigration
         2 => 'migration_002_async_tasks',
         3 => 'migration_003_push_notifications',
         4 => 'migration_004_memory_expiry',
+        5 => 'migration_005_mcp_activation',
     ];
 
     private static function downDir(): string
@@ -436,5 +437,31 @@ class alfredMigration
     private static function migration_004_memory_expiry_down(): string
     {
         return 'ALTER TABLE `alfred_memory` DROP COLUMN `expires_at`';
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Migration 5 — Persisted MCP server activation (2-phase tool discovery)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static function migration_005_mcp_activation(): void
+    {
+        $row = DB::Prepare(
+            "SELECT COUNT(*) as cnt FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = 'alfred_conversation' AND column_name = 'active_mcp_servers'",
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+        if (!isset($row['cnt']) || (int)$row['cnt'] === 0) {
+            DB::Prepare(
+                'ALTER TABLE `alfred_conversation` ADD COLUMN `active_mcp_servers` JSON DEFAULT NULL AFTER `user_login`',
+                [],
+                DB::FETCH_TYPE_ROW
+            );
+        }
+    }
+
+    private static function migration_005_mcp_activation_down(): string
+    {
+        return 'ALTER TABLE `alfred_conversation` DROP COLUMN `active_mcp_servers`';
     }
 }

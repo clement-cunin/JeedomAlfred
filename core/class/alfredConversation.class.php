@@ -81,6 +81,39 @@ class alfredConversation
         );
     }
 
+    /**
+     * Returns the list of MCP server keys explicitly activated by the LLM for this session.
+     * This is the source of truth for which servers' tools are loaded on each turn —
+     * it is never inferred from the message history.
+     */
+    public static function getActiveMcpServers(string $sessionId): array
+    {
+        $session = self::getSession($sessionId);
+        if ($session === null || empty($session['active_mcp_servers'])) {
+            return [];
+        }
+        $decoded = json_decode($session['active_mcp_servers'], true);
+        return is_array($decoded) ? array_values(array_unique(array_map('strval', $decoded))) : [];
+    }
+
+    /**
+     * Mark an MCP server as activated for this session (idempotent). Persisted immediately
+     * so the activation survives a page reload without needing to re-scan message history.
+     */
+    public static function activateMcpServer(string $sessionId, string $server): void
+    {
+        $current = self::getActiveMcpServers($sessionId);
+        if (in_array($server, $current, true)) {
+            return;
+        }
+        $current[] = $server;
+        DB::Prepare(
+            'UPDATE alfred_conversation SET active_mcp_servers = :active_mcp_servers WHERE session_id = :session_id',
+            [':active_mcp_servers' => json_encode($current, JSON_UNESCAPED_UNICODE), ':session_id' => $sessionId],
+            DB::FETCH_TYPE_ROW
+        );
+    }
+
     public static function deleteSession(string $sessionId): void
     {
         DB::Prepare(
