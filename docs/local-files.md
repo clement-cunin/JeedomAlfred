@@ -120,6 +120,14 @@ Réponse retournée au LLM :
 }
 ```
 
+Taille maximale lisible par le LLM : **`alfredAgent::MAX_FILE_READ_BYTES`, 5 Mo par défaut**. Un fichier uploadé peut aller jusqu'à 20 Mo (cf. plus haut), mais au-delà de cette limite, `uploaded_file_read` refuse de le transmettre — l'encodage base64 gonfle la taille d'environ 33 %, et un fichier binaire volumineux (image, PDF) tronqué serait de toute façon inexploitable par le LLM. Dans ce cas, l'outil renvoie une erreur explicite plutôt que le contenu :
+
+```json
+{
+  "error": "File too large to read (18.0 Mo > limit 5.0 Mo). Ask the user for a smaller file or a summary."
+}
+```
+
 ### `file_create`
 
 Permet au LLM de créer un fichier téléchargeable dans la session courante. Le fichier apparaît dans la barre des pièces jointes dès le tour suivant.
