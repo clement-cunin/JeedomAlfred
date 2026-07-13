@@ -21,6 +21,7 @@ $_js_i18n = [
     'error'              => __('Error', __FILE__),
     'up_to_date'         => __('Up to date', __FILE__),
     'server_name'        => __('Name', __FILE__),
+    'server_description' => __('Description (shown to the AI to help it decide when to activate this server)', __FILE__),
     'server_slug'        => __('Slug', __FILE__),
     'server_url'         => __('URL', __FILE__),
     'server_auth_header' => __('Auth header', __FILE__),
@@ -551,6 +552,15 @@ function alfredMcpBuildRow(i, srv) {
     }));
     $card.append($('<div class="alfred-mcp-line">').append($nameWrap));
 
+    // ---- Description (shown to the LLM in the server discovery list, before activation) ----
+    var $descWrap = $('<div class="alfred-field">');
+    $descWrap.append($('<label>').text(_alfredI18n.server_description));
+    $descWrap.append($('<input type="text" class="form-control input-sm" placeholder="e.g. Jeedom devices, scenarios and home automation commands">').val(srv.description || '').on('input', function() {
+        _alfredMcpServers[i].description = $(this).val();
+        alfredMcpSerialize();
+    }));
+    $card.append($('<div class="alfred-mcp-line">').append($descWrap));
+
     // ---- URL ----
     var $urlWrap = $('<div class="alfred-field">');
     $urlWrap.append($('<label>').text(_alfredI18n.server_url));
@@ -724,7 +734,7 @@ function alfredMcpCheckConflicts() {
 // ---- Add server ----
 $('#bt_alfred_add_server').on('click', function() {
     _alfredMcpServers.push({
-        name: '', slug: '', url: '',
+        name: '', description: '', slug: '', url: '',
         auth_header: 'X-API-Key', auth_value: '',
         prefix_tools: false, enabled: true
     });
@@ -736,6 +746,7 @@ $('#bt_alfred_add_server').on('click', function() {
 $('#bt_alfred_autodetect_mcp').on('click', function() {
     _alfredMcpServers.push({
         name:         'JeedomMCP',
+        description:  'Équipements, pièces, scénarios et commandes domotiques Jeedom (lister, consulter les états, exécuter des actions).',
         slug:         'jeedom',
         url:          _alfredMcpAutoUrl,
         auth_header:  'X-API-Key',
