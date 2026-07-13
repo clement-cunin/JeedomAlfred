@@ -1638,11 +1638,12 @@ $(function () {
             data:     { action: 'getMessages', session_id: sessionId },
             dataType: 'json',
             success:  function (resp) {
-                if (resp.state !== 'ok') return;
                 try {
+                    if (resp.state !== 'ok') return;
                     renderHistory(resp.result);
                 } finally {
-                    // A malformed message must never leave the input stuck disabled.
+                    // A server-side error state or a malformed message must never
+                    // leave the input stuck disabled.
                     setInputEnabled(!!alfred_config.isConfigured);
                 }
             },
