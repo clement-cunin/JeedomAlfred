@@ -1639,8 +1639,12 @@ $(function () {
             dataType: 'json',
             success:  function (resp) {
                 if (resp.state !== 'ok') return;
-                renderHistory(resp.result);
-                setInputEnabled(!!alfred_config.isConfigured);
+                try {
+                    renderHistory(resp.result);
+                } finally {
+                    // A malformed message must never leave the input stuck disabled.
+                    setInputEnabled(!!alfred_config.isConfigured);
+                }
             },
             error: function () {
                 setInputEnabled(!!alfred_config.isConfigured);
@@ -1665,6 +1669,7 @@ $(function () {
         $('#alfred-messages').empty();
         var toolInputMap = {};
         messages.forEach(function (msg, idx) {
+          try {
             if (msg.role === 'assistant') {
                 if (msg.tool_calls) msg.tool_calls.forEach(function (tc) { toolInputMap[tc.id] = tc.input; });
                 if (msg.content !== '') {
@@ -1696,6 +1701,10 @@ $(function () {
             } else if (msg.role === 'pending') {
                 appendAsyncTask(msg);
             }
+          } catch (err) {
+              // One malformed message must not blank out / break the rest of the history.
+              console.error('renderHistory: skipping malformed message', idx, err);
+          }
         });
         scrollToBottom();
     }
