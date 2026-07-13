@@ -1641,6 +1641,9 @@ $(function () {
                 if (resp.state !== 'ok') return;
                 renderHistory(resp.result);
                 setInputEnabled(!!alfred_config.isConfigured);
+            },
+            error: function () {
+                setInputEnabled(!!alfred_config.isConfigured);
             }
         });
         $.ajax({
@@ -2217,9 +2220,10 @@ $(function () {
         });
 
         source.onerror = function () {
-            if (source.readyState === EventSource.CLOSED) {
-                hideTyping(); isStreaming = false; currentSource = null; setInputEnabled(true);
-            }
+            // chat.php is a one-shot stream: don't let the browser silently
+            // retry (readyState CONNECTING) and leave the input disabled forever.
+            source.close();
+            hideTyping(); isStreaming = false; currentSource = null; setInputEnabled(true);
         };
     }
 
