@@ -231,6 +231,14 @@ try {
         ajax::success(alfredJournal::runForDate($date));
     }
 
+    if ($action === 'runWeeklyDigest') {
+        if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
+        require_once __DIR__ . '/../class/alfredJournal.class.php';
+        require_once __DIR__ . '/../class/alfredLLM.class.php';
+        require_once __DIR__ . '/../class/alfredMemory.class.php';
+        ajax::success(alfredJournal::runWeeklyDigest());
+    }
+
     if ($action === 'regenVapid') {
         if (!isConnect('admin')) throw new Exception(__('401 - Unauthorized access', __FILE__));
         require_once __DIR__ . '/../class/alfredPush.class.php';

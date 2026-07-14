@@ -49,6 +49,8 @@ class alfred extends eqLogic {
             'system_prompt'            => 'You are Alfred, an AI assistant integrated into a Jeedom home automation system. You help the user control and monitor their smart home. Be concise and friendly.',
             'journal_daily_enabled'    => '0',
             'journal_daily_expiry_days' => '10',
+            'journal_weekly_enabled'    => '0',
+            'journal_weekly_expiry_days' => '0',
         ];
         foreach ($defaults as $key => $value) {
             if (config::byKey($key, __CLASS__) === '') {
@@ -113,6 +115,11 @@ class alfred extends eqLogic {
             alfredJournal::cronDaily();
         } catch (Exception $e) {
             log::add('alfred_cron', 'error', 'cronDaily: alfredJournal failed — ' . $e->getMessage());
+        }
+        try {
+            alfredJournal::cronWeekly();
+        } catch (Exception $e) {
+            log::add('alfred_cron', 'error', 'cronDaily: weekly digest failed — ' . $e->getMessage());
         }
         try {
             alfredMemory::cronDaily();
