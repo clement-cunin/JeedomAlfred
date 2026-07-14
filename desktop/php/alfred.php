@@ -3,8 +3,11 @@ if (!isConnect()) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
 
+require_once dirname(__FILE__) . '/../../core/class/alfredLLM.class.php';
 $_chatUrl      = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/alfred/chat/index.php';
-$_isConfigured = alfred::getApiKey() !== '';
+// See chat/index.php for why this can't be alfred::getApiKey() !== '' —
+// that only checks the first provider's api_key, which is wrong for ollama.
+$_isConfigured = alfredLLM::hasConfiguredProvider();
 $_userHash     = $_SESSION['user']->getHash();
 ?>
 <link rel="stylesheet" href="plugins/alfred/desktop/css/alfred.css">

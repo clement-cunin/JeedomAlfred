@@ -16,8 +16,13 @@ $_isAdmin        = false;
 $_vapidPublicKey = '';
 if (isConnect()) {
     require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
+    require_once dirname(__FILE__) . '/../core/class/alfredLLM.class.php';
     $_userHash     = $_SESSION['user']->getHash();
-    $_isConfigured = alfred::getApiKey() !== '';
+    // alfred::getApiKey() only looks at the *first* provider in the chain and
+    // assumes an api_key credential — wrong for ollama (which uses base_url),
+    // so a chain with ollama first (even mid-chain, with a working mistral
+    // fallback behind it) would report "not configured" and disable the UI.
+    $_isConfigured = alfredLLM::hasConfiguredProvider();
     $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
 }
 // VAPID keys are generated lazily on first subscribe request (api/push.php).
