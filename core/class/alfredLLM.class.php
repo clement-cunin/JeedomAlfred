@@ -214,6 +214,22 @@ class alfredLLM
      * If $provider is given explicitly, bypass chain and return a single adapter
      * (used by testLLM, listModels, etc.).
      */
+    /**
+     * Whether at least one entry in the provider chain has the credential it
+     * needs (base_url for ollama, api_key for the rest). Unlike make(), this
+     * never instantiates an adapter or makes a network call — safe to use for
+     * a cheap "is Alfred usable at all" UI check.
+     */
+    public static function hasConfiguredProvider(): bool
+    {
+        $chain = self::normalizeChain(alfred::getProviderChain());
+        foreach ($chain as $entry) {
+            if (isset($entry['enabled']) && !$entry['enabled']) continue;
+            if (self::entryCredential($entry) !== '') return true;
+        }
+        return false;
+    }
+
     public static function make(string $provider = '', string $apiKey = '', string $model = ''): alfredLLMAdapter
     {
         if ($provider !== '') {

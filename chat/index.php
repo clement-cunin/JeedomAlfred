@@ -16,17 +16,17 @@ $_isAdmin        = false;
 $_vapidPublicKey = '';
 if (isConnect()) {
     require_once dirname(__FILE__) . '/../core/class/alfred.class.php';
+    require_once dirname(__FILE__) . '/../core/class/alfredLLM.class.php';
     $_userHash     = $_SESSION['user']->getHash();
-    $_isConfigured = alfred::getApiKey() !== '';
+    // alfred::getApiKey() only looks at the *first* provider in the chain and
+    // assumes an api_key credential — wrong for ollama (which uses base_url),
+    // so a chain with ollama first (even mid-chain, with a working mistral
+    // fallback behind it) would report "not configured" and disable the UI.
+    $_isConfigured = alfredLLM::hasConfiguredProvider();
     $_isAdmin      = $_SESSION['user']->getProfils() === 'admin';
 }
 // VAPID keys are generated lazily on first subscribe request (api/push.php).
 // No need to inject the public key into the page — the JS fetches it from the API.
-$_alfredDebug = 'isConnect=' . (isConnect() ? '1' : '0')
-    . ' hasSessionUser=' . (isset($_SESSION['user']) ? '1' : '0')
-    . ' isConfigured=' . ($_isConfigured ? '1' : '0')
-    . ' isAdmin=' . ($_isAdmin ? '1' : '0')
-    . ' userHash=' . ($_userHash !== '' ? 'present' : 'empty');
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1290,8 +1290,6 @@ $_alfredDebug = 'isConnect=' . (isConnect() ? '1' : '0')
     </style>
 </head>
 <body>
-
-<div onclick="this.remove()" style="position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;font-size:11px;padding:4px 8px;word-break:break-all;"><?php echo htmlspecialchars($_alfredDebug); ?> (tap to dismiss)</div>
 
 <div id="alfred-login">
     <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
