@@ -4,8 +4,11 @@
  * No Jeedom chrome. Installable via Chrome / Safari "Add to Home Screen".
  */
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
+include_file('core', 'authentification', 'php');
 
-// PHP session works only when accessed through Jeedom's router.
+// Accessed as a standalone entry point (bookmark / installed PWA), not through
+// Jeedom's router, so the "remember me" cookie needs authentification.class.php
+// (loaded above) to hydrate $_SESSION['user'] before isConnect() is checked.
 // Fallback: JS reads user_hash from localStorage (saved by the desktop page).
 $_userHash       = '';
 $_isConfigured   = false;
