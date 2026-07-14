@@ -149,6 +149,24 @@ class alfredMemory
     }
 
     /**
+     * Logins of users who currently have at least one non-expired memory entry.
+     */
+    public static function getUsersWithMemories(): array
+    {
+        $rows = DB::Prepare(
+            "SELECT DISTINCT scope FROM alfred_memory"
+            . " WHERE scope LIKE 'user:%'"
+            . ' AND (expires_at IS NULL OR expires_at > NOW())',
+            [],
+            DB::FETCH_TYPE_ALL
+        ) ?: [];
+
+        return array_map(function ($row) {
+            return substr($row['scope'], strlen('user:'));
+        }, $rows);
+    }
+
+    /**
      * Returns the scopes a user is allowed to write/update/delete.
      * null login → only global (scheduled/background context).
      */

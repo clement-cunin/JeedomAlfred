@@ -286,6 +286,53 @@ $_mcpServersJson = is_array($_mcpRaw) ? (json_encode($_mcpRaw) ?: '[]') : ($_mcp
         <div id="alfred_journal_run_results" class="col-sm-offset-1 col-sm-10" style="display:none;margin-bottom:12px"></div>
 
         <!-- ================================================================ -->
+        <!-- Weekly digest -->
+        <!-- ================================================================ -->
+        <legend><i class="fas fa-calendar-week"></i> {{Weekly digest}}</legend>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Enable weekly digest}}</label>
+            <div class="col-sm-8" style="padding-top:7px">
+                <input type="checkbox" class="configKey" data-l1key="journal_weekly_enabled" />
+                <span class="help-block" style="display:inline;margin-left:8px">
+                    {{Every Monday, compress each user's accumulated memory into a single weekly digest entry.}}
+                </span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Weekly digest prompt}}</label>
+            <div class="col-sm-6">
+                <textarea class="configKey form-control" data-l1key="journal_weekly_prompt" rows="5"
+                          style="font-family: monospace; font-size: 12px;"
+                          placeholder="{{Leave empty to use the default prompt.}}"></textarea>
+            </div>
+            <span class="help-block col-sm-2">{{LLM instruction for generating the weekly digest. Leave empty for the default.}}</span>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Weekly digest expiry (days)}}</label>
+            <div class="col-sm-2">
+                <input type="number" class="configKey form-control" data-l1key="journal_weekly_expiry_days"
+                       min="0" max="365" placeholder="0" />
+            </div>
+            <span class="help-block col-sm-6">{{Days before the weekly digest memory entry expires. 0 = never.}}</span>
+        </div>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{Force run}}</label>
+            <div class="col-sm-8" style="padding-top:4px">
+                <button type="button" class="btn btn-warning btn-sm" id="bt_alfred_run_weekly_digest">
+                    <i class="fas fa-play"></i> {{Run weekly digest}}
+                </button>
+                <span id="alfred_weekly_digest_run_spinner" style="display:none;margin-left:8px">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </span>
+            </div>
+        </div>
+        <div id="alfred_weekly_digest_run_results" class="col-sm-offset-1 col-sm-10" style="display:none;margin-bottom:12px"></div>
+
+        <!-- ================================================================ -->
         <!-- Phones -->
         <!-- ================================================================ -->
         <legend><i class="fas fa-mobile-alt"></i> {{Phones}}</legend>
@@ -1304,6 +1351,71 @@ $('#bt_alfred_run_journal').on('click', function () {
                     // Result
                     if (e.result) {
                         html += '<p><strong>{{LLM summary}}</strong></p>'
+                            + '<div style="background:#f0f7f0;border-left:3px solid #5cb85c;padding:8px 10px;font-size:13px;white-space:pre-wrap">' + $('<div>').text(e.result).html() + '</div>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+                $results.append(html);
+            });
+            $results.show();
+        },
+        error:    function (jqXHR) {
+            $results.html('<div class="alert alert-danger">' + jqXHR.responseText + '</div>').show();
+        },
+        complete: function () {
+            $btn.prop('disabled', false);
+            $spinner.hide();
+        }
+    });
+});
+
+// ---- Weekly digest: force run ----
+$('#bt_alfred_run_weekly_digest').on('click', function () {
+    var $btn     = $(this).prop('disabled', true);
+    var $spinner = $('#alfred_weekly_digest_run_spinner').show();
+    var $results = $('#alfred_weekly_digest_run_results').hide().empty();
+
+    $.ajax({
+        type:     'POST',
+        url:      'plugins/alfred/core/ajax/alfred.ajax.php',
+        data:     { action: 'runWeeklyDigest' },
+        dataType: 'json',
+        success:  function (data) {
+            if (data.state !== 'ok') {
+                $results.html('<div class="alert alert-danger">' + (data.result || 'Error') + '</div>').show();
+                return;
+            }
+            var entries = data.result;
+            if (!entries || entries.length === 0) {
+                $results.html('<div class="alert alert-info">{{No users with memory entries found.}}</div>').show();
+                return;
+            }
+            entries.forEach(function (e) {
+                var uid  = 'wd_' + Math.random().toString(36).slice(2);
+                var html = '<div class="panel panel-default" style="margin-bottom:8px">'
+                    + '<div class="panel-heading" style="padding:8px 12px"><strong>' + e.login + '</strong>';
+                if (e.skipped) {
+                    html += ' <span class="label label-default">{{No memory entries}}</span>';
+                } else if (!e.result) {
+                    html += ' <span class="label label-warning">{{LLM returned empty}}</span>';
+                } else {
+                    html += ' <span class="label label-success">{{Saved}}</span>';
+                }
+                html += '</div>';
+                if (!e.skipped) {
+                    html += '<div class="panel-body" style="padding:10px 12px">';
+                    // Prompt
+                    html += '<p><strong>{{Prompt}}</strong></p>'
+                        + '<pre style="max-height:100px;overflow:auto;font-size:11px;background:#f9f9f9;padding:6px">' + $('<div>').text(e.prompt).html() + '</pre>';
+                    // Memory block (collapsible)
+                    html += '<p><a data-toggle="collapse" href="#' + uid + '_mem" style="font-size:12px">{{Show memory}}</a></p>'
+                        + '<div id="' + uid + '_mem" class="collapse">'
+                        + '<pre style="max-height:200px;overflow:auto;font-size:11px;background:#f9f9f9;padding:6px">' + $('<div>').text(e.memory).html() + '</pre>'
+                        + '</div>';
+                    // Result
+                    if (e.result) {
+                        html += '<p><strong>{{Weekly digest}}</strong></p>'
                             + '<div style="background:#f0f7f0;border-left:3px solid #5cb85c;padding:8px 10px;font-size:13px;white-space:pre-wrap">' + $('<div>').text(e.result).html() + '</div>';
                     }
                     html += '</div>';
