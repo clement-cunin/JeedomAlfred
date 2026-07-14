@@ -22,6 +22,11 @@ if (isConnect()) {
 }
 // VAPID keys are generated lazily on first subscribe request (api/push.php).
 // No need to inject the public key into the page — the JS fetches it from the API.
+$_alfredDebug = 'isConnect=' . (isConnect() ? '1' : '0')
+    . ' hasSessionUser=' . (isset($_SESSION['user']) ? '1' : '0')
+    . ' isConfigured=' . ($_isConfigured ? '1' : '0')
+    . ' isAdmin=' . ($_isAdmin ? '1' : '0')
+    . ' userHash=' . ($_userHash !== '' ? 'present' : 'empty');
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1285,6 +1290,8 @@ if (isConnect()) {
     </style>
 </head>
 <body>
+
+<div onclick="this.remove()" style="position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;font-size:11px;padding:4px 8px;word-break:break-all;"><?php echo htmlspecialchars($_alfredDebug); ?> (tap to dismiss)</div>
 
 <div id="alfred-login">
     <div class="alfred-welcome-icon"><i class="fas fa-robot"></i></div>
