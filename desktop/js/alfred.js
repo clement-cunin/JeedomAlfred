@@ -720,6 +720,7 @@ $(function () {
         });
 
         source.addEventListener('done', function (e) {
+            sessionStorage.removeItem('alfred_auth_retry');
             var d = JSON.parse(e.data);
             hideTyping();
             var finalText = d.text || assistantText;
@@ -752,6 +753,12 @@ $(function () {
             hideTyping();
             var technical = null;
             try { technical = JSON.parse(e.data).message; } catch (_) {}
+            source.close();
+            currentSource = null;
+            isStreaming   = false;
+            if (technical && technical.indexOf('401') !== -1 && handleAuthExpired()) {
+                return;
+            }
             var display = alfred_config.isAdmin && technical
                 ? technical
                 : "{{An error occurred.}}";
@@ -763,9 +770,6 @@ $(function () {
                         .append($('<pre style="white-space:pre-wrap;margin:4px 0 0">').text(technical))
                 );
             }
-            source.close();
-            currentSource = null;
-            isStreaming   = false;
             setInputEnabled(true);
         });
 
@@ -777,6 +781,25 @@ $(function () {
                 currentSource = null;
             }
         };
+    }
+
+    // Jeedom rotates admin user hashes automatically every ~3 months
+    // (core/class/user.class.php::regenerateHash()), which can make the
+    // user_hash cached in localStorage stale and every chat.php call fail
+    // with 401. Clear the stale cache and reload once so the dashboard
+    // widget picks up a fresh hash from the live PHP session, instead of
+    // looping on the error.
+    // Returns true if a reload was triggered (caller should stop handling the error).
+    function handleAuthExpired() {
+        if (sessionStorage.getItem('alfred_auth_retry')) {
+            return false;
+        }
+        sessionStorage.setItem('alfred_auth_retry', '1');
+        localStorage.removeItem('alfred_user_hash');
+        localStorage.removeItem('alfred_is_configured');
+        localStorage.removeItem('alfred_is_admin');
+        location.reload();
+        return true;
     }
 
     function appendLimitReached(sessionId) {
