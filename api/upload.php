@@ -22,6 +22,12 @@ if (isConnect()) {
 } else {
     $hash          = trim($_POST['user_hash'] ?? init('user_hash'));
     $connectedUser = $hash !== '' ? user::byHash($hash) : null;
+    // user_hash cached client-side can go stale after Jeedom's automatic admin
+    // hash rotation — fall back to jeedom::apiAccess(), same as api/conversation.php.
+    if (!$connectedUser && $hash !== '' && jeedom::apiAccess($hash, 'core')) {
+        global $_USER_GLOBAL;
+        $connectedUser = is_object($_USER_GLOBAL) ? $_USER_GLOBAL : true;
+    }
     if (!$connectedUser) {
         http_response_code(401);
         echo json_encode(['error' => 'Unauthorized']);

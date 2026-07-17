@@ -27,19 +27,43 @@ if (ob_get_level()) ob_end_flush();
 set_time_limit(0);
 
 // ---- Auth ----
-$connectedUser = null;
+// Three accepted auth methods (in priority order), same as api/conversation.php:
+// 1. Active Jeedom browser session
+// 2. user_hash query parameter
+// 3. jeedom::apiAccess() fallback — the user_hash cached client-side (localStorage)
+//    can go stale after Jeedom's automatic admin hash rotation
+//    (core/class/user.class.php::regenerateHash(), every ~3 months), which makes
+//    user::byHash() fail even though the account is otherwise valid.
+$userLogin  = null;
+$userProfil = 'user';
 if (isConnect()) {
     $connectedUser = $_SESSION['user'] ?? null;
+    if ($connectedUser) {
+        $userLogin  = $connectedUser->getLogin();
+        $userProfil = $connectedUser->getProfils() === 'admin' ? 'admin' : 'user';
+    }
 } else {
     $hash          = trim(init('user_hash'));
     $connectedUser = $hash !== '' ? user::byHash($hash) : null;
-    if (!$connectedUser) {
+    if ($connectedUser) {
+        $userLogin  = $connectedUser->getLogin();
+        $userProfil = $connectedUser->getProfils() === 'admin' ? 'admin' : 'user';
+    } elseif ($hash !== '' && jeedom::apiAccess($hash, 'core')) {
+        global $_USER_GLOBAL;
+        if (is_object($_USER_GLOBAL)) {
+            $userLogin  = $_USER_GLOBAL->getLogin();
+            $userProfil = $_USER_GLOBAL->getProfils() === 'admin' ? 'admin' : 'user';
+        } else {
+            // Core API key — use a synthetic admin identity
+            $userLogin  = 'api';
+            $userProfil = 'admin';
+        }
+    }
+    if ($userLogin === null) {
         sse_event('error', ['message' => '401 - Unauthorized']);
         exit;
     }
 }
-$userLogin  = ($connectedUser !== null) ? $connectedUser->getLogin()   : null;
-$userProfil = ($connectedUser !== null && $connectedUser->getProfils() === 'admin') ? 'admin' : 'user';
 
 // ---- Input ----
 $raw       = file_get_contents('php://input');

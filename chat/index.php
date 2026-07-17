@@ -2209,6 +2209,7 @@ $(function () {
         });
 
         source.addEventListener('done', function (e) {
+            sessionStorage.removeItem('alfred_auth_retry');
             var d         = JSON.parse(e.data);
             var finalText = d.text || assistantText;
             hideTyping();
@@ -2232,9 +2233,13 @@ $(function () {
             hideTyping();
             var technical = null;
             try { technical = JSON.parse(e.data).message; } catch (_) {}
+            source.close(); currentSource = null; isStreaming = false;
+            if (technical && technical.indexOf('401') !== -1 && handleAuthExpired()) {
+                return;
+            }
             var display = alfred_config.isAdmin && technical ? technical : 'An error occurred.';
             appendErrorBubble(display, sessionId);
-            source.close(); currentSource = null; isStreaming = false; setInputEnabled(true);
+            setInputEnabled(true);
         });
 
         source.onerror = function () {
@@ -2243,6 +2248,25 @@ $(function () {
             source.close();
             hideTyping(); isStreaming = false; currentSource = null; setInputEnabled(true);
         };
+    }
+
+    // Jeedom rotates admin user hashes automatically every ~3 months
+    // (core/class/user.class.php::regenerateHash()), which can make the
+    // user_hash cached in localStorage stale and every chat.php call fail
+    // with 401. Clear the stale cache and reload once so the page picks up a
+    // fresh hash from the live PHP session, instead of looping on the error.
+    // Returns true if a reload was triggered (caller should stop handling the error).
+    function handleAuthExpired() {
+        if (sessionStorage.getItem('alfred_auth_retry')) {
+            return false;
+        }
+        sessionStorage.setItem('alfred_auth_retry', '1');
+        localStorage.removeItem('alfred_user_hash');
+        localStorage.removeItem('alfred_is_configured');
+        localStorage.removeItem('alfred_is_admin');
+        document.cookie = 'alfred_user_hash=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/plugins/alfred/; Secure; SameSite=None';
+        location.reload();
+        return true;
     }
 
     function appendLimitReached(sessionId) {
