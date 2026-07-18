@@ -66,11 +66,17 @@ class alfredMCP
      */
     public function callTool(string $name, array $arguments, ?string $sessionId = null)
     {
-        $this->ensureInitialized();
-        $response = $this->send('tools/call', [
-            'name'      => $name,
-            'arguments' => $arguments,
-        ], $sessionId);
+        try {
+            $this->ensureInitialized();
+            $response = $this->send('tools/call', [
+                'name'      => $name,
+                'arguments' => $arguments,
+            ], $sessionId);
+        } catch (Exception $e) {
+            // Transport/protocol failures (network, HTTP status, malformed JSON-RPC)
+            // don't otherwise mention which tool was being called — name it here.
+            throw new Exception("MCP tool '{$name}' call failed: {$e->getMessage()}");
+        }
 
         // MCP tool result: {content: [{type:'text', text:'...'}], isError: bool}
         if (!empty($response['isError'])) {
