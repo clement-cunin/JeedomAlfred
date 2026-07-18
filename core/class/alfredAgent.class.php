@@ -718,7 +718,7 @@ class alfredAgent
                 $this->emit('tool_result', ['name' => $tc['name'], 'result' => $result]);
 
                 $tDb = microtime(true);
-                alfredConversation::saveToolResult($sessionId, $tc['id'], $tc['name'], $result);
+                alfredConversation::saveToolResult($sessionId, $tc['id'], $tc['name'], $result, $tc['input']);
                 $timing['db_writes'] += (int)round((microtime(true) - $tDb) * 1000);
 
                 // Create the pending UI message AFTER the tool result so it appears last in the conversation

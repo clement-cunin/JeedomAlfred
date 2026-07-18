@@ -468,6 +468,18 @@
     color: #337ab7;
 }
 
+.alfred-tool-call.alfred-tool-call-error {
+    border-color: #d9534f66;
+}
+
+.alfred-tool-call.alfred-tool-call-error i {
+    color: #d9534f;
+}
+
+.alfred-tool-call.alfred-tool-call-error .alfred-tool-label {
+    color: #d9534f;
+}
+
 .alfred-tool-call-header code {
     background: transparent;
     color: inherit;

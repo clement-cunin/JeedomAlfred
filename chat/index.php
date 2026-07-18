@@ -574,6 +574,10 @@ if (isConnect()) {
 
         .alfred-tool-call i { color: #337ab7; }
 
+        .alfred-tool-call.alfred-tool-call-error { border-color: #d9534f66; }
+        .alfred-tool-call.alfred-tool-call-error i { color: #d9534f; }
+        .alfred-tool-call.alfred-tool-call-error .alfred-tool-label { color: #d9534f; }
+
         .alfred-tool-call-header code {
             background: transparent;
             color: inherit;
@@ -1706,7 +1710,7 @@ $(function () {
                 var input  = toolInputMap[msg.tool_call_id];
                 var result;
                 try { result = JSON.parse(msg.content); } catch (e) { result = msg.content; }
-                appendToolCall(msg.name, 'done', input, result);
+                appendToolCall(msg.name, isToolResultError(result) ? 'error' : 'done', input, result);
             } else if (msg.role === 'pending') {
                 appendAsyncTask(msg);
             }
@@ -2173,7 +2177,7 @@ $(function () {
         });
 
         source.addEventListener('tool_result', function (e) {
-            var d = JSON.parse(e.data); updateToolCall(d.name, 'done', d.result);
+            var d = JSON.parse(e.data); updateToolCall(d.name, isToolResultError(d.result) ? 'error' : 'done', d.result);
         });
 
         source.addEventListener('async_task', function (e) {
@@ -2342,8 +2346,15 @@ $(function () {
 
     var _toolCallMap = {};
 
+    // A tool result is an error when it's an object carrying a truthy `error` key
+    // (e.g. {error: "..."} or {error: true, message: "..."}).
+    function isToolResultError(result) {
+        return !!(result && typeof result === 'object' && !Array.isArray(result) && result.error);
+    }
+
     function appendToolCall(name, status, input, result) {
-        var icon     = status === 'running' ? 'fa-spinner fa-spin' : 'fa-check text-success';
+        var isError = status === 'error';
+        var icon    = status === 'running' ? 'fa-spinner fa-spin' : (isError ? 'fa-times text-danger' : 'fa-check text-success');
         var $summary = $('<summary class="alfred-tool-call-header">')
             .append($('<i>').addClass('fas ' + icon)).append($('<code>').text(name));
         var $details  = $('<details class="alfred-tool-details">').append($summary);
@@ -2358,10 +2369,11 @@ $(function () {
         if (hasResult) {
             var rstr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
             $details.append($('<div class="alfred-tool-section alfred-tool-result-section">')
-                .append($('<span class="alfred-tool-label">').text('Result'))
+                .append($('<span class="alfred-tool-label">').text(isError ? 'Error' : 'Result'))
                 .append($('<pre class="alfred-tool-pre">').text(rstr)));
         }
-        var $el = $('<div class="alfred-tool-call">').attr('data-tool', name).append($details);
+        var $el = $('<div class="alfred-tool-call">').attr('data-tool', name)
+            .toggleClass('alfred-tool-call-error', isError).append($details);
         _toolCallMap[name] = $el;
         $('#alfred-messages').append($el);
         scrollToBottom();
@@ -2370,7 +2382,9 @@ $(function () {
     function updateToolCall(name, status, result) {
         var $el = _toolCallMap[name];
         if (!$el) return;
-        $el.find('i').attr('class', 'fas ' + (status === 'done' ? 'fa-check text-success' : 'fa-times text-danger'));
+        var isError = status === 'error';
+        $el.toggleClass('alfred-tool-call-error', isError);
+        $el.find('i').attr('class', 'fas ' + (isError ? 'fa-times text-danger' : 'fa-check text-success'));
         if (result !== undefined && result !== null) {
             var $details = $el.find('.alfred-tool-details');
             // Guard: only append result section if none exists yet
@@ -2378,7 +2392,7 @@ $(function () {
             var rstr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
             $details.removeClass('alfred-tool-no-content');
             $details.append($('<div class="alfred-tool-section alfred-tool-result-section">')
-                .append($('<span class="alfred-tool-label">').text('Result'))
+                .append($('<span class="alfred-tool-label">').text(isError ? 'Error' : 'Result'))
                 .append($('<pre class="alfred-tool-pre">').text(rstr)));
         }
     }

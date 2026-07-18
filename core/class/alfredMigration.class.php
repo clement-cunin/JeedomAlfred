@@ -8,6 +8,7 @@ class alfredMigration
         3 => 'migration_003_push_notifications',
         4 => 'migration_004_memory_expiry',
         5 => 'migration_005_mcp_activation',
+        6 => 'migration_006_tool_error_log',
     ];
 
     private static function downDir(): string
@@ -463,5 +464,34 @@ class alfredMigration
     private static function migration_005_mcp_activation_down(): string
     {
         return 'ALTER TABLE `alfred_conversation` DROP COLUMN `active_mcp_servers`';
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Migration 6 — Dedicated tool error log (for analysis & debugging)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static function migration_006_tool_error_log(): void
+    {
+        DB::Prepare(
+            'CREATE TABLE IF NOT EXISTS `alfred_tool_error` (
+                `id`            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+                `session_id`    VARCHAR(36)   NOT NULL,
+                `tool_name`     VARCHAR(150)  NOT NULL,
+                `arguments`     JSON          DEFAULT NULL,
+                `error_message` TEXT          NOT NULL,
+                `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_session` (`session_id`),
+                KEY `idx_tool` (`tool_name`),
+                KEY `idx_created_at` (`created_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+            [],
+            DB::FETCH_TYPE_ROW
+        );
+    }
+
+    private static function migration_006_tool_error_log_down(): string
+    {
+        return 'DROP TABLE IF EXISTS `alfred_tool_error`';
     }
 }
