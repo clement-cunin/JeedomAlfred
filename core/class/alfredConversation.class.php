@@ -355,15 +355,58 @@ class alfredConversation
     }
 
     /**
-     * Persist a tool result into the session.
+     * Persist a tool result into the session. If the result carries an error,
+     * it is additionally logged to `alfred_tool_error` (with the tool's
+     * arguments) for later analysis and debugging.
      */
-    public static function saveToolResult(string $sessionId, string $toolCallId, string $toolName, $result): void
+    public static function saveToolResult(string $sessionId, string $toolCallId, string $toolName, $result, array $arguments = []): void
     {
         $content = is_array($result) ? json_encode($result, JSON_UNESCAPED_UNICODE) : (string)$result;
         self::addMessage($sessionId, 'tool', $content, [
             'tool_call_id' => $toolCallId,
             'name'         => $toolName,
         ]);
+
+        $errorMessage = self::extractToolError($result);
+        if ($errorMessage !== null) {
+            self::logToolError($sessionId, $toolName, $arguments, $errorMessage);
+        }
+    }
+
+    /**
+     * Extract a human-readable error message from a tool result, or null if
+     * the result does not represent an error.
+     */
+    private static function extractToolError($result): ?string
+    {
+        if (!is_array($result) || !array_key_exists('error', $result) || $result['error'] === false) {
+            return null;
+        }
+        if (is_string($result['error']) && $result['error'] !== '') {
+            return $result['error'];
+        }
+        if (isset($result['message']) && is_string($result['message']) && $result['message'] !== '') {
+            return $result['message'];
+        }
+        return 'Unknown tool error';
+    }
+
+    /**
+     * Record a tool error into the dedicated `alfred_tool_error` log table.
+     */
+    public static function logToolError(string $sessionId, string $toolName, array $arguments, string $errorMessage): void
+    {
+        DB::Prepare(
+            'INSERT INTO alfred_tool_error (session_id, tool_name, arguments, error_message)
+             VALUES (:session_id, :tool_name, :arguments, :error_message)',
+            [
+                ':session_id'    => $sessionId,
+                ':tool_name'     => $toolName,
+                ':arguments'     => json_encode($arguments, JSON_UNESCAPED_UNICODE),
+                ':error_message' => $errorMessage,
+            ],
+            DB::FETCH_TYPE_ROW
+        );
     }
 
     /**
