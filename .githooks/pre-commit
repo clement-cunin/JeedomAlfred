@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: lint staged PHP files with `php -l` and block the commit
+# if any file fails to compile.
+#
+# Activation: git config core.hooksPath .githooks
+#
+# Context: a PHP fatal error (redeclared class constant) in a JeedomMCP file
+# reached git history and crashed the MCP server in production because
+# nothing checked that the file actually compiled before commit. This hook
+# is the guard rail against that class of incident.
+
+set -euo pipefail
+
+php_bin="${PHP_BIN:-php}"
+
+if ! command -v "$php_bin" >/dev/null 2>&1; then
+    echo "pre-commit: '$php_bin' not found in PATH, skipping PHP lint." >&2
+    exit 0
+fi
+
+mapfile -t staged_php_files < <(git diff --cached --name-only --diff-filter=ACM -- '*.php')
+
+if [ "${#staged_php_files[@]}" -eq 0 ]; then
+    exit 0
+fi
+
+status=0
+
+for file in "${staged_php_files[@]}"; do
+    if [ ! -f "$file" ]; then
+        continue
+    fi
+    if ! lint_output=$("$php_bin" -l "./$file" 2>&1); then
+        echo "pre-commit: PHP lint failed for $file" >&2
+        echo "$lint_output" >&2
+        status=1
+    fi
+done
+
+if [ "$status" -ne 0 ]; then
+    echo "" >&2
+    echo "pre-commit: commit aborted, fix the PHP syntax errors above." >&2
+    exit 1
+fi
+
+exit 0
