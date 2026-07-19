@@ -809,6 +809,17 @@ if (isConnect()) {
         #alfred-input:focus { border-color: #337ab7; }
         #alfred-input:disabled { background: #fafafa; color: #aaa; }
 
+        /* Right-side action icons, wrapped onto 2 rows to save horizontal space */
+        #alfred-input-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            justify-content: flex-end;
+            gap: 6px;
+            width: 80px;
+            flex-shrink: 0;
+        }
+
         #alfred-send {
             width: 34px;
             height: 34px;
@@ -1347,13 +1358,15 @@ if (isConnect()) {
 
         <div id="alfred-input-bar">
             <button id="alfred-attach" title="Attach file"><i class="fas fa-paperclip"></i></button>
-            <textarea id="alfred-input" placeholder="Type a message…" rows="1"></textarea>
-            <div id="alfred-tts-wrap">
-                <button id="alfred-tts" title="Text-to-speech"><i class="fas fa-volume-up"></i></button>
+            <textarea id="alfred-input" placeholder="Type a message…" rows="2"></textarea>
+            <div id="alfred-input-actions">
+                <div id="alfred-tts-wrap">
+                    <button id="alfred-tts" title="Text-to-speech"><i class="fas fa-volume-up"></i></button>
+                </div>
+                <button id="alfred-mic-autosend" title="Auto-send: OFF"><i class="fas fa-bolt"></i></button>
+                <button id="alfred-mic" title="Voice input"><i class="fas fa-microphone"></i></button>
+                <button id="alfred-send" title="Send"><i class="fas fa-paper-plane"></i></button>
             </div>
-            <button id="alfred-mic-autosend" title="Auto-send: OFF"><i class="fas fa-bolt"></i></button>
-            <button id="alfred-mic" title="Voice input"><i class="fas fa-microphone"></i></button>
-            <button id="alfred-send" title="Send"><i class="fas fa-paper-plane"></i></button>
         </div>
 
     </div>
