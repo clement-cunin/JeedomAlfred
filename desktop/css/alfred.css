@@ -487,6 +487,15 @@
     border-radius: 0;
     font-size: inherit;
     font-family: inherit;
+    flex-shrink: 0;
+}
+
+.alfred-tool-call-params {
+    color: #aaa;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .alfred-tool-details {
