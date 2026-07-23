@@ -878,7 +878,7 @@ $(function () {
                 parts.push(str);
             }
         });
-        return parts.join(', ');
+        return parts.length ? '(' + parts.join(', ') + ')' : '';
     }
 
     function appendToolCall(name, status, input, result) {
