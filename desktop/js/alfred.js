@@ -875,7 +875,7 @@ $(function () {
             if (val === null || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
                 var str = String(val);
                 if (str.length > 40) str = str.slice(0, 40) + '…';
-                parts.push(key + '=' + str);
+                parts.push(str);
             }
         });
         return parts.join(', ');
