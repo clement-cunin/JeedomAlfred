@@ -584,6 +584,15 @@ if (isConnect()) {
             padding: 0;
             font-size: inherit;
             font-family: inherit;
+            flex-shrink: 0;
+        }
+
+        .alfred-tool-call-params {
+            color: #aaa;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .alfred-tool-details { font-size: 11px; }
@@ -2365,11 +2374,31 @@ $(function () {
         return !!(result && typeof result === 'object' && !Array.isArray(result) && result.error);
     }
 
+    // Inline preview of scalar params only (string/number/boolean/null) — arrays and
+    // nested objects are skipped so the collapsed header stays a single short line.
+    function formatScalarParams(input) {
+        if (!input || typeof input !== 'object') return '';
+        var parts = [];
+        Object.keys(input).forEach(function (key) {
+            var val = input[key];
+            if (val === null || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+                var str = String(val);
+                if (str.length > 40) str = str.slice(0, 40) + '…';
+                parts.push(str);
+            }
+        });
+        return parts.length ? '(' + parts.join(', ') + ')' : '';
+    }
+
     function appendToolCall(name, status, input, result) {
         var isError = status === 'error';
         var icon    = status === 'running' ? 'fa-spinner fa-spin' : (isError ? 'fa-times text-danger' : 'fa-check text-success');
         var $summary = $('<summary class="alfred-tool-call-header">')
             .append($('<i>').addClass('fas ' + icon)).append($('<code>').text(name));
+        var paramsPreview = formatScalarParams(input);
+        if (paramsPreview) {
+            $summary.append($('<span class="alfred-tool-call-params">').text(paramsPreview));
+        }
         var $details  = $('<details class="alfred-tool-details">').append($summary);
         var hasInput  = input && Object.keys(input).length > 0;
         var hasResult = result !== undefined && result !== null;
