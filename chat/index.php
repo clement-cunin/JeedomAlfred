@@ -1520,6 +1520,24 @@ $(function () {
     });
 
     // =========================================================================
+    // Android keyboard handling (visualViewport)
+    // =========================================================================
+    // On Android WebViews the on-screen keyboard shrinks the *visual* viewport
+    // but not the *layout* viewport that 100vh/100dvh are based on, so
+    // #alfred-app keeps its full height and the keyboard just covers its
+    // bottom (last message + input bar) instead of the layout resizing around
+    // it. Resize the app container to the actual visible height instead.
+    if (window.visualViewport) {
+        var alfredApp = document.getElementById('alfred-app');
+        var applyViewportHeight = function () {
+            alfredApp.style.height = window.visualViewport.height + 'px';
+            scrollToBottom();
+        };
+        window.visualViewport.addEventListener('resize', applyViewportHeight);
+        applyViewportHeight();
+    }
+
+    // =========================================================================
     // New conversation
     // =========================================================================
 
