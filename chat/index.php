@@ -70,7 +70,10 @@ if (isConnect()) {
             height: 100dvh;
             overflow: hidden;
             background: #fff;
-            position: relative;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
             padding-top: env(safe-area-inset-top, 0px);
         }
 
@@ -1518,6 +1521,62 @@ $(function () {
     $('#alfred-main').on('click', function () {
         if ($(window).width() < 768) $('#alfred-sidebar').removeClass('open');
     });
+
+    // =========================================================================
+    // Android keyboard handling (visualViewport)
+    // =========================================================================
+    // On Android WebViews the on-screen keyboard shrinks the *visual* viewport
+    // but not the *layout* viewport that 100vh/100dvh are based on, so
+    // #alfred-app keeps its full height and the keyboard just covers its
+    // bottom (last message + input bar) instead of the layout resizing around
+    // it. Resize the app container to the actual visible height instead.
+    //
+    // The keyboard animates open/closed over several frames, and Android
+    // fires visualViewport 'resize' repeatedly during that animation — not
+    // just once at the end. Reacting to every tick with an instant
+    // scrollTop=scrollHeight looks like the chat "scrolls way too much"
+    // (it snaps to bottom several times while the container is still
+    // shrinking). Coalesce ticks with requestAnimationFrame, only apply the
+    // final height, and only force a scroll if the user was already at (or
+    // near) the bottom before the keyboard opened — otherwise leave their
+    // scroll position alone.
+    if (window.visualViewport) {
+        var alfredApp   = document.getElementById('alfred-app');
+        var viewportRaf = null;
+
+        var wasNearBottom = function () {
+            var el = document.getElementById('alfred-messages');
+            if (!el) return true;
+            return (el.scrollHeight - el.scrollTop - el.clientHeight) < 80;
+        };
+
+        var applyViewportHeight = function () {
+            viewportRaf = null;
+            var nearBottom = wasNearBottom();
+            // Android scrolls the document to bring the focused input into view,
+            // which drags a plain `position:fixed; top:0` element along with it
+            // (fixed is anchored to the layout viewport, not the visual one).
+            // Re-pin #alfred-app to the visual viewport's current offset every
+            // time, not just its height.
+            alfredApp.style.top    = window.visualViewport.offsetTop + 'px';
+            alfredApp.style.height = window.visualViewport.height + 'px';
+            // #alfred-app repositions itself, so the document never needs to
+            // scroll — cancel the browser's own scroll-into-view to avoid the
+            // visible "page jumps up, then messages settle back" double motion.
+            if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
+            if (nearBottom) scrollToBottom();
+        };
+
+        var scheduleViewportUpdate = function () {
+            if (viewportRaf) cancelAnimationFrame(viewportRaf);
+            viewportRaf = requestAnimationFrame(applyViewportHeight);
+        };
+
+        window.visualViewport.addEventListener('resize', scheduleViewportUpdate);
+        window.visualViewport.addEventListener('scroll', scheduleViewportUpdate);
+        window.addEventListener('scroll', scheduleViewportUpdate);
+        applyViewportHeight();
+    }
 
     // =========================================================================
     // New conversation
