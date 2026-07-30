@@ -195,13 +195,28 @@ class alfredLLMChain extends alfredLLMAdapter
     public function testConnection(): array { return $this->entries[0]['adapter']->testConnection(); }
     public function listModels(): array     { return $this->entries[0]['adapter']->listModels(); }
 
+    /**
+     * Default to retriable (fallback to the next provider) — most failures (network
+     * errors, timeouts, invalid/expired credentials, missing model, rate limits, ...)
+     * are provider-specific and the next entry in the chain may well succeed.
+     * Only exclude cases where falling over would just repeat the same failure or
+     * mask something the user needs to act on:
+     *   - HTTP 400: malformed request/payload — a code bug, not a provider outage;
+     *     every provider will reject the same malformed request identically.
+     *   - Content/safety errors: the provider refused the content itself; switching
+     *     provider doesn't fix that, and the user needs to adjust the request.
+     */
     private static function isRetriable(Exception $e): bool
     {
         $msg = $e->getMessage();
-        if (strpos($msg, 'HTTP request failed') !== false) return true;
-        if (preg_match('/\b(429|502|503|504)\b/', $msg)) return true;
-        if (stripos($msg, 'expired') !== false && stripos($msg, 'token') !== false) return true;
-        return false;
+        if (preg_match('/\b400\b/', $msg)) return false;
+        if (self::isContentError($msg)) return false;
+        return true;
+    }
+
+    private static function isContentError(string $msg): bool
+    {
+        return (bool) preg_match('/safety|content[\s_-]?polic|moderation|blocked|prohibited[\s_-]?content|harmful|content[\s_-]?filter/i', $msg);
     }
 }
 

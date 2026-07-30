@@ -86,7 +86,7 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
         curl_close($ch);
 
         if ($err) {
-            throw new Exception("Cannot connect to Ollama: {$err}");
+            throw new Exception("HTTP request failed [{$this->chatUrl()}]: {$err}");
         }
         if ($code >= 400) {
             if ($buffer !== '') $error_body .= trim($buffer);
