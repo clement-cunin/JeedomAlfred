@@ -2316,14 +2316,27 @@ $(function () {
 
         source.addEventListener('error', function (e) {
             hideTyping();
-            var technical = null;
-            try { technical = JSON.parse(e.data).message; } catch (_) {}
+            var technical = null, isNetwork = false;
+            try {
+                var parsed = JSON.parse(e.data);
+                technical = parsed.message;
+                isNetwork = !!parsed.network;
+            } catch (_) {}
             source.close(); currentSource = null; isStreaming = false;
             if (technical && technical.indexOf('401') !== -1 && handleAuthExpired()) {
                 return;
             }
-            var display = alfred_config.isAdmin && technical ? technical : 'An error occurred.';
-            appendErrorBubble(display, sessionId);
+            var display = isNetwork
+                ? 'Network error, the server is unreachable.'
+                : (alfred_config.isAdmin && technical ? technical : 'An error occurred.');
+            var $msg = appendErrorBubble(display, sessionId);
+            if (alfred_config.isAdmin && technical && technical !== display) {
+                $msg.find('.alfred-msg-bubble').append(
+                    $('<details style="margin-top:6px;font-size:11px;opacity:0.7">')
+                        .append($('<summary>').text('Details'))
+                        .append($('<pre style="white-space:pre-wrap;margin:4px 0 0">').text(technical))
+                );
+            }
             setInputEnabled(true);
         });
 

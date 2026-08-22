@@ -105,7 +105,7 @@ try {
     if ($sessionId !== '') {
         alfredConversation::addMessage($sessionId, 'assistant', $e->getMessage(), ['error' => true]);
     }
-    sse_event('error', ['message' => $e->getMessage()]);
+    sse_event('error', ['message' => $e->getMessage(), 'network' => alfredLLMAdapter::isNetworkError($e)]);
 }
 
 // ---- Helpers ----

@@ -75,7 +75,7 @@ class alfredMCP
         } catch (Exception $e) {
             // Transport/protocol failures (network, HTTP status, malformed JSON-RPC)
             // don't otherwise mention which tool was being called — name it here.
-            throw new Exception("MCP tool '{$name}' call failed: {$e->getMessage()}");
+            throw new Exception("MCP tool '{$name}' call failed: {$e->getMessage()}", $e->getCode(), $e);
         }
 
         // MCP tool result: {content: [{type:'text', text:'...'}], isError: bool}
@@ -177,13 +177,14 @@ class alfredMCP
                 return strlen($header);
             },
         ]);
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
+        $raw   = curl_exec($ch);
+        $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err   = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
 
         if ($raw === false) {
-            throw new Exception("MCP HTTP request failed [{$this->url}]: {$err}");
+            throw new Exception("MCP HTTP request failed [{$this->url}]: {$err}", $errno);
         }
         if ($code >= 400) {
             $preview = substr(trim($raw), 0, 200);
