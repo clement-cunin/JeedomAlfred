@@ -52,6 +52,7 @@
     "plugins\/alfred\/desktop\/php\/alfred.php": {
         "401 - Unauthorized access": "401 - Accès non autorisé",
         "An error occurred.": "Une erreur est survenue.",
+        "Network error, the server is unreachable.": "Erreur réseau, le serveur n'est pas accessible.",
         "Maximum iterations reached": "Limite d'itérations atteinte",
         "Ask me anything about your home automation system.": "Posez-moi n'importe quelle question sur votre domotique.",
         "Auto-send: OFF": "Envoi auto : désactivé",

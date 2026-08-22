@@ -116,12 +116,13 @@ class alfredLLMMistralAdapter extends alfredLLMAdapter
         ]);
 
         curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
+        $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err   = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
 
         if ($err) {
-            throw new Exception("HTTP request failed: {$err}");
+            throw new Exception("HTTP request failed: {$err}", $errno);
         }
         if ($code >= 400) {
             // Flush any partial buffer (error body without trailing newline)

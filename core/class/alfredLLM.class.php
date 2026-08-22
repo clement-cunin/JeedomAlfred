@@ -87,13 +87,14 @@ abstract class alfredLLMAdapter
             CURLOPT_TIMEOUT        => $timeout,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
+        $raw   = curl_exec($ch);
+        $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err   = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
 
         if ($raw === false) {
-            throw new Exception("HTTP request failed [{$url}]: {$err}");
+            throw new Exception("HTTP request failed [{$url}]: {$err}", $errno);
         }
         $data = json_decode($raw, true);
         if (!is_array($data)) {
@@ -104,6 +105,38 @@ abstract class alfredLLMAdapter
             throw new Exception("API error (HTTP {$code}) [{$url}]: {$msg}");
         }
         return $data;
+    }
+
+    /**
+     * curl errno values that indicate the transport itself failed (host unreachable,
+     * connection refused, DNS resolution failure, timeout) as opposed to an HTTP-level
+     * API error. Adapters pass curl_errno() as the Exception code when a raw HTTP
+     * request fails, so these can be recognized regardless of the provider or of any
+     * wrapping done by alfredLLMChain / alfredMCP as the exception bubbles up.
+     */
+    private const NETWORK_CURL_ERRNOS = [
+        CURLE_COULDNT_RESOLVE_PROXY, // 5
+        CURLE_COULDNT_RESOLVE_HOST,  // 6
+        CURLE_COULDNT_CONNECT,       // 7
+        CURLE_OPERATION_TIMEDOUT,    // 28
+        CURLE_SSL_CONNECT_ERROR,     // 35
+        CURLE_GOT_NOTHING,           // 52
+        CURLE_SEND_ERROR,            // 55
+        CURLE_RECV_ERROR,            // 56
+    ];
+
+    /**
+     * True if $e (or any exception it wraps, via getPrevious()) is a network/transport
+     * failure rather than an API- or content-level error.
+     */
+    public static function isNetworkError(Throwable $e): bool
+    {
+        for ($cur = $e; $cur !== null; $cur = $cur->getPrevious()) {
+            if (in_array($cur->getCode(), self::NETWORK_CURL_ERRNOS, true)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -160,7 +193,7 @@ class alfredLLMChain extends alfredLLMAdapter
                 log::add('alfred', 'warning', 'LLM chain: ' . $entry['adapter']->getProvider() . ' failed (retriable, auto-disabled 15min): ' . $e->getMessage());
             }
         }
-        throw new Exception('All LLM providers failed. Last error: ' . $lastException->getMessage());
+        throw new Exception('All LLM providers failed. Last error: ' . $lastException->getMessage(), $lastException->getCode(), $lastException);
     }
 
     public function chatStream(array $messages, array $tools, string $systemPrompt, callable $onDelta): array
@@ -189,7 +222,7 @@ class alfredLLMChain extends alfredLLMAdapter
                 log::add('alfred', 'warning', 'LLM chain: ' . $entry['adapter']->getProvider() . ' stream failed (retriable, auto-disabled 15min): ' . $e->getMessage());
             }
         }
-        throw new Exception('All LLM providers failed. Last error: ' . $lastException->getMessage());
+        throw new Exception('All LLM providers failed. Last error: ' . $lastException->getMessage(), $lastException->getCode(), $lastException);
     }
 
     public function testConnection(): array { return $this->entries[0]['adapter']->testConnection(); }

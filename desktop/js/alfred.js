@@ -751,17 +751,21 @@ $(function () {
 
         source.addEventListener('error', function (e) {
             hideTyping();
-            var technical = null;
-            try { technical = JSON.parse(e.data).message; } catch (_) {}
+            var technical = null, isNetwork = false;
+            try {
+                var parsed = JSON.parse(e.data);
+                technical = parsed.message;
+                isNetwork = !!parsed.network;
+            } catch (_) {}
             source.close();
             currentSource = null;
             isStreaming   = false;
             if (technical && technical.indexOf('401') !== -1 && handleAuthExpired()) {
                 return;
             }
-            var display = alfred_config.isAdmin && technical
-                ? technical
-                : "{{An error occurred.}}";
+            var display = isNetwork
+                ? "{{Network error, the server is unreachable.}}"
+                : (alfred_config.isAdmin && technical ? technical : "{{An error occurred.}}");
             var $bubble = appendBubble('assistant', '⚠️ ' + display);
             if (alfred_config.isAdmin && technical && technical !== display) {
                 $bubble.find('.alfred-msg-bubble').append(

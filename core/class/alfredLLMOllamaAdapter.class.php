@@ -81,12 +81,13 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
         ]);
 
         curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
+        $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err   = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
 
         if ($err) {
-            throw new Exception("HTTP request failed [{$this->chatUrl()}]: {$err}");
+            throw new Exception("HTTP request failed [{$this->chatUrl()}]: {$err}", $errno);
         }
         if ($code >= 400) {
             if ($buffer !== '') $error_body .= trim($buffer);
@@ -143,13 +144,14 @@ class alfredLLMOllamaAdapter extends alfredLLMAdapter
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_SSL_VERIFYPEER => false,
         ]);
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
+        $raw   = curl_exec($ch);
+        $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err   = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
 
         if ($err) {
-            throw new Exception("Cannot connect to Ollama at {$this->apiKey}: {$err}");
+            throw new Exception("Cannot connect to Ollama at {$this->apiKey}: {$err}", $errno);
         }
         if ($code >= 400) {
             throw new Exception("Ollama tags API error (HTTP {$code})");
