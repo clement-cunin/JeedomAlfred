@@ -6,6 +6,24 @@
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 include_file('core', 'authentification', 'php');
 
+// Jeedom core sends a Content-Security-Policy on every page that loads core.inc.php
+// (script-src-elem without cdn.jsdelivr.net, worker-src limited to blob:). On this
+// standalone page that blocks jQuery, FontAwesome and the service worker, leaving the
+// PWA broken ($ is not defined, no offline/push). Replace it with a policy scoped to
+// what the page actually loads. header() replaces the header already queued by core.
+header("Content-Security-Policy: " . implode('; ', array(
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "font-src 'self' data: https://cdn.jsdelivr.net",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' data: blob:",
+    "connect-src 'self'",
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "frame-ancestors 'self'",
+)));
+
 // Accessed as a standalone entry point (bookmark / installed PWA), not through
 // Jeedom's router, so the "remember me" cookie needs authentification.class.php
 // (loaded above) to hydrate $_SESSION['user'] before isConnect() is checked.
