@@ -1,4 +1,13 @@
-# Allow PWA static files without Jeedom session authentication
-<FilesMatch "^(manifest\.json|sw\.js|favicon\.ico)$">
-    Require all granted
-</FilesMatch>
+# Jeedom core sends a server-wide Content-Security-Policy from Apache
+# (install/apache_security) whose "worker-src blob:" forbids registering ./sw.js,
+# so the PWA gets neither offline cache nor push notifications. PHP cannot override
+# it: mod_headers runs after the PHP handler and replaces any header() from index.php.
+# Per-directory Header directives run after the server-level ones, so this adds
+# 'self' to worker-src for this directory only and leaves the rest of the core policy
+# untouched. Both tables are edited because the core header may be set with or
+# without "always" depending on the Jeedom version; an edit on a missing header is a
+# no-op.
+<IfModule mod_headers.c>
+    Header edit Content-Security-Policy "worker-src " "worker-src 'self' "
+    Header always edit Content-Security-Policy "worker-src " "worker-src 'self' "
+</IfModule>
