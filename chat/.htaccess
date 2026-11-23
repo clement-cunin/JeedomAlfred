@@ -1,3 +1,8 @@
+# Allow PWA static files without Jeedom session authentication
+<FilesMatch "^(manifest\.json|sw\.js|favicon\.ico)$">
+    Require all granted
+</FilesMatch>
+
 # Jeedom core sends a server-wide Content-Security-Policy from Apache
 # (install/apache_security) whose "worker-src blob:" forbids registering ./sw.js,
 # so the PWA gets neither offline cache nor push notifications. PHP cannot override
