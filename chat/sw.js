@@ -1,9 +1,10 @@
 'use strict';
 
 // Increment CACHE_VERSION on each deployment to invalidate stale caches.
-var CACHE_VERSION = 'v2';
+// v3: jQuery and FontAwesome now come from Jeedom core's /3rdparty/ (cached by the
+// generic cache-first rule below) instead of cdn.jsdelivr.net.
+var CACHE_VERSION = 'v3';
 var SHELL_CACHE   = 'alfred-shell-' + CACHE_VERSION;
-var CDN_CACHE     = 'alfred-cdn-'   + CACHE_VERSION;
 
 // Static assets pre-cached on install (local, never change between sessions).
 var PRECACHE_ASSETS = [
@@ -52,9 +53,7 @@ self.addEventListener('activate', function (e) {
                     keys
                         .filter(function (key) {
                             // Remove any alfred-* cache that is not the current version.
-                            return key.startsWith('alfred-') &&
-                                   key !== SHELL_CACHE &&
-                                   key !== CDN_CACHE;
+                            return key.startsWith('alfred-') && key !== SHELL_CACHE;
                         })
                         .map(function (key) { return caches.delete(key); })
                 );
@@ -73,24 +72,7 @@ self.addEventListener('fetch', function (e) {
         return;
     }
 
-    // 2. Cache-first — CDN resources (jQuery, FontAwesome).
-    //    Cached on first use; served from cache on subsequent loads.
-    if (url.indexOf('cdn.jsdelivr.net') !== -1) {
-        e.respondWith(
-            caches.open(CDN_CACHE).then(function (cache) {
-                return cache.match(e.request).then(function (cached) {
-                    if (cached) return cached;
-                    return fetch(e.request).then(function (response) {
-                        if (response.ok) cache.put(e.request, response.clone());
-                        return response;
-                    });
-                });
-            })
-        );
-        return;
-    }
-
-    // 3. Network-first — PHP pages (index.php, manifest.php).
+    // 2. Network-first — PHP pages (index.php, manifest.php).
     //    Always attempt a fresh load; fall back to cache when offline.
     if (url.indexOf('.php') !== -1) {
         e.respondWith(
@@ -113,7 +95,8 @@ self.addEventListener('fetch', function (e) {
         return;
     }
 
-    // 4. Cache-first — everything else (icons, favicon, manifest.json, etc.).
+    // 3. Cache-first — everything else (icons, favicon, manifest.json, core /3rdparty/
+    //    jQuery + FontAwesome, etc.).
     //    Pre-cached assets are served immediately; others are cached on first fetch.
     e.respondWith(
         caches.match(e.request).then(function (cached) {

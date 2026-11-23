@@ -6,23 +6,11 @@
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 include_file('core', 'authentification', 'php');
 
-// Jeedom core sends a Content-Security-Policy on every page that loads core.inc.php
-// (script-src-elem without cdn.jsdelivr.net, worker-src limited to blob:). On this
-// standalone page that blocks jQuery, FontAwesome and the service worker, leaving the
-// PWA broken ($ is not defined, no offline/push). Replace it with a policy scoped to
-// what the page actually loads. header() replaces the header already queued by core.
-header("Content-Security-Policy: " . implode('; ', array(
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-    "font-src 'self' data: https://cdn.jsdelivr.net",
-    "img-src 'self' data: blob: https:",
-    "media-src 'self' data: blob:",
-    "connect-src 'self'",
-    "worker-src 'self'",
-    "manifest-src 'self'",
-    "frame-ancestors 'self'",
-)));
+// Content-Security-Policy: Jeedom core sets it server-wide in Apache
+// (install/apache_security, mod_headers "Header set"), which runs after PHP and
+// replaces anything sent with header() here. Hence jQuery and FontAwesome are loaded
+// from core's own 3rdparty copies ('self'), never from a CDN, and the worker-src
+// exception the service worker needs lives in chat/.htaccess.
 
 // Accessed as a standalone entry point (bookmark / installed PWA), not through
 // Jeedom's router, so the "remember me" cookie needs authentification.class.php
@@ -69,7 +57,7 @@ if (isConnect()) {
     <link rel="manifest" href="manifest.php">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="../plugin_info/alfred_icon.png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="../../../3rdparty/font-awesome5/css/all.min.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; }
 
@@ -1512,7 +1500,7 @@ if (alfred_config.userHash) {
         + '; expires=' + _cookieExp + '; path=/plugins/alfred/; Secure; SameSite=None';
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="../../../3rdparty/jquery/jquery.min.js"></script>
 <script>
 'use strict';
 
@@ -2997,7 +2985,11 @@ window.addEventListener('appinstalled', function () {
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-        navigator.serviceWorker.register('./sw.js');
+        // Rejected when the server CSP still forbids the worker (chat/.htaccess not
+        // honoured): the chat keeps working, only offline cache and push are lost.
+        navigator.serviceWorker.register('./sw.js').catch(function (err) {
+            console.warn('Alfred: service worker registration failed', err);
+        });
     });
 }
 </script>
